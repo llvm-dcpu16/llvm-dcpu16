@@ -1,4 +1,4 @@
-//===-- MSP430InstrInfo.h - MSP430 Instruction Information ------*- C++ -*-===//
+//===-- DCPU16InstrInfo.h - DCPU16 Instruction Information ------*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,27 +7,27 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file contains the MSP430 implementation of the TargetInstrInfo class.
+// This file contains the DCPU16 implementation of the TargetInstrInfo class.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_TARGET_MSP430INSTRINFO_H
-#define LLVM_TARGET_MSP430INSTRINFO_H
+#ifndef LLVM_TARGET_DCPU16INSTRINFO_H
+#define LLVM_TARGET_DCPU16INSTRINFO_H
 
-#include "MSP430RegisterInfo.h"
+#include "DCPU16RegisterInfo.h"
 #include "llvm/Target/TargetInstrInfo.h"
 
 #define GET_INSTRINFO_HEADER
-#include "MSP430GenInstrInfo.inc"
+#include "DCPU16GenInstrInfo.inc"
 
 namespace llvm {
 
-class MSP430TargetMachine;
+class DCPU16TargetMachine;
 
-/// MSP430II - This namespace holds all of the target specific flags that
+/// DCPU16II - This namespace holds all of the target specific flags that
 /// instruction info tracks.
 ///
-namespace MSP430II {
+namespace DCPU16II {
   enum {
     SizeShift   = 2,
     SizeMask    = 7 << SizeShift,
@@ -40,11 +40,11 @@ namespace MSP430II {
   };
 }
 
-class MSP430InstrInfo : public MSP430GenInstrInfo {
-  const MSP430RegisterInfo RI;
-  MSP430TargetMachine &TM;
+class DCPU16InstrInfo : public DCPU16GenInstrInfo {
+  const DCPU16RegisterInfo RI;
+  DCPU16TargetMachine &TM;
 public:
-  explicit MSP430InstrInfo(MSP430TargetMachine &TM);
+  explicit DCPU16InstrInfo(DCPU16TargetMachine &TM);
 
   /// getRegisterInfo - TargetInstrInfo is a superset of MRegister info.  As
   /// such, whenever a client has an instance of instruction info, it should

@@ -1,6 +1,6 @@
-add_llvm_library(LLVMMSP430Desc
-  MSP430MCTargetDesc.cpp
-  MSP430MCAsmInfo.cpp
+add_llvm_library(LLVMDCPU16Desc
+  DCPU16MCTargetDesc.cpp
+  DCPU16MCAsmInfo.cpp
   )
 
-add_dependencies(LLVMMSP430Desc MSP430CommonTableGen)
+add_dependencies(LLVMDCPU16Desc DCPU16CommonTableGen)

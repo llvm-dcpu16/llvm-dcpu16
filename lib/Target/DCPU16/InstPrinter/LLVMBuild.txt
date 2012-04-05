@@ -1,4 +1,4 @@
-;===- ./lib/Target/MSP430/InstPrinter/LLVMBuild.txt ------------*- Conf -*--===;
+;===- ./lib/Target/DCPU16/InstPrinter/LLVMBuild.txt ------------*- Conf -*--===;
 ;
 ;                     The LLVM Compiler Infrastructure
 ;
@@ -17,7 +17,7 @@
 
 [component_0]
 type = Library
-name = MSP430AsmPrinter
-parent = MSP430
+name = DCPU16AsmPrinter
+parent = DCPU16
 required_libraries = MC Support
-add_to_library_groups = MSP430
+add_to_library_groups = DCPU16

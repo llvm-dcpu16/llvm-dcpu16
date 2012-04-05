@@ -1,4 +1,4 @@
-//===-- MSP430MCTargetDesc.cpp - MSP430 Target Descriptions ---------------===//
+//===-- DCPU16MCTargetDesc.cpp - DCPU16 Target Descriptions ---------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,13 +7,13 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file provides MSP430 specific target descriptions.
+// This file provides DCPU16 specific target descriptions.
 //
 //===----------------------------------------------------------------------===//
 
-#include "MSP430MCTargetDesc.h"
-#include "MSP430MCAsmInfo.h"
-#include "InstPrinter/MSP430InstPrinter.h"
+#include "DCPU16MCTargetDesc.h"
+#include "DCPU16MCAsmInfo.h"
+#include "InstPrinter/DCPU16InstPrinter.h"
 #include "llvm/MC/MCCodeGenInfo.h"
 #include "llvm/MC/MCInstrInfo.h"
 #include "llvm/MC/MCRegisterInfo.h"
@@ -21,36 +21,36 @@
 #include "llvm/Support/TargetRegistry.h"
 
 #define GET_INSTRINFO_MC_DESC
-#include "MSP430GenInstrInfo.inc"
+#include "DCPU16GenInstrInfo.inc"
 
 #define GET_SUBTARGETINFO_MC_DESC
-#include "MSP430GenSubtargetInfo.inc"
+#include "DCPU16GenSubtargetInfo.inc"
 
 #define GET_REGINFO_MC_DESC
-#include "MSP430GenRegisterInfo.inc"
+#include "DCPU16GenRegisterInfo.inc"
 
 using namespace llvm;
 
-static MCInstrInfo *createMSP430MCInstrInfo() {
+static MCInstrInfo *createDCPU16MCInstrInfo() {
   MCInstrInfo *X = new MCInstrInfo();
-  InitMSP430MCInstrInfo(X);
+  InitDCPU16MCInstrInfo(X);
   return X;
 }
 
-static MCRegisterInfo *createMSP430MCRegisterInfo(StringRef TT) {
+static MCRegisterInfo *createDCPU16MCRegisterInfo(StringRef TT) {
   MCRegisterInfo *X = new MCRegisterInfo();
-  InitMSP430MCRegisterInfo(X, MSP430::PCW);
+  InitDCPU16MCRegisterInfo(X, DCPU16::PCW);
   return X;
 }
 
-static MCSubtargetInfo *createMSP430MCSubtargetInfo(StringRef TT, StringRef CPU,
+static MCSubtargetInfo *createDCPU16MCSubtargetInfo(StringRef TT, StringRef CPU,
                                                     StringRef FS) {
   MCSubtargetInfo *X = new MCSubtargetInfo();
-  InitMSP430MCSubtargetInfo(X, TT, CPU, FS);
+  InitDCPU16MCSubtargetInfo(X, TT, CPU, FS);
   return X;
 }
 
-static MCCodeGenInfo *createMSP430MCCodeGenInfo(StringRef TT, Reloc::Model RM,
+static MCCodeGenInfo *createDCPU16MCCodeGenInfo(StringRef TT, Reloc::Model RM,
                                                 CodeModel::Model CM,
                                                 CodeGenOpt::Level OL) {
   MCCodeGenInfo *X = new MCCodeGenInfo();
@@ -58,37 +58,37 @@ static MCCodeGenInfo *createMSP430MCCodeGenInfo(StringRef TT, Reloc::Model RM,
   return X;
 }
 
-static MCInstPrinter *createMSP430MCInstPrinter(const Target &T,
+static MCInstPrinter *createDCPU16MCInstPrinter(const Target &T,
                                                 unsigned SyntaxVariant,
                                                 const MCAsmInfo &MAI,
                                                 const MCInstrInfo &MII,
                                                 const MCRegisterInfo &MRI,
                                                 const MCSubtargetInfo &STI) {
   if (SyntaxVariant == 0)
-    return new MSP430InstPrinter(MAI, MII, MRI);
+    return new DCPU16InstPrinter(MAI, MII, MRI);
   return 0;
 }
 
-extern "C" void LLVMInitializeMSP430TargetMC() {
+extern "C" void LLVMInitializeDCPU16TargetMC() {
   // Register the MC asm info.
-  RegisterMCAsmInfo<MSP430MCAsmInfo> X(TheMSP430Target);
+  RegisterMCAsmInfo<DCPU16MCAsmInfo> X(TheDCPU16Target);
 
   // Register the MC codegen info.
-  TargetRegistry::RegisterMCCodeGenInfo(TheMSP430Target,
-                                        createMSP430MCCodeGenInfo);
+  TargetRegistry::RegisterMCCodeGenInfo(TheDCPU16Target,
+                                        createDCPU16MCCodeGenInfo);
 
   // Register the MC instruction info.
-  TargetRegistry::RegisterMCInstrInfo(TheMSP430Target, createMSP430MCInstrInfo);
+  TargetRegistry::RegisterMCInstrInfo(TheDCPU16Target, createDCPU16MCInstrInfo);
 
   // Register the MC register info.
-  TargetRegistry::RegisterMCRegInfo(TheMSP430Target,
-                                    createMSP430MCRegisterInfo);
+  TargetRegistry::RegisterMCRegInfo(TheDCPU16Target,
+                                    createDCPU16MCRegisterInfo);
 
   // Register the MC subtarget info.
-  TargetRegistry::RegisterMCSubtargetInfo(TheMSP430Target,
-                                          createMSP430MCSubtargetInfo);
+  TargetRegistry::RegisterMCSubtargetInfo(TheDCPU16Target,
+                                          createDCPU16MCSubtargetInfo);
 
   // Register the MCInstPrinter.
-  TargetRegistry::RegisterMCInstPrinter(TheMSP430Target,
-                                        createMSP430MCInstPrinter);
+  TargetRegistry::RegisterMCInstPrinter(TheDCPU16Target,
+                                        createDCPU16MCInstPrinter);
 }

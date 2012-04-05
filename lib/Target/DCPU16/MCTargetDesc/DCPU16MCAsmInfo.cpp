@@ -1,4 +1,4 @@
-//===-- MSP430MCAsmInfo.cpp - MSP430 asm properties -----------------------===//
+//===-- DCPU16MCAsmInfo.cpp - DCPU16 asm properties -----------------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,17 +7,17 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file contains the declarations of the MSP430MCAsmInfo properties.
+// This file contains the declarations of the DCPU16MCAsmInfo properties.
 //
 //===----------------------------------------------------------------------===//
 
-#include "MSP430MCAsmInfo.h"
+#include "DCPU16MCAsmInfo.h"
 #include "llvm/ADT/StringRef.h"
 using namespace llvm;
 
-void MSP430MCAsmInfo::anchor() { }
+void DCPU16MCAsmInfo::anchor() { }
 
-MSP430MCAsmInfo::MSP430MCAsmInfo(const Target &T, StringRef TT) {
+DCPU16MCAsmInfo::DCPU16MCAsmInfo(const Target &T, StringRef TT) {
   PointerSize = 2;
 
   PrivateGlobalPrefix = ".L";

@@ -1,4 +1,4 @@
-//===-- MSP430MachineFuctionInfo.cpp - MSP430 machine function info -------===//
+//===-- DCPU16MachineFuctionInfo.cpp - DCPU16 machine function info -------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,8 +7,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "MSP430MachineFunctionInfo.h"
+#include "DCPU16MachineFunctionInfo.h"
 
 using namespace llvm;
 
-void MSP430MachineFunctionInfo::anchor() { }
+void DCPU16MachineFunctionInfo::anchor() { }

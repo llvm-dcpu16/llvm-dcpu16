@@ -1,4 +1,4 @@
-//===-- MSP430RegisterInfo.h - MSP430 Register Information Impl -*- C++ -*-===//
+//===-- DCPU16RegisterInfo.h - DCPU16 Register Information Impl -*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,33 +7,33 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file contains the MSP430 implementation of the MRegisterInfo class.
+// This file contains the DCPU16 implementation of the MRegisterInfo class.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_TARGET_MSP430REGISTERINFO_H
-#define LLVM_TARGET_MSP430REGISTERINFO_H
+#ifndef LLVM_TARGET_DCPU16REGISTERINFO_H
+#define LLVM_TARGET_DCPU16REGISTERINFO_H
 
 #include "llvm/Target/TargetRegisterInfo.h"
 
 #define GET_REGINFO_HEADER
-#include "MSP430GenRegisterInfo.inc"
+#include "DCPU16GenRegisterInfo.inc"
 
 namespace llvm {
 
 class TargetInstrInfo;
-class MSP430TargetMachine;
+class DCPU16TargetMachine;
 
-struct MSP430RegisterInfo : public MSP430GenRegisterInfo {
+struct DCPU16RegisterInfo : public DCPU16GenRegisterInfo {
 private:
-  MSP430TargetMachine &TM;
+  DCPU16TargetMachine &TM;
   const TargetInstrInfo &TII;
 
   /// StackAlign - Default stack alignment.
   ///
   unsigned StackAlign;
 public:
-  MSP430RegisterInfo(MSP430TargetMachine &tm, const TargetInstrInfo &tii);
+  DCPU16RegisterInfo(DCPU16TargetMachine &tm, const TargetInstrInfo &tii);
 
   /// Code Generation virtual methods...
   const uint16_t *getCalleeSavedRegs(const MachineFunction *MF = 0) const;
@@ -56,4 +56,4 @@ public:
 
 } // end namespace llvm
 
-#endif // LLVM_TARGET_MSP430REGISTERINFO_H
+#endif // LLVM_TARGET_DCPU16REGISTERINFO_H

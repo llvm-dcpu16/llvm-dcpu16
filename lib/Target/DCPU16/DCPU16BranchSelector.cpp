@@ -1,4 +1,4 @@
-//===-- MSP430BranchSelector.cpp - Emit long conditional branches ---------===//
+//===-- DCPU16BranchSelector.cpp - Emit long conditional branches ---------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -16,8 +16,8 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "msp430-branch-select"
-#include "MSP430.h"
-#include "MSP430InstrInfo.h"
+#include "DCPU16.h"
+#include "DCPU16InstrInfo.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/Target/TargetMachine.h"
@@ -28,9 +28,9 @@ using namespace llvm;
 STATISTIC(NumExpanded, "Number of branches expanded to long format");
 
 namespace {
-  struct MSP430BSel : public MachineFunctionPass {
+  struct DCPU16BSel : public MachineFunctionPass {
     static char ID;
-    MSP430BSel() : MachineFunctionPass(ID) {}
+    DCPU16BSel() : MachineFunctionPass(ID) {}
 
     /// BlockSizes - The sizes of the basic blocks in the function.
     std::vector<unsigned> BlockSizes;
@@ -38,22 +38,22 @@ namespace {
     virtual bool runOnMachineFunction(MachineFunction &Fn);
 
     virtual const char *getPassName() const {
-      return "MSP430 Branch Selector";
+      return "DCPU16 Branch Selector";
     }
   };
-  char MSP430BSel::ID = 0;
+  char DCPU16BSel::ID = 0;
 }
 
-/// createMSP430BranchSelectionPass - returns an instance of the Branch
+/// createDCPU16BranchSelectionPass - returns an instance of the Branch
 /// Selection Pass
 ///
-FunctionPass *llvm::createMSP430BranchSelectionPass() {
-  return new MSP430BSel();
+FunctionPass *llvm::createDCPU16BranchSelectionPass() {
+  return new DCPU16BSel();
 }
 
-bool MSP430BSel::runOnMachineFunction(MachineFunction &Fn) {
-  const MSP430InstrInfo *TII =
-             static_cast<const MSP430InstrInfo*>(Fn.getTarget().getInstrInfo());
+bool DCPU16BSel::runOnMachineFunction(MachineFunction &Fn) {
+  const DCPU16InstrInfo *TII =
+             static_cast<const DCPU16InstrInfo*>(Fn.getTarget().getInstrInfo());
   // Give the blocks of the function a dense, in-order, numbering.
   Fn.RenumberBlocks();
   BlockSizes.resize(Fn.getNumBlockIDs());
@@ -102,8 +102,8 @@ bool MSP430BSel::runOnMachineFunction(MachineFunction &Fn) {
       unsigned MBBStartOffset = 0;
       for (MachineBasicBlock::iterator I = MBB.begin(), E = MBB.end();
            I != E; ++I) {
-        if ((I->getOpcode() != MSP430::JCC || I->getOperand(0).isImm()) &&
-            I->getOpcode() != MSP430::JMP) {
+        if ((I->getOpcode() != DCPU16::JCC || I->getOperand(0).isImm()) &&
+            I->getOpcode() != DCPU16::JMP) {
           MBBStartOffset += TII->GetInstSizeInBytes(I);
           continue;
         }
@@ -141,24 +141,24 @@ bool MSP430BSel::runOnMachineFunction(MachineFunction &Fn) {
         MachineInstr *OldBranch = I;
         DebugLoc dl = OldBranch->getDebugLoc();
 
-        if (I->getOpcode() == MSP430::JMP) {
+        if (I->getOpcode() == DCPU16::JMP) {
           NewSize = 4;
         } else {
           // The BCC operands are:
-          // 0. MSP430 branch predicate
+          // 0. DCPU16 branch predicate
           // 1. Target MBB
           SmallVector<MachineOperand, 1> Cond;
           Cond.push_back(I->getOperand(1));
 
           // Jump over the uncond branch inst (i.e. $+6) on opposite condition.
           TII->ReverseBranchCondition(Cond);
-          BuildMI(MBB, I, dl, TII->get(MSP430::JCC))
+          BuildMI(MBB, I, dl, TII->get(DCPU16::JCC))
             .addImm(4).addOperand(Cond[0]);
 
           NewSize = 6;
         }
         // Uncond branch to the real destination.
-        I = BuildMI(MBB, I, dl, TII->get(MSP430::Bi)).addMBB(Dest);
+        I = BuildMI(MBB, I, dl, TII->get(DCPU16::Bi)).addMBB(Dest);
 
         // Remove the old branch from the function.
         OldBranch->eraseFromParent();

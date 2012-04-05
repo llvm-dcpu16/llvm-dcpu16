@@ -1,4 +1,4 @@
-//===-- MSP430.td - Describe the MSP430 Target Machine -----*- tablegen -*-===//
+//===-- DCPU16.td - Describe the DCPU16 Target Machine -----*- tablegen -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -6,7 +6,7 @@
 // License. See LICENSE.TXT for details.
 //
 //===----------------------------------------------------------------------===//
-// This is the top level entry point for the MSP430 target.
+// This is the top level entry point for the DCPU16 target.
 //===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
@@ -20,10 +20,10 @@ include "llvm/Target/Target.td"
 //===----------------------------------------------------------------------===//
 def FeatureX
  : SubtargetFeature<"ext", "ExtendedInsts", "true",
-                    "Enable MSP430-X extensions">;
+                    "Enable DCPU16-X extensions">;
 
 //===----------------------------------------------------------------------===//
-// MSP430 supported processors.
+// DCPU16 supported processors.
 //===----------------------------------------------------------------------===//
 class Proc<string Name, list<SubtargetFeature> Features>
  : Processor<Name, NoItineraries, Features>;
@@ -34,23 +34,23 @@ def : Proc<"generic",         []>;
 // Register File Description
 //===----------------------------------------------------------------------===//
 
-include "MSP430RegisterInfo.td"
+include "DCPU16RegisterInfo.td"
 
 //===----------------------------------------------------------------------===//
 // Calling Convention Description
 //===----------------------------------------------------------------------===//
 
-include "MSP430CallingConv.td"
+include "DCPU16CallingConv.td"
 
 //===----------------------------------------------------------------------===//
 // Instruction Descriptions
 //===----------------------------------------------------------------------===//
 
-include "MSP430InstrInfo.td"
+include "DCPU16InstrInfo.td"
 
-def MSP430InstrInfo : InstrInfo;
+def DCPU16InstrInfo : InstrInfo;
 
-def MSP430InstPrinter : AsmWriter {
+def DCPU16InstPrinter : AsmWriter {
   string AsmWriterClassName  = "InstPrinter";
   bit isMCAsmWriter = 1;
 }
@@ -59,8 +59,8 @@ def MSP430InstPrinter : AsmWriter {
 // Target Declaration
 //===----------------------------------------------------------------------===//
 
-def MSP430 : Target {
-  let InstructionSet = MSP430InstrInfo;
-  let AssemblyWriters = [MSP430InstPrinter];
+def DCPU16 : Target {
+  let InstructionSet = DCPU16InstrInfo;
+  let AssemblyWriters = [DCPU16InstPrinter];
 }
 

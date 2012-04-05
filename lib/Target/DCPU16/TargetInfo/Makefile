@@ -1,4 +1,4 @@
-##===- lib/Target/MSP430/TargetInfo/Makefile ---------------*- Makefile -*-===##
+##===- lib/Target/DCPU16/TargetInfo/Makefile ---------------*- Makefile -*-===##
 #
 #                     The LLVM Compiler Infrastructure
 #
@@ -7,7 +7,7 @@
 #
 ##===----------------------------------------------------------------------===##
 LEVEL = ../../../..
-LIBRARYNAME = LLVMMSP430Info
+LIBRARYNAME = LLVMDCPU16Info
 
 # Hack: we need to include 'main' target directory to grab private headers
 CPPFLAGS = -I$(PROJ_OBJ_DIR)/.. -I$(PROJ_SRC_DIR)/..

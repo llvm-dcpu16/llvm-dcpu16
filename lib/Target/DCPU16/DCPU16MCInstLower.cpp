@@ -1,4 +1,4 @@
-//===-- MSP430MCInstLower.cpp - Convert MSP430 MachineInstr to an MCInst --===//
+//===-- DCPU16MCInstLower.cpp - Convert DCPU16 MachineInstr to an MCInst --===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,12 +7,12 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file contains code to lower MSP430 MachineInstrs to their corresponding
+// This file contains code to lower DCPU16 MachineInstrs to their corresponding
 // MCInst records.
 //
 //===----------------------------------------------------------------------===//
 
-#include "MSP430MCInstLower.h"
+#include "DCPU16MCInstLower.h"
 #include "llvm/CodeGen/AsmPrinter.h"
 #include "llvm/CodeGen/MachineBasicBlock.h"
 #include "llvm/CodeGen/MachineInstr.h"
@@ -26,7 +26,7 @@
 #include "llvm/ADT/SmallString.h"
 using namespace llvm;
 
-MCSymbol *MSP430MCInstLower::
+MCSymbol *DCPU16MCInstLower::
 GetGlobalAddressSymbol(const MachineOperand &MO) const {
   switch (MO.getTargetFlags()) {
   default: llvm_unreachable("Unknown target flag on GV operand");
@@ -36,7 +36,7 @@ GetGlobalAddressSymbol(const MachineOperand &MO) const {
   return Printer.Mang->getSymbol(MO.getGlobal());
 }
 
-MCSymbol *MSP430MCInstLower::
+MCSymbol *DCPU16MCInstLower::
 GetExternalSymbolSymbol(const MachineOperand &MO) const {
   switch (MO.getTargetFlags()) {
   default: llvm_unreachable("Unknown target flag on GV operand");
@@ -46,7 +46,7 @@ GetExternalSymbolSymbol(const MachineOperand &MO) const {
   return Printer.GetExternalSymbolSymbol(MO.getSymbolName());
 }
 
-MCSymbol *MSP430MCInstLower::
+MCSymbol *DCPU16MCInstLower::
 GetJumpTableSymbol(const MachineOperand &MO) const {
   SmallString<256> Name;
   raw_svector_ostream(Name) << Printer.MAI->getPrivateGlobalPrefix() << "JTI"
@@ -62,7 +62,7 @@ GetJumpTableSymbol(const MachineOperand &MO) const {
   return Ctx.GetOrCreateSymbol(Name.str());
 }
 
-MCSymbol *MSP430MCInstLower::
+MCSymbol *DCPU16MCInstLower::
 GetConstantPoolIndexSymbol(const MachineOperand &MO) const {
   SmallString<256> Name;
   raw_svector_ostream(Name) << Printer.MAI->getPrivateGlobalPrefix() << "CPI"
@@ -78,7 +78,7 @@ GetConstantPoolIndexSymbol(const MachineOperand &MO) const {
   return Ctx.GetOrCreateSymbol(Name.str());
 }
 
-MCSymbol *MSP430MCInstLower::
+MCSymbol *DCPU16MCInstLower::
 GetBlockAddressSymbol(const MachineOperand &MO) const {
   switch (MO.getTargetFlags()) {
   default: llvm_unreachable("Unknown target flag on GV operand");
@@ -88,7 +88,7 @@ GetBlockAddressSymbol(const MachineOperand &MO) const {
   return Printer.GetBlockAddressSymbol(MO.getBlockAddress());
 }
 
-MCOperand MSP430MCInstLower::
+MCOperand DCPU16MCInstLower::
 LowerSymbolOperand(const MachineOperand &MO, MCSymbol *Sym) const {
   // FIXME: We would like an efficient form for this, so we don't have to do a
   // lot of extra uniquing.
@@ -106,7 +106,7 @@ LowerSymbolOperand(const MachineOperand &MO, MCSymbol *Sym) const {
   return MCOperand::CreateExpr(Expr);
 }
 
-void MSP430MCInstLower::Lower(const MachineInstr *MI, MCInst &OutMI) const {
+void DCPU16MCInstLower::Lower(const MachineInstr *MI, MCInst &OutMI) const {
   OutMI.setOpcode(MI->getOpcode());
 
   for (unsigned i = 0, e = MI->getNumOperands(); i != e; ++i) {

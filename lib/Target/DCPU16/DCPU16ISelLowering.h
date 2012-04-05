@@ -1,4 +1,4 @@
-//===-- MSP430ISelLowering.h - MSP430 DAG Lowering Interface ----*- C++ -*-===//
+//===-- DCPU16ISelLowering.h - DCPU16 DAG Lowering Interface ----*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,20 +7,20 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the interfaces that MSP430 uses to lower LLVM code into a
+// This file defines the interfaces that DCPU16 uses to lower LLVM code into a
 // selection DAG.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_TARGET_MSP430_ISELLOWERING_H
-#define LLVM_TARGET_MSP430_ISELLOWERING_H
+#ifndef LLVM_TARGET_DCPU16_ISELLOWERING_H
+#define LLVM_TARGET_DCPU16_ISELLOWERING_H
 
-#include "MSP430.h"
+#include "DCPU16.h"
 #include "llvm/CodeGen/SelectionDAG.h"
 #include "llvm/Target/TargetLowering.h"
 
 namespace llvm {
-  namespace MSP430ISD {
+  namespace DCPU16ISD {
     enum {
       FIRST_NUMBER = ISD::BUILTIN_OP_END,
 
@@ -51,7 +51,7 @@ namespace llvm {
       /// operand produced by a CMP instruction.
       SETCC,
 
-      /// MSP430 conditional branches. Operand 0 is the chain operand, operand 1
+      /// DCPU16 conditional branches. Operand 0 is the chain operand, operand 1
       /// is the block to branch if condition is true, operand 2 is the
       /// condition code, and operand 3 is the flag operand produced by a CMP
       /// instruction.
@@ -66,12 +66,12 @@ namespace llvm {
     };
   }
 
-  class MSP430Subtarget;
-  class MSP430TargetMachine;
+  class DCPU16Subtarget;
+  class DCPU16TargetMachine;
 
-  class MSP430TargetLowering : public TargetLowering {
+  class DCPU16TargetLowering : public TargetLowering {
   public:
-    explicit MSP430TargetLowering(MSP430TargetMachine &TM);
+    explicit DCPU16TargetLowering(DCPU16TargetMachine &TM);
 
     virtual MVT getShiftAmountTy(EVT LHSTy) const { return MVT::i8; }
 
@@ -173,10 +173,10 @@ namespace llvm {
                                             ISD::MemIndexedMode &AM,
                                             SelectionDAG &DAG) const;
 
-    const MSP430Subtarget &Subtarget;
-    const MSP430TargetMachine &TM;
+    const DCPU16Subtarget &Subtarget;
+    const DCPU16TargetMachine &TM;
     const TargetData *TD;
   };
 } // namespace llvm
 
-#endif // LLVM_TARGET_MSP430_ISELLOWERING_H
+#endif // LLVM_TARGET_DCPU16_ISELLOWERING_H

@@ -1,4 +1,4 @@
-##===- lib/Target/MSP430/TargetDesc/Makefile ---------------*- Makefile -*-===##
+##===- lib/Target/DCPU16/TargetDesc/Makefile ---------------*- Makefile -*-===##
 #
 #                     The LLVM Compiler Infrastructure
 #
@@ -8,7 +8,7 @@
 ##===----------------------------------------------------------------------===##
 
 LEVEL = ../../../..
-LIBRARYNAME = LLVMMSP430Desc
+LIBRARYNAME = LLVMDCPU16Desc
 
 # Hack: we need to include 'main' target directory to grab private headers
 CPP.Flags += -I$(PROJ_OBJ_DIR)/.. -I$(PROJ_SRC_DIR)/..
