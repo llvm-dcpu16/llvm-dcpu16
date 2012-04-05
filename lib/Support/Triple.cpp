@@ -42,6 +42,7 @@ const char *Triple::getArchTypeName(ArchType Kind) {
   case ptx64:   return "ptx64";
   case le32:    return "le32";
   case amdil:   return "amdil";
+  case dcpu16:  return "dcpu16";
   }
 
   llvm_unreachable("Invalid ArchType!");
@@ -164,6 +165,7 @@ Triple::ArchType Triple::getArchTypeForLLVMName(StringRef Name) {
     .Case("ptx64", ptx64)
     .Case("le32", le32)
     .Case("amdil", amdil)
+    .Case("dcpu16", dcpu16)
     .Default(UnknownArch);
 }
 
@@ -253,6 +255,7 @@ static Triple::ArchType parseArch(StringRef ArchName) {
     .Case("ptx64", Triple::ptx64)
     .Case("le32", Triple::le32)
     .Case("amdil", Triple::amdil)
+    .Case("dcpu16", Triple::dcpu16)
     .Default(Triple::UnknownArch);
 }
 
@@ -642,6 +645,7 @@ static unsigned getArchPointerBitWidth(llvm::Triple::ArchType Arch) {
     return 0;
 
   case llvm::Triple::msp430:
+  case llvm::Triple::dcpu16:
     return 16;
 
   case llvm::Triple::amdil:
@@ -690,6 +694,7 @@ Triple Triple::get32BitArchVariant() const {
   switch (getArch()) {
   case Triple::UnknownArch:
   case Triple::msp430:
+  case Triple::dcpu16:
     T.setArch(UnknownArch);
     break;
 
@@ -733,6 +738,7 @@ Triple Triple::get64BitArchVariant() const {
   case Triple::le32:
   case Triple::mblaze:
   case Triple::msp430:
+  case Triple::dcpu16:
   case Triple::r600:
   case Triple::tce:
   case Triple::thumb:
