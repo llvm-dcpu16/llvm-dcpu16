@@ -15,6 +15,6 @@ using namespace llvm;
 Target llvm::TheDCPU16Target;
 
 extern "C" void LLVMInitializeDCPU16TargetInfo() { 
-  RegisterTarget<Triple::msp430> 
-    X(TheDCPU16Target, "msp430", "DCPU16 [experimental]");
+  RegisterTarget<Triple::dcpu16> 
+    X(TheDCPU16Target, "dcpu16", "DCPU16 [experimental]");
 }

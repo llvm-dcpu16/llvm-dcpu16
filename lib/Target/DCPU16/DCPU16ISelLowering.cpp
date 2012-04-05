@@ -11,7 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "msp430-lower"
+#define DEBUG_TYPE "dcpu16-lower"
 
 #include "DCPU16ISelLowering.h"
 #include "DCPU16.h"
@@ -45,7 +45,7 @@ typedef enum {
 } HWMultUseMode;
 
 static cl::opt<HWMultUseMode>
-HWMultMode("msp430-hwmult-mode",
+HWMultMode("dcpu16-hwmult-mode",
            cl::desc("Hardware multiplier use mode"),
            cl::init(HWMultNoIntr),
            cl::values(

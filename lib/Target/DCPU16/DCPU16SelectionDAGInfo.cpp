@@ -11,7 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "msp430-selectiondag-info"
+#define DEBUG_TYPE "dcpu16-selectiondag-info"
 #include "DCPU16TargetMachine.h"
 using namespace llvm;
 
