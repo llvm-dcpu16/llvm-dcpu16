@@ -509,7 +509,7 @@ def AND8rr  : I8rr<0x0,
                     (implicit SRW)]>;
 def AND16rr : I16rr<0x0,
                     (outs GR16:$dst), (ins GR16:$src, GR16:$src2),
-                    "and.w\t{$src2, $dst}",
+                    "AND\t{$src2, $dst}",
                     [(set GR16:$dst, (and GR16:$src, GR16:$src2)),
                      (implicit SRW)]>;
 }
@@ -521,7 +521,7 @@ def AND8ri  : I8ri<0x0,
                     (implicit SRW)]>;
 def AND16ri : I16ri<0x0,
                     (outs GR16:$dst), (ins GR16:$src, i16imm:$src2),
-                    "and.w\t{$src2, $dst}",
+                    "AND\t{$src2, $dst}",
                     [(set GR16:$dst, (and GR16:$src, imm:$src2)),
                      (implicit SRW)]>;
 
@@ -532,7 +532,7 @@ def AND8rm  : I8rm<0x0,
                     (implicit SRW)]>;
 def AND16rm : I16rm<0x0,
                     (outs GR16:$dst), (ins GR16:$src, memsrc:$src2),
-                    "and.w\t{$src2, $dst}",
+                    "AND\t{$src2, $dst}",
                     [(set GR16:$dst, (and GR16:$src, (load addr:$src2))),
                      (implicit SRW)]>;
 
@@ -545,7 +545,7 @@ def AND8rm_POST : IForm8<0x0, DstReg, SrcPostInc, Size2Bytes,
 def AND16rm_POST : IForm16<0x0, DstReg, SrcPostInc, Size2Bytes,
                            (outs GR16:$dst, GR16:$base_wb),
                            (ins GR16:$src, GR16:$base),
-                           "and.w\t{@$base+, $dst}", []>;
+                           "AND\t{@$base+, $dst}", []>;
 }
 
 let Constraints = "" in {
@@ -556,7 +556,7 @@ def AND8mr  : I8mr<0x0,
                     (implicit SRW)]>;
 def AND16mr : I16mr<0x0,
                     (outs), (ins memdst:$dst, GR16:$src),
-                    "and.w\t{$src, $dst}",
+                    "AND\t{$src, $dst}",
                     [(store (and (load addr:$dst), GR16:$src), addr:$dst),
                      (implicit SRW)]>;
 
@@ -567,7 +567,7 @@ def AND8mi  : I8mi<0x0,
                     (implicit SRW)]>;
 def AND16mi : I16mi<0x0,
                     (outs), (ins memdst:$dst, i16imm:$src),
-                    "and.w\t{$src, $dst}",
+                    "AND\t{$src, $dst}",
                     [(store (and (load addr:$dst), (i16 imm:$src)), addr:$dst),
                      (implicit SRW)]>;
 
@@ -579,7 +579,7 @@ def AND8mm  : I8mm<0x0,
                     (implicit SRW)]>;
 def AND16mm : I16mm<0x0,
                     (outs), (ins memdst:$dst, memsrc:$src),
-                    "and.w\t{$src, $dst}",
+                    "AND\t{$src, $dst}",
                     [(store (and (load addr:$dst), 
                                  (i16 (load addr:$src))), addr:$dst),
                      (implicit SRW)]>;
