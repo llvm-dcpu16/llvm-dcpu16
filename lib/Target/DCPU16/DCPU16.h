@@ -1,4 +1,4 @@
-//==-- MSP430.h - Top-level interface for MSP430 representation --*- C++ -*-==//
+//==-- DCPU16.h - Top-level interface for DCPU16 representation --*- C++ -*-==//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -8,18 +8,18 @@
 //===----------------------------------------------------------------------===//
 //
 // This file contains the entry points for global functions defined in
-// the LLVM MSP430 backend.
+// the LLVM DCPU16 backend.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_TARGET_MSP430_H
-#define LLVM_TARGET_MSP430_H
+#ifndef LLVM_TARGET_DCPU16_H
+#define LLVM_TARGET_DCPU16_H
 
-#include "MCTargetDesc/MSP430MCTargetDesc.h"
+#include "MCTargetDesc/DCPU16MCTargetDesc.h"
 #include "llvm/Target/TargetMachine.h"
 
-namespace MSP430CC {
-  // MSP430 specific condition code.
+namespace DCPU16CC {
+  // DCPU16 specific condition code.
   enum CondCodes {
     COND_E  = 0,  // aka COND_Z
     COND_NE = 1,  // aka COND_NZ
@@ -33,14 +33,14 @@ namespace MSP430CC {
 }
 
 namespace llvm {
-  class MSP430TargetMachine;
+  class DCPU16TargetMachine;
   class FunctionPass;
   class formatted_raw_ostream;
 
-  FunctionPass *createMSP430ISelDag(MSP430TargetMachine &TM,
+  FunctionPass *createDCPU16ISelDag(DCPU16TargetMachine &TM,
                                     CodeGenOpt::Level OptLevel);
 
-  FunctionPass *createMSP430BranchSelectionPass();
+  FunctionPass *createDCPU16BranchSelectionPass();
 
 } // end namespace llvm;
 

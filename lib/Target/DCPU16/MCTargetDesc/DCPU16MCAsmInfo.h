@@ -1,4 +1,4 @@
-//===-- MSP430MCAsmInfo.h - MSP430 asm properties --------------*- C++ -*--===//
+//===-- DCPU16MCAsmInfo.h - DCPU16 asm properties --------------*- C++ -*--===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,12 +7,12 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file contains the declaration of the MSP430MCAsmInfo class.
+// This file contains the declaration of the DCPU16MCAsmInfo class.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef MSP430TARGETASMINFO_H
-#define MSP430TARGETASMINFO_H
+#ifndef DCPU16TARGETASMINFO_H
+#define DCPU16TARGETASMINFO_H
 
 #include "llvm/MC/MCAsmInfo.h"
 
@@ -20,10 +20,10 @@ namespace llvm {
   class StringRef;
   class Target;
 
-  class MSP430MCAsmInfo : public MCAsmInfo {
+  class DCPU16MCAsmInfo : public MCAsmInfo {
     virtual void anchor();
   public:
-    explicit MSP430MCAsmInfo(const Target &T, StringRef TT);
+    explicit DCPU16MCAsmInfo(const Target &T, StringRef TT);
   };
 
 } // namespace llvm

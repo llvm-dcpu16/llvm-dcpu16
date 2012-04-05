@@ -1,4 +1,4 @@
-//===-- MSP430AsmPrinter.cpp - MSP430 LLVM assembly writer ----------------===//
+//===-- DCPU16AsmPrinter.cpp - DCPU16 LLVM assembly writer ----------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -8,16 +8,16 @@
 //===----------------------------------------------------------------------===//
 //
 // This file contains a printer that converts from our internal representation
-// of machine-dependent LLVM code to the MSP430 assembly language.
+// of machine-dependent LLVM code to the DCPU16 assembly language.
 //
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "asm-printer"
-#include "MSP430.h"
-#include "MSP430InstrInfo.h"
-#include "MSP430MCInstLower.h"
-#include "MSP430TargetMachine.h"
-#include "InstPrinter/MSP430InstPrinter.h"
+#include "DCPU16.h"
+#include "DCPU16InstrInfo.h"
+#include "DCPU16MCInstLower.h"
+#include "DCPU16TargetMachine.h"
+#include "InstPrinter/DCPU16InstPrinter.h"
 #include "llvm/Constants.h"
 #include "llvm/DerivedTypes.h"
 #include "llvm/Module.h"
@@ -37,13 +37,13 @@
 using namespace llvm;
 
 namespace {
-  class MSP430AsmPrinter : public AsmPrinter {
+  class DCPU16AsmPrinter : public AsmPrinter {
   public:
-    MSP430AsmPrinter(TargetMachine &TM, MCStreamer &Streamer)
+    DCPU16AsmPrinter(TargetMachine &TM, MCStreamer &Streamer)
       : AsmPrinter(TM, Streamer) {}
 
     virtual const char *getPassName() const {
-      return "MSP430 Assembly Printer";
+      return "DCPU16 Assembly Printer";
     }
 
     void printOperand(const MachineInstr *MI, int OpNum,
@@ -61,13 +61,13 @@ namespace {
 } // end of anonymous namespace
 
 
-void MSP430AsmPrinter::printOperand(const MachineInstr *MI, int OpNum,
+void DCPU16AsmPrinter::printOperand(const MachineInstr *MI, int OpNum,
                                     raw_ostream &O, const char *Modifier) {
   const MachineOperand &MO = MI->getOperand(OpNum);
   switch (MO.getType()) {
   default: llvm_unreachable("Not implemented yet!");
   case MachineOperand::MO_Register:
-    O << MSP430InstPrinter::getRegisterName(MO.getReg());
+    O << DCPU16InstPrinter::getRegisterName(MO.getReg());
     return;
   case MachineOperand::MO_Immediate:
     if (!Modifier || strcmp(Modifier, "nohash"))
@@ -108,7 +108,7 @@ void MSP430AsmPrinter::printOperand(const MachineInstr *MI, int OpNum,
   }
 }
 
-void MSP430AsmPrinter::printSrcMemOperand(const MachineInstr *MI, int OpNum,
+void DCPU16AsmPrinter::printSrcMemOperand(const MachineInstr *MI, int OpNum,
                                           raw_ostream &O) {
   const MachineOperand &Base = MI->getOperand(OpNum);
   const MachineOperand &Disp = MI->getOperand(OpNum+1);
@@ -130,7 +130,7 @@ void MSP430AsmPrinter::printSrcMemOperand(const MachineInstr *MI, int OpNum,
 
 /// PrintAsmOperand - Print out an operand for an inline asm expression.
 ///
-bool MSP430AsmPrinter::PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
+bool DCPU16AsmPrinter::PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
                                        unsigned AsmVariant,
                                        const char *ExtraCode, raw_ostream &O) {
   // Does this asm operand have a single letter operand modifier?
@@ -141,7 +141,7 @@ bool MSP430AsmPrinter::PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
   return false;
 }
 
-bool MSP430AsmPrinter::PrintAsmMemoryOperand(const MachineInstr *MI,
+bool DCPU16AsmPrinter::PrintAsmMemoryOperand(const MachineInstr *MI,
                                              unsigned OpNo, unsigned AsmVariant,
                                              const char *ExtraCode,
                                              raw_ostream &O) {
@@ -153,8 +153,8 @@ bool MSP430AsmPrinter::PrintAsmMemoryOperand(const MachineInstr *MI,
 }
 
 //===----------------------------------------------------------------------===//
-void MSP430AsmPrinter::EmitInstruction(const MachineInstr *MI) {
-  MSP430MCInstLower MCInstLowering(OutContext, *Mang, *this);
+void DCPU16AsmPrinter::EmitInstruction(const MachineInstr *MI) {
+  DCPU16MCInstLower MCInstLowering(OutContext, *Mang, *this);
 
   MCInst TmpInst;
   MCInstLowering.Lower(MI, TmpInst);
@@ -162,6 +162,6 @@ void MSP430AsmPrinter::EmitInstruction(const MachineInstr *MI) {
 }
 
 // Force static initialization.
-extern "C" void LLVMInitializeMSP430AsmPrinter() {
-  RegisterAsmPrinter<MSP430AsmPrinter> X(TheMSP430Target);
+extern "C" void LLVMInitializeDCPU16AsmPrinter() {
+  RegisterAsmPrinter<DCPU16AsmPrinter> X(TheDCPU16Target);
 }

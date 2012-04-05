@@ -1,4 +1,4 @@
-//===-- MSP430InstPrinter.cpp - Convert MSP430 MCInst to assembly syntax --===//
+//===-- DCPU16InstPrinter.cpp - Convert DCPU16 MCInst to assembly syntax --===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,13 +7,13 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This class prints an MSP430 MCInst to a .s file.
+// This class prints an DCPU16 MCInst to a .s file.
 //
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "asm-printer"
-#include "MSP430.h"
-#include "MSP430InstPrinter.h"
+#include "DCPU16.h"
+#include "DCPU16InstPrinter.h"
 #include "llvm/MC/MCInst.h"
 #include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCExpr.h"
@@ -23,15 +23,15 @@ using namespace llvm;
 
 
 // Include the auto-generated portion of the assembly writer.
-#include "MSP430GenAsmWriter.inc"
+#include "DCPU16GenAsmWriter.inc"
 
-void MSP430InstPrinter::printInst(const MCInst *MI, raw_ostream &O,
+void DCPU16InstPrinter::printInst(const MCInst *MI, raw_ostream &O,
                                   StringRef Annot) {
   printInstruction(MI, O);
   printAnnotation(O, Annot);
 }
 
-void MSP430InstPrinter::printPCRelImmOperand(const MCInst *MI, unsigned OpNo,
+void DCPU16InstPrinter::printPCRelImmOperand(const MCInst *MI, unsigned OpNo,
                                              raw_ostream &O) {
   const MCOperand &Op = MI->getOperand(OpNo);
   if (Op.isImm())
@@ -42,7 +42,7 @@ void MSP430InstPrinter::printPCRelImmOperand(const MCInst *MI, unsigned OpNo,
   }
 }
 
-void MSP430InstPrinter::printOperand(const MCInst *MI, unsigned OpNo,
+void DCPU16InstPrinter::printOperand(const MCInst *MI, unsigned OpNo,
                                      raw_ostream &O, const char *Modifier) {
   assert((Modifier == 0 || Modifier[0] == 0) && "No modifiers supported");
   const MCOperand &Op = MI->getOperand(OpNo);
@@ -56,7 +56,7 @@ void MSP430InstPrinter::printOperand(const MCInst *MI, unsigned OpNo,
   }
 }
 
-void MSP430InstPrinter::printSrcMemOperand(const MCInst *MI, unsigned OpNo,
+void DCPU16InstPrinter::printSrcMemOperand(const MCInst *MI, unsigned OpNo,
                                            raw_ostream &O,
                                            const char *Modifier) {
   const MCOperand &Base = MI->getOperand(OpNo);
@@ -85,29 +85,29 @@ void MSP430InstPrinter::printSrcMemOperand(const MCInst *MI, unsigned OpNo,
     O << '(' << getRegisterName(Base.getReg()) << ')';
 }
 
-void MSP430InstPrinter::printCCOperand(const MCInst *MI, unsigned OpNo,
+void DCPU16InstPrinter::printCCOperand(const MCInst *MI, unsigned OpNo,
                                        raw_ostream &O) {
   unsigned CC = MI->getOperand(OpNo).getImm();
 
   switch (CC) {
   default:
    llvm_unreachable("Unsupported CC code");
-  case MSP430CC::COND_E:
+  case DCPU16CC::COND_E:
    O << "eq";
    break;
-  case MSP430CC::COND_NE:
+  case DCPU16CC::COND_NE:
    O << "ne";
    break;
-  case MSP430CC::COND_HS:
+  case DCPU16CC::COND_HS:
    O << "hs";
    break;
-  case MSP430CC::COND_LO:
+  case DCPU16CC::COND_LO:
    O << "lo";
    break;
-  case MSP430CC::COND_GE:
+  case DCPU16CC::COND_GE:
    O << "ge";
    break;
-  case MSP430CC::COND_L:
+  case DCPU16CC::COND_L:
    O << 'l';
    break;
   }

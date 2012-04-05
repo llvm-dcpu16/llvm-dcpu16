@@ -1,4 +1,4 @@
-##===- lib/Target/MSP430/AsmPrinter/Makefile ---------------*- Makefile -*-===##
+##===- lib/Target/DCPU16/AsmPrinter/Makefile ---------------*- Makefile -*-===##
 #
 #                     The LLVM Compiler Infrastructure
 #
@@ -7,9 +7,9 @@
 #
 ##===----------------------------------------------------------------------===##
 LEVEL = ../../../..
-LIBRARYNAME = LLVMMSP430AsmPrinter
+LIBRARYNAME = LLVMDCPU16AsmPrinter
 
-# Hack: we need to include 'main' MSP430 target directory to grab private headers
+# Hack: we need to include 'main' DCPU16 target directory to grab private headers
 CPP.Flags += -I$(PROJ_OBJ_DIR)/.. -I$(PROJ_SRC_DIR)/..
 
 include $(LEVEL)/Makefile.common

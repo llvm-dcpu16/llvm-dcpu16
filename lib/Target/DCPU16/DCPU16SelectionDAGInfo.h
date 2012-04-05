@@ -1,4 +1,4 @@
-//===-- MSP430SelectionDAGInfo.h - MSP430 SelectionDAG Info -----*- C++ -*-===//
+//===-- DCPU16SelectionDAGInfo.h - DCPU16 SelectionDAG Info -----*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,23 +7,23 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the MSP430 subclass for TargetSelectionDAGInfo.
+// This file defines the DCPU16 subclass for TargetSelectionDAGInfo.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef MSP430SELECTIONDAGINFO_H
-#define MSP430SELECTIONDAGINFO_H
+#ifndef DCPU16SELECTIONDAGINFO_H
+#define DCPU16SELECTIONDAGINFO_H
 
 #include "llvm/Target/TargetSelectionDAGInfo.h"
 
 namespace llvm {
 
-class MSP430TargetMachine;
+class DCPU16TargetMachine;
 
-class MSP430SelectionDAGInfo : public TargetSelectionDAGInfo {
+class DCPU16SelectionDAGInfo : public TargetSelectionDAGInfo {
 public:
-  explicit MSP430SelectionDAGInfo(const MSP430TargetMachine &TM);
-  ~MSP430SelectionDAGInfo();
+  explicit DCPU16SelectionDAGInfo(const DCPU16TargetMachine &TM);
+  ~DCPU16SelectionDAGInfo();
 };
 
 }

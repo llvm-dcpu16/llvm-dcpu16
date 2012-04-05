@@ -1,4 +1,4 @@
-//===-- MSP430Subtarget.h - Define Subtarget for the MSP430 ----*- C++ -*--===//
+//===-- DCPU16Subtarget.h - Define Subtarget for the DCPU16 ----*- C++ -*--===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,30 +7,30 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file declares the MSP430 specific subclass of TargetSubtargetInfo.
+// This file declares the DCPU16 specific subclass of TargetSubtargetInfo.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_TARGET_MSP430_SUBTARGET_H
-#define LLVM_TARGET_MSP430_SUBTARGET_H
+#ifndef LLVM_TARGET_DCPU16_SUBTARGET_H
+#define LLVM_TARGET_DCPU16_SUBTARGET_H
 
 #include "llvm/Target/TargetSubtargetInfo.h"
 #include <string>
 
 #define GET_SUBTARGETINFO_HEADER
-#include "MSP430GenSubtargetInfo.inc"
+#include "DCPU16GenSubtargetInfo.inc"
 
 namespace llvm {
 class StringRef;
 
-class MSP430Subtarget : public MSP430GenSubtargetInfo {
+class DCPU16Subtarget : public DCPU16GenSubtargetInfo {
   virtual void anchor();
   bool ExtendedInsts;
 public:
   /// This constructor initializes the data members to match that
   /// of the specified triple.
   ///
-  MSP430Subtarget(const std::string &TT, const std::string &CPU,
+  DCPU16Subtarget(const std::string &TT, const std::string &CPU,
                   const std::string &FS);
 
   /// ParseSubtargetFeatures - Parses features string setting specified
@@ -39,4 +39,4 @@ public:
 };
 } // End llvm namespace
 
-#endif  // LLVM_TARGET_MSP430_SUBTARGET_H
+#endif  // LLVM_TARGET_DCPU16_SUBTARGET_H

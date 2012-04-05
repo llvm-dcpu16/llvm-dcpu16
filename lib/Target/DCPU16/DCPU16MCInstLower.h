@@ -1,4 +1,4 @@
-//===-- MSP430MCInstLower.h - Lower MachineInstr to MCInst ------*- C++ -*-===//
+//===-- DCPU16MCInstLower.h - Lower MachineInstr to MCInst ------*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,8 +7,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef MSP430_MCINSTLOWER_H
-#define MSP430_MCINSTLOWER_H
+#ifndef DCPU16_MCINSTLOWER_H
+#define DCPU16_MCINSTLOWER_H
 
 #include "llvm/Support/Compiler.h"
 
@@ -23,15 +23,15 @@ namespace llvm {
   class MachineOperand;
   class Mangler;
 
-  /// MSP430MCInstLower - This class is used to lower an MachineInstr
+  /// DCPU16MCInstLower - This class is used to lower an MachineInstr
   /// into an MCInst.
-class LLVM_LIBRARY_VISIBILITY MSP430MCInstLower {
+class LLVM_LIBRARY_VISIBILITY DCPU16MCInstLower {
   MCContext &Ctx;
   Mangler &Mang;
 
   AsmPrinter &Printer;
 public:
-  MSP430MCInstLower(MCContext &ctx, Mangler &mang, AsmPrinter &printer)
+  DCPU16MCInstLower(MCContext &ctx, Mangler &mang, AsmPrinter &printer)
     : Ctx(ctx), Mang(mang), Printer(printer) {}
   void Lower(const MachineInstr *MI, MCInst &OutMI) const;
 
