@@ -49,7 +49,7 @@ void DCPU16InstPrinter::printOperand(const MCInst *MI, unsigned OpNo,
   if (Op.isReg()) {
     O << getRegisterName(Op.getReg());
   } else if (Op.isImm()) {
-    O << '#' << Op.getImm();
+    O << Op.getImm();
   } else {
     assert(Op.isExpr() && "unknown operand kind in printOperand");
     O << '#' << *Op.getExpr();
