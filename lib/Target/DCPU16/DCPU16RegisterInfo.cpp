@@ -11,7 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "msp430-reg-info"
+#define DEBUG_TYPE "dcpu16-reg-info"
 
 #include "DCPU16RegisterInfo.h"
 #include "DCPU16.h"

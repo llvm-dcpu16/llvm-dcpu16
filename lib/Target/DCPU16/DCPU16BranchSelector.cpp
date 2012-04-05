@@ -15,7 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "msp430-branch-select"
+#define DEBUG_TYPE "dcpu16-branch-select"
 #include "DCPU16.h"
 #include "DCPU16InstrInfo.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
