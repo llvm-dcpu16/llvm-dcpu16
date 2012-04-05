@@ -66,9 +66,9 @@ void DCPU16InstPrinter::printSrcMemOperand(const MCInst *MI, unsigned OpNo,
 
   // If the global address expression is a part of displacement field with a
   // register base, we should not emit any prefix symbol here, e.g.
-  //   SET &foo, r1
+  //   SET r1, &foo ; The Notch order
   // vs
-  //   SET glb(r1), r2
+  //   SET r2, glb(r1) ; The Notch order
   // Otherwise (!) dcpu16-as will silently miscompile the output :(
   if (!Base.getReg())
     O << '&';
