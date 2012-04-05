@@ -348,7 +348,7 @@ def ADD8rr  : I8rr<0x0,
                     (implicit SRW)]>;
 def ADD16rr : I16rr<0x0,
                     (outs GR16:$dst), (ins GR16:$src, GR16:$src2),
-                    "ADD\t{$src2, $dst}",
+                    "ADD\t{$dst, $src2} ; The Notch order",
                     [(set GR16:$dst, (add GR16:$src, GR16:$src2)),
                      (implicit SRW)]>;
 }
@@ -360,7 +360,7 @@ def ADD8rm  : I8rm<0x0,
                     (implicit SRW)]>;
 def ADD16rm : I16rm<0x0,
                     (outs GR16:$dst), (ins GR16:$src, memsrc:$src2),
-                    "ADD\t{$src2, $dst}",
+                    "ADD\t{$dst, $src2} ; The Notch order",
                     [(set GR16:$dst, (add GR16:$src, (load addr:$src2))),
                      (implicit SRW)]>;
 
@@ -373,7 +373,7 @@ def ADD8rm_POST : IForm8<0x0, DstReg, SrcPostInc, Size2Bytes,
 def ADD16rm_POST : IForm16<0x0, DstReg, SrcPostInc, Size2Bytes,
                            (outs GR16:$dst, GR16:$base_wb),
                            (ins GR16:$src, GR16:$base),
-                          "ADD\t{@$base+, $dst}", []>;
+                          "ADD\t{$dst, @$base+} ; The Notch order", []>;
 }
 
 
@@ -384,7 +384,7 @@ def ADD8ri  : I8ri<0x0,
                     (implicit SRW)]>;
 def ADD16ri : I16ri<0x0,
                     (outs GR16:$dst), (ins GR16:$src, i16imm:$src2),
-                    "ADD\t{$src2, $dst}",
+                    "ADD\t{$dst, $src2} ; The Notch order",
                     [(set GR16:$dst, (add GR16:$src, imm:$src2)),
                      (implicit SRW)]>;
 
@@ -396,7 +396,7 @@ def ADD8mr  : I8mr<0x0,
                     (implicit SRW)]>;
 def ADD16mr : I16mr<0x0,
                     (outs), (ins memdst:$dst, GR16:$src),
-                    "ADD\t{$src, $dst}",
+                    "ADD\t{$dst, $src} ; The Notch order",
                     [(store (add (load addr:$dst), GR16:$src), addr:$dst),
                      (implicit SRW)]>;
 
@@ -407,7 +407,7 @@ def ADD8mi  : I8mi<0x0,
                     (implicit SRW)]>;
 def ADD16mi : I16mi<0x0,
                     (outs), (ins memdst:$dst, i16imm:$src),
-                    "ADD\t{$src, $dst}",
+                    "ADD\t{$dst, $src} ; The Notch order",
                     [(store (add (load addr:$dst), (i16 imm:$src)), addr:$dst),
                      (implicit SRW)]>;
 
@@ -419,7 +419,7 @@ def ADD8mm  : I8mm<0x0,
                     (implicit SRW)]>;
 def ADD16mm : I16mm<0x0,
                     (outs), (ins memdst:$dst, memsrc:$src),
-                    "ADD\t{$src, $dst}",
+                    "ADD\t{$dst, $src} ; The Notch order",
                     [(store (add (load addr:$dst), 
                                   (i16 (load addr:$src))), addr:$dst),
                      (implicit SRW)]>;
