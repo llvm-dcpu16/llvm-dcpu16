@@ -44,12 +44,12 @@ DCPU16RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
   const Function* F = MF->getFunction();
   static const uint16_t CalleeSavedRegs[] = {
     DCPU16::FPW, DCPU16::R1A, DCPU16::R2B, DCPU16::R3C,
-    DCPU16::R6Z, DCPU16::R7I,
+    DCPU16::R7I,
     0
   };
   static const uint16_t CalleeSavedRegsFP[] = {
     DCPU16::R1A, DCPU16::R2B, DCPU16::R3C,
-    DCPU16::R6Z, DCPU16::R7I,
+    DCPU16::R7I,
     0
   };
   static const uint16_t CalleeSavedRegsIntr[] = {
