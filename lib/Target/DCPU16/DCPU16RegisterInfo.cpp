@@ -44,23 +44,23 @@ DCPU16RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
   const Function* F = MF->getFunction();
   static const uint16_t CalleeSavedRegs[] = {
     DCPU16::FPW, DCPU16::R1A, DCPU16::R2B, DCPU16::R3C,
-    DCPU16::R4X, DCPU16::R9W, DCPU16::R10W, DCPU16::R11W,
+    DCPU16::R4X, DCPU16::R5Y, DCPU16::R10W, DCPU16::R11W,
     0
   };
   static const uint16_t CalleeSavedRegsFP[] = {
     DCPU16::R1A, DCPU16::R2B, DCPU16::R3C,
-    DCPU16::R4X, DCPU16::R9W, DCPU16::R10W, DCPU16::R11W,
+    DCPU16::R4X, DCPU16::R5Y, DCPU16::R10W, DCPU16::R11W,
     0
   };
   static const uint16_t CalleeSavedRegsIntr[] = {
     DCPU16::FPW,  DCPU16::R1A,  DCPU16::R2B,  DCPU16::R3C,
-    DCPU16::R4X,  DCPU16::R9W,  DCPU16::R10W, DCPU16::R11W,
+    DCPU16::R4X,  DCPU16::R5Y,  DCPU16::R10W, DCPU16::R11W,
     DCPU16::R12W, DCPU16::R13W, DCPU16::R14W, DCPU16::R15W,
     0
   };
   static const uint16_t CalleeSavedRegsIntrFP[] = {
     DCPU16::R1A,  DCPU16::R2B,  DCPU16::R3C,
-    DCPU16::R4X,  DCPU16::R9W,  DCPU16::R10W, DCPU16::R11W,
+    DCPU16::R4X,  DCPU16::R5Y,  DCPU16::R10W, DCPU16::R11W,
     DCPU16::R12W, DCPU16::R13W, DCPU16::R14W, DCPU16::R15W,
     0
   };
