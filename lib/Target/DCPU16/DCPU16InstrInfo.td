@@ -163,7 +163,7 @@ def NOP : Pseudo<(outs), (ins), "nop", []>;
 // FIXME: Provide proper encoding!
 let isReturn = 1, isTerminator = 1, isBarrier = 1 in {
   def RET  : IForm16<0x0, DstReg, SrcPostInc, Size2Bytes,
-                     (outs), (ins), "ret",  [(DCPU16retflag)]>;
+                     (outs), (ins), "SET PC, POP ; The Notch order",  [(DCPU16retflag)]>;
   def RETI : II16r<0x0, (outs), (ins), "reti", [(DCPU16retiflag)]>;
 }
 
@@ -211,10 +211,10 @@ let isCall = 1 in
       Uses = [SPW] in {
     def CALLi     : II16i<0x0,
                           (outs), (ins i16imm:$dst, variable_ops),
-                          "call\t$dst", [(DCPU16call imm:$dst)]>;
+                          "SET PC, $dst ; The Notch order", [(DCPU16call imm:$dst)]>;
     def CALLr     : II16r<0x0,
                           (outs), (ins GR16:$dst, variable_ops),
-                          "call\t$dst", [(DCPU16call GR16:$dst)]>;
+                          "SET PC, $dst ; The Notch order", [(DCPU16call GR16:$dst)]>;
     def CALLm     : II16m<0x0,
                           (outs), (ins memsrc:$dst, variable_ops),
                           "call\t${dst:mem}", [(DCPU16call (load addr:$dst))]>;
