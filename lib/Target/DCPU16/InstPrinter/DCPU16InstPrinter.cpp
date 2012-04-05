@@ -69,7 +69,7 @@ void DCPU16InstPrinter::printSrcMemOperand(const MCInst *MI, unsigned OpNo,
   //   mov.w &foo, r1
   // vs
   //   mov.w glb(r1), r2
-  // Otherwise (!) msp430-as will silently miscompile the output :(
+  // Otherwise (!) dcpu16-as will silently miscompile the output :(
   if (!Base.getReg())
     O << '&';
 

@@ -16,7 +16,7 @@ be modelled currently in improper way - should we need to mark the superreg as
 def for every 8 bit instruction?).
 
 2. Libcalls: multiplication, division, remainder. Note, that calling convention
-for libcalls is incomptible with calling convention of libcalls of msp430-gcc
+for libcalls is incomptible with calling convention of libcalls of dcpu16-gcc
 (these cannot be used though due to license restriction).
 
 3. Implement multiplication / division by constant (dag combiner hook?).
