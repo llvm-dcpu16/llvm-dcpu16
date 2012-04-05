@@ -183,10 +183,10 @@ let isBarrier = 1 in {
                     "br\t$brdst",
                     [(brind tblockaddress:$brdst)]>;
     def Br  : I16rr<0, (outs), (ins GR16:$brdst),
-                    "SET\t{$brdst, pc}",
+                    "SET\t{pc, $brdst} ; The Notch order",
                     [(brind GR16:$brdst)]>;
     def Bm  : I16rm<0, (outs), (ins memsrc:$brdst),
-                    "SET\t{$brdst, pc}",
+                    "SET\t{pc, $brdst} ; The Notch order",
                     [(brind (load addr:$brdst))]>;
   }
 }
@@ -245,7 +245,7 @@ def MOV8rr  : I8rr<0x0,
                    []>;
 def MOV16rr : I16rr<0x0,
                     (outs GR16:$dst), (ins GR16:$src),
-                    "SET\t{$src, $dst}",
+                    "SET\t{$dst, $src} ; The Notch order",
                     []>;
 }
 
@@ -257,7 +257,7 @@ def MOV8ri  : I8ri<0x0,
                    [(set GR8:$dst, imm:$src)]>;
 def MOV16ri : I16ri<0x0,
                     (outs GR16:$dst), (ins i16imm:$src),
-                    "SET\t{$src, $dst}",
+                    "SET\t{$dst, $src} ; The Notch order",
                     [(set GR16:$dst, imm:$src)]>;
 }
 
@@ -268,7 +268,7 @@ def MOV8rm  : I8rm<0x0,
                    [(set GR8:$dst, (load addr:$src))]>;
 def MOV16rm : I16rm<0x0,
                     (outs GR16:$dst), (ins memsrc:$src),
-                    "SET\t{$src, $dst}",
+                    "SET\t{$dst, $src} ; The Notch order",
                     [(set GR16:$dst, (load addr:$src))]>;
 }
 
@@ -287,7 +287,7 @@ def MOV8rm_POST  : IForm8<0x0, DstReg, SrcPostInc, Size2Bytes,
                          "mov.b\t{@$base+, $dst}", []>;
 def MOV16rm_POST : IForm16<0x0, DstReg, SrcPostInc, Size2Bytes,
                            (outs GR16:$dst, GR16:$base_wb), (ins GR16:$base),
-                           "SET\t{@$base+, $dst}", []>;
+                           "SET\t{$dst, @$base+} ; The Notch order", []>;
 }
 
 // Any instruction that defines a 8-bit result leaves the high half of the
@@ -311,7 +311,7 @@ def MOV8mi  : I8mi<0x0,
                    [(store (i8 imm:$src), addr:$dst)]>;
 def MOV16mi : I16mi<0x0,
                     (outs), (ins memdst:$dst, i16imm:$src),
-                    "SET\t{$src, $dst}",
+                    "SET\t{$dst, $src} ; The Notch order",
                     [(store (i16 imm:$src), addr:$dst)]>;
 
 def MOV8mr  : I8mr<0x0,
@@ -320,7 +320,7 @@ def MOV8mr  : I8mr<0x0,
                    [(store GR8:$src, addr:$dst)]>;
 def MOV16mr : I16mr<0x0,
                     (outs), (ins memdst:$dst, GR16:$src),
-                    "SET\t{$src, $dst}",
+                    "SET\t{$dst, $src} ; The Notch order",
                     [(store GR16:$src, addr:$dst)]>;
 
 def MOV8mm  : I8mm<0x0,
@@ -329,7 +329,7 @@ def MOV8mm  : I8mm<0x0,
                    [(store (i8 (load addr:$src)), addr:$dst)]>;
 def MOV16mm : I16mm<0x0,
                     (outs), (ins memdst:$dst, memsrc:$src),
-                    "SET\t{$src, $dst}",
+                    "SET\t{$dst, $src} ; The Notch order",
                     [(store (i16 (load addr:$src)), addr:$dst)]>;
 
 //===----------------------------------------------------------------------===//
