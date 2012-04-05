@@ -38,7 +38,7 @@ def R4XB : DCPU16Reg<8,  "X">;
 def R5YB : DCPU16Reg<9,  "Y">;
 def R6ZB : DCPU16Reg<10, "Z">;
 def R7IB : DCPU16Reg<11, "I">;
-def R12B : DCPU16Reg<12, "r12">;
+def R8JB : DCPU16Reg<12, "J">;
 def R13B : DCPU16Reg<13, "r13">;
 def R14B : DCPU16Reg<14, "r14">;
 def R15B : DCPU16Reg<15, "r15">;
@@ -58,7 +58,7 @@ def R4X  : DCPU16RegWithSubregs<8,  "X",   [R4XB]>;
 def R5Y  : DCPU16RegWithSubregs<9,  "Y",   [R5YB]>;
 def R6Z  : DCPU16RegWithSubregs<10, "Z",   [R6ZB]>;
 def R7I  : DCPU16RegWithSubregs<11, "I",   [R7IB]>;
-def R12W : DCPU16RegWithSubregs<12, "r12", [R12B]>;
+def R8J  : DCPU16RegWithSubregs<12, "J",   [R8JB]>;
 def R13W : DCPU16RegWithSubregs<13, "r13", [R13B]>;
 def R14W : DCPU16RegWithSubregs<14, "r14", [R14B]>;
 def R15W : DCPU16RegWithSubregs<15, "r15", [R15B]>;
@@ -66,7 +66,7 @@ def R15W : DCPU16RegWithSubregs<15, "r15", [R15B]>;
 
 def GR8 : RegisterClass<"DCPU16", [i8], 8,
    // Volatile registers
-  (add R12B, R13B, R14B, R15B, R7IB, R6ZB, R5YB, R4XB, R3CB, R2BB, R1AB,
+  (add R8JB, R13B, R14B, R15B, R7IB, R6ZB, R5YB, R4XB, R3CB, R2BB, R1AB,
    // Frame pointer, sometimes allocable
    FPB,
    // Volatile, but not allocable
@@ -74,7 +74,7 @@ def GR8 : RegisterClass<"DCPU16", [i8], 8,
 
 def GR16 : RegisterClass<"DCPU16", [i16], 16,
    // Volatile registers
-  (add R12W, R13W, R14W, R15W, R7I, R6Z, R5Y, R4X, R3C, R2B, R1A,
+  (add R8J, R13W, R14W, R15W, R7I, R6Z, R5Y, R4X, R3C, R2B, R1A,
    // Frame pointer, sometimes allocable
    FPW,
    // Volatile, but not allocable
