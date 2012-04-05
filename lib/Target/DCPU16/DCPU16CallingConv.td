@@ -1,4 +1,4 @@
-//==- MSP430CallingConv.td - Calling Conventions for MSP430 -*- tablegen -*-==//
+//==- DCPU16CallingConv.td - Calling Conventions for DCPU16 -*- tablegen -*-==//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -6,13 +6,13 @@
 // License. See LICENSE.TXT for details.
 //
 //===----------------------------------------------------------------------===//
-// This describes the calling conventions for MSP430 architecture.
+// This describes the calling conventions for DCPU16 architecture.
 //===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
-// MSP430 Return Value Calling Convention
+// DCPU16 Return Value Calling Convention
 //===----------------------------------------------------------------------===//
-def RetCC_MSP430 : CallingConv<[
+def RetCC_DCPU16 : CallingConv<[
   // i8 are returned in registers R15B, R14B, R13B, R12B
   CCIfType<[i8], CCAssignToReg<[R15B, R14B, R13B, R12B]>>,
 
@@ -21,9 +21,9 @@ def RetCC_MSP430 : CallingConv<[
 ]>;
 
 //===----------------------------------------------------------------------===//
-// MSP430 Argument Calling Conventions
+// DCPU16 Argument Calling Conventions
 //===----------------------------------------------------------------------===//
-def CC_MSP430 : CallingConv<[
+def CC_DCPU16 : CallingConv<[
   // Promote i8 arguments to i16.
   CCIfType<[i8], CCPromoteToType<i16>>,
 

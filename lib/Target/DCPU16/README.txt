@@ -1,5 +1,5 @@
 //===---------------------------------------------------------------------===//
-// MSP430 backend.
+// DCPU16 backend.
 //===---------------------------------------------------------------------===//
 
 DISCLAIMER: Thid backend should be considered as highly experimental. I never
@@ -35,6 +35,6 @@ future.
 9. Since almost all instructions set flags - implement brcond / select in better
 way (currently they emit explicit comparison).
 
-10. Handle imm in comparisons in better way (see comment in MSP430InstrInfo.td)
+10. Handle imm in comparisons in better way (see comment in DCPU16InstrInfo.td)
 
 11. Implement hooks for better memory op folding, etc.

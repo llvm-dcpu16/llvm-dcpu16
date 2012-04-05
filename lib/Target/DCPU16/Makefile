@@ -1,4 +1,4 @@
-##===- lib/Target/MSP430/Makefile --------------------------*- Makefile -*-===##
+##===- lib/Target/DCPU16/Makefile --------------------------*- Makefile -*-===##
 # 
 #                     The LLVM Compiler Infrastructure
 #
@@ -8,14 +8,14 @@
 ##===----------------------------------------------------------------------===##
 
 LEVEL = ../../..
-LIBRARYNAME = LLVMMSP430CodeGen
-TARGET = MSP430
+LIBRARYNAME = LLVMDCPU16CodeGen
+TARGET = DCPU16
 
 # Make sure that tblgen is run, first thing.
-BUILT_SOURCES = MSP430GenRegisterInfo.inc MSP430GenInstrInfo.inc \
-		MSP430GenAsmWriter.inc \
-		MSP430GenDAGISel.inc MSP430GenCallingConv.inc \
-		MSP430GenSubtargetInfo.inc
+BUILT_SOURCES = DCPU16GenRegisterInfo.inc DCPU16GenInstrInfo.inc \
+		DCPU16GenAsmWriter.inc \
+		DCPU16GenDAGISel.inc DCPU16GenCallingConv.inc \
+		DCPU16GenSubtargetInfo.inc
 
 DIRS = InstPrinter TargetInfo MCTargetDesc
 

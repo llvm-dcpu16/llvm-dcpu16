@@ -1,4 +1,4 @@
-;===- ./lib/Target/MSP430/LLVMBuild.txt ------------------------*- Conf -*--===;
+;===- ./lib/Target/DCPU16/LLVMBuild.txt ------------------------*- Conf -*--===;
 ;
 ;                     The LLVM Compiler Infrastructure
 ;
@@ -20,13 +20,13 @@ subdirectories = InstPrinter MCTargetDesc TargetInfo
 
 [component_0]
 type = TargetGroup
-name = MSP430
+name = DCPU16
 parent = Target
 has_asmprinter = 1
 
 [component_1]
 type = Library
-name = MSP430CodeGen
-parent = MSP430
-required_libraries = AsmPrinter CodeGen Core MC MSP430AsmPrinter MSP430Desc MSP430Info SelectionDAG Support Target
-add_to_library_groups = MSP430
+name = DCPU16CodeGen
+parent = DCPU16
+required_libraries = AsmPrinter CodeGen Core MC DCPU16AsmPrinter DCPU16Desc DCPU16Info SelectionDAG Support Target
+add_to_library_groups = DCPU16

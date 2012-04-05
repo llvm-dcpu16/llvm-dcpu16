@@ -1,4 +1,4 @@
-//===-- MSP430TargetMachine.h - Define TargetMachine for MSP430 -*- C++ -*-===//
+//===-- DCPU16TargetMachine.h - Define TargetMachine for DCPU16 -*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,38 +7,38 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file declares the MSP430 specific subclass of TargetMachine.
+// This file declares the DCPU16 specific subclass of TargetMachine.
 //
 //===----------------------------------------------------------------------===//
 
 
-#ifndef LLVM_TARGET_MSP430_TARGETMACHINE_H
-#define LLVM_TARGET_MSP430_TARGETMACHINE_H
+#ifndef LLVM_TARGET_DCPU16_TARGETMACHINE_H
+#define LLVM_TARGET_DCPU16_TARGETMACHINE_H
 
-#include "MSP430InstrInfo.h"
-#include "MSP430ISelLowering.h"
-#include "MSP430FrameLowering.h"
-#include "MSP430SelectionDAGInfo.h"
-#include "MSP430RegisterInfo.h"
-#include "MSP430Subtarget.h"
+#include "DCPU16InstrInfo.h"
+#include "DCPU16ISelLowering.h"
+#include "DCPU16FrameLowering.h"
+#include "DCPU16SelectionDAGInfo.h"
+#include "DCPU16RegisterInfo.h"
+#include "DCPU16Subtarget.h"
 #include "llvm/Target/TargetData.h"
 #include "llvm/Target/TargetFrameLowering.h"
 #include "llvm/Target/TargetMachine.h"
 
 namespace llvm {
 
-/// MSP430TargetMachine
+/// DCPU16TargetMachine
 ///
-class MSP430TargetMachine : public LLVMTargetMachine {
-  MSP430Subtarget        Subtarget;
+class DCPU16TargetMachine : public LLVMTargetMachine {
+  DCPU16Subtarget        Subtarget;
   const TargetData       DataLayout;       // Calculates type size & alignment
-  MSP430InstrInfo        InstrInfo;
-  MSP430TargetLowering   TLInfo;
-  MSP430SelectionDAGInfo TSInfo;
-  MSP430FrameLowering    FrameLowering;
+  DCPU16InstrInfo        InstrInfo;
+  DCPU16TargetLowering   TLInfo;
+  DCPU16SelectionDAGInfo TSInfo;
+  DCPU16FrameLowering    FrameLowering;
 
 public:
-  MSP430TargetMachine(const Target &T, StringRef TT,
+  DCPU16TargetMachine(const Target &T, StringRef TT,
                       StringRef CPU, StringRef FS, const TargetOptions &Options,
                       Reloc::Model RM, CodeModel::Model CM,
                       CodeGenOpt::Level OL);
@@ -46,25 +46,25 @@ public:
   virtual const TargetFrameLowering *getFrameLowering() const {
     return &FrameLowering;
   }
-  virtual const MSP430InstrInfo *getInstrInfo() const  { return &InstrInfo; }
+  virtual const DCPU16InstrInfo *getInstrInfo() const  { return &InstrInfo; }
   virtual const TargetData *getTargetData() const     { return &DataLayout;}
-  virtual const MSP430Subtarget *getSubtargetImpl() const { return &Subtarget; }
+  virtual const DCPU16Subtarget *getSubtargetImpl() const { return &Subtarget; }
 
   virtual const TargetRegisterInfo *getRegisterInfo() const {
     return &InstrInfo.getRegisterInfo();
   }
 
-  virtual const MSP430TargetLowering *getTargetLowering() const {
+  virtual const DCPU16TargetLowering *getTargetLowering() const {
     return &TLInfo;
   }
 
-  virtual const MSP430SelectionDAGInfo* getSelectionDAGInfo() const {
+  virtual const DCPU16SelectionDAGInfo* getSelectionDAGInfo() const {
     return &TSInfo;
   }
 
   virtual TargetPassConfig *createPassConfig(PassManagerBase &PM);
-}; // MSP430TargetMachine.
+}; // DCPU16TargetMachine.
 
 } // end namespace llvm
 
-#endif // LLVM_TARGET_MSP430_TARGETMACHINE_H
+#endif // LLVM_TARGET_DCPU16_TARGETMACHINE_H

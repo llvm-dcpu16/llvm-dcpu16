@@ -1,4 +1,4 @@
-//===-- MSP430InstrInfo.td - MSP430 Instruction defs -------*- tablegen -*-===//
+//===-- DCPU16InstrInfo.td - DCPU16 Instruction defs -------*- tablegen -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,11 +7,11 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file describes the MSP430 instructions in TableGen format.
+// This file describes the DCPU16 instructions in TableGen format.
 //
 //===----------------------------------------------------------------------===//
 
-include "MSP430InstrFormats.td"
+include "DCPU16InstrFormats.td"
 
 //===----------------------------------------------------------------------===//
 // Type Constraints.
@@ -22,52 +22,52 @@ class SDTCisI16<int OpNum> : SDTCisVT<OpNum, i16>;
 //===----------------------------------------------------------------------===//
 // Type Profiles.
 //===----------------------------------------------------------------------===//
-def SDT_MSP430Call         : SDTypeProfile<0, -1, [SDTCisVT<0, iPTR>]>;
-def SDT_MSP430CallSeqStart : SDCallSeqStart<[SDTCisVT<0, i16>]>;
-def SDT_MSP430CallSeqEnd   : SDCallSeqEnd<[SDTCisVT<0, i16>, SDTCisVT<1, i16>]>;
-def SDT_MSP430Wrapper      : SDTypeProfile<1, 1, [SDTCisSameAs<0, 1>,
+def SDT_DCPU16Call         : SDTypeProfile<0, -1, [SDTCisVT<0, iPTR>]>;
+def SDT_DCPU16CallSeqStart : SDCallSeqStart<[SDTCisVT<0, i16>]>;
+def SDT_DCPU16CallSeqEnd   : SDCallSeqEnd<[SDTCisVT<0, i16>, SDTCisVT<1, i16>]>;
+def SDT_DCPU16Wrapper      : SDTypeProfile<1, 1, [SDTCisSameAs<0, 1>,
                                                   SDTCisPtrTy<0>]>;
-def SDT_MSP430Cmp          : SDTypeProfile<0, 2, [SDTCisSameAs<0, 1>]>;
-def SDT_MSP430BrCC         : SDTypeProfile<0, 2, [SDTCisVT<0, OtherVT>,
+def SDT_DCPU16Cmp          : SDTypeProfile<0, 2, [SDTCisSameAs<0, 1>]>;
+def SDT_DCPU16BrCC         : SDTypeProfile<0, 2, [SDTCisVT<0, OtherVT>,
                                                   SDTCisVT<1, i8>]>;
-def SDT_MSP430SelectCC     : SDTypeProfile<1, 3, [SDTCisSameAs<0, 1>,
+def SDT_DCPU16SelectCC     : SDTypeProfile<1, 3, [SDTCisSameAs<0, 1>,
                                                   SDTCisSameAs<1, 2>, 
                                                   SDTCisVT<3, i8>]>;
-def SDT_MSP430Shift        : SDTypeProfile<1, 2, [SDTCisSameAs<0, 1>,
+def SDT_DCPU16Shift        : SDTypeProfile<1, 2, [SDTCisSameAs<0, 1>,
                                                   SDTCisI8<2>]>;
 
 //===----------------------------------------------------------------------===//
-// MSP430 Specific Node Definitions.
+// DCPU16 Specific Node Definitions.
 //===----------------------------------------------------------------------===//
-def MSP430retflag  : SDNode<"MSP430ISD::RET_FLAG", SDTNone,
+def DCPU16retflag  : SDNode<"DCPU16ISD::RET_FLAG", SDTNone,
                        [SDNPHasChain, SDNPOptInGlue]>;
-def MSP430retiflag : SDNode<"MSP430ISD::RETI_FLAG", SDTNone,
+def DCPU16retiflag : SDNode<"DCPU16ISD::RETI_FLAG", SDTNone,
                        [SDNPHasChain, SDNPOptInGlue]>;
 
-def MSP430rra     : SDNode<"MSP430ISD::RRA", SDTIntUnaryOp, []>;
-def MSP430rla     : SDNode<"MSP430ISD::RLA", SDTIntUnaryOp, []>;
-def MSP430rrc     : SDNode<"MSP430ISD::RRC", SDTIntUnaryOp, []>;
+def DCPU16rra     : SDNode<"DCPU16ISD::RRA", SDTIntUnaryOp, []>;
+def DCPU16rla     : SDNode<"DCPU16ISD::RLA", SDTIntUnaryOp, []>;
+def DCPU16rrc     : SDNode<"DCPU16ISD::RRC", SDTIntUnaryOp, []>;
 
-def MSP430call    : SDNode<"MSP430ISD::CALL", SDT_MSP430Call,
+def DCPU16call    : SDNode<"DCPU16ISD::CALL", SDT_DCPU16Call,
                      [SDNPHasChain, SDNPOutGlue, SDNPOptInGlue, SDNPVariadic]>;
-def MSP430callseq_start :
-                 SDNode<"ISD::CALLSEQ_START", SDT_MSP430CallSeqStart,
+def DCPU16callseq_start :
+                 SDNode<"ISD::CALLSEQ_START", SDT_DCPU16CallSeqStart,
                         [SDNPHasChain, SDNPOutGlue]>;
-def MSP430callseq_end :
-                 SDNode<"ISD::CALLSEQ_END",   SDT_MSP430CallSeqEnd,
+def DCPU16callseq_end :
+                 SDNode<"ISD::CALLSEQ_END",   SDT_DCPU16CallSeqEnd,
                         [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue]>;
-def MSP430Wrapper : SDNode<"MSP430ISD::Wrapper", SDT_MSP430Wrapper>;
-def MSP430cmp     : SDNode<"MSP430ISD::CMP", SDT_MSP430Cmp, [SDNPOutGlue]>;
-def MSP430brcc    : SDNode<"MSP430ISD::BR_CC", SDT_MSP430BrCC,
+def DCPU16Wrapper : SDNode<"DCPU16ISD::Wrapper", SDT_DCPU16Wrapper>;
+def DCPU16cmp     : SDNode<"DCPU16ISD::CMP", SDT_DCPU16Cmp, [SDNPOutGlue]>;
+def DCPU16brcc    : SDNode<"DCPU16ISD::BR_CC", SDT_DCPU16BrCC,
                             [SDNPHasChain, SDNPInGlue]>;
-def MSP430selectcc: SDNode<"MSP430ISD::SELECT_CC", SDT_MSP430SelectCC,
+def DCPU16selectcc: SDNode<"DCPU16ISD::SELECT_CC", SDT_DCPU16SelectCC,
                             [SDNPInGlue]>;
-def MSP430shl     : SDNode<"MSP430ISD::SHL", SDT_MSP430Shift, []>;
-def MSP430sra     : SDNode<"MSP430ISD::SRA", SDT_MSP430Shift, []>;
-def MSP430srl     : SDNode<"MSP430ISD::SRL", SDT_MSP430Shift, []>;
+def DCPU16shl     : SDNode<"DCPU16ISD::SHL", SDT_DCPU16Shift, []>;
+def DCPU16sra     : SDNode<"DCPU16ISD::SRA", SDT_DCPU16Shift, []>;
+def DCPU16srl     : SDNode<"DCPU16ISD::SRL", SDT_DCPU16Shift, []>;
 
 //===----------------------------------------------------------------------===//
-// MSP430 Operand Definitions.
+// DCPU16 Operand Definitions.
 //===----------------------------------------------------------------------===//
 
 // Address operands
@@ -92,7 +92,7 @@ def cc : Operand<i8> {
 }
 
 //===----------------------------------------------------------------------===//
-// MSP430 Complex Pattern Definitions.
+// DCPU16 Complex Pattern Definitions.
 //===----------------------------------------------------------------------===//
 
 def addr : ComplexPattern<iPTR, 2, "SelectAddr", [], []>;
@@ -115,40 +115,40 @@ def and_su : PatFrag<(ops node:$lhs, node:$rhs), (and node:$lhs, node:$rhs), [{
 let Defs = [SPW, SRW], Uses = [SPW] in {
 def ADJCALLSTACKDOWN : Pseudo<(outs), (ins i16imm:$amt),
                               "#ADJCALLSTACKDOWN",
-                              [(MSP430callseq_start timm:$amt)]>;
+                              [(DCPU16callseq_start timm:$amt)]>;
 def ADJCALLSTACKUP   : Pseudo<(outs), (ins i16imm:$amt1, i16imm:$amt2),
                               "#ADJCALLSTACKUP",
-                              [(MSP430callseq_end timm:$amt1, timm:$amt2)]>;
+                              [(DCPU16callseq_end timm:$amt1, timm:$amt2)]>;
 }
 
 let usesCustomInserter = 1 in {
   def Select8  : Pseudo<(outs GR8:$dst), (ins GR8:$src, GR8:$src2, i8imm:$cc),
                         "# Select8 PSEUDO",
                         [(set GR8:$dst,
-                          (MSP430selectcc GR8:$src, GR8:$src2, imm:$cc))]>;
+                          (DCPU16selectcc GR8:$src, GR8:$src2, imm:$cc))]>;
   def Select16 : Pseudo<(outs GR16:$dst), (ins GR16:$src, GR16:$src2, i8imm:$cc),
                         "# Select16 PSEUDO",
                         [(set GR16:$dst,
-                          (MSP430selectcc GR16:$src, GR16:$src2, imm:$cc))]>;
+                          (DCPU16selectcc GR16:$src, GR16:$src2, imm:$cc))]>;
   let Defs = [SRW] in {
   def Shl8     : Pseudo<(outs GR8:$dst), (ins GR8:$src, GR8:$cnt),
                         "# Shl8 PSEUDO",
-                        [(set GR8:$dst, (MSP430shl GR8:$src, GR8:$cnt))]>;
+                        [(set GR8:$dst, (DCPU16shl GR8:$src, GR8:$cnt))]>;
   def Shl16    : Pseudo<(outs GR16:$dst), (ins GR16:$src, GR8:$cnt),
                         "# Shl16 PSEUDO",
-                        [(set GR16:$dst, (MSP430shl GR16:$src, GR8:$cnt))]>;
+                        [(set GR16:$dst, (DCPU16shl GR16:$src, GR8:$cnt))]>;
   def Sra8     : Pseudo<(outs GR8:$dst), (ins GR8:$src, GR8:$cnt),
                         "# Sra8 PSEUDO",
-                        [(set GR8:$dst, (MSP430sra GR8:$src, GR8:$cnt))]>;
+                        [(set GR8:$dst, (DCPU16sra GR8:$src, GR8:$cnt))]>;
   def Sra16    : Pseudo<(outs GR16:$dst), (ins GR16:$src, GR8:$cnt),
                         "# Sra16 PSEUDO",
-                        [(set GR16:$dst, (MSP430sra GR16:$src, GR8:$cnt))]>;
+                        [(set GR16:$dst, (DCPU16sra GR16:$src, GR8:$cnt))]>;
   def Srl8     : Pseudo<(outs GR8:$dst), (ins GR8:$src, GR8:$cnt),
                         "# Srl8 PSEUDO",
-                        [(set GR8:$dst, (MSP430srl GR8:$src, GR8:$cnt))]>;
+                        [(set GR8:$dst, (DCPU16srl GR8:$src, GR8:$cnt))]>;
   def Srl16    : Pseudo<(outs GR16:$dst), (ins GR16:$src, GR8:$cnt),
                         "# Srl16 PSEUDO",
-                        [(set GR16:$dst, (MSP430srl GR16:$src, GR8:$cnt))]>;
+                        [(set GR16:$dst, (DCPU16srl GR16:$src, GR8:$cnt))]>;
 
   }
 }
@@ -163,8 +163,8 @@ def NOP : Pseudo<(outs), (ins), "nop", []>;
 // FIXME: Provide proper encoding!
 let isReturn = 1, isTerminator = 1, isBarrier = 1 in {
   def RET  : IForm16<0x0, DstReg, SrcPostInc, Size2Bytes,
-                     (outs), (ins), "ret",  [(MSP430retflag)]>;
-  def RETI : II16r<0x0, (outs), (ins), "reti", [(MSP430retiflag)]>;
+                     (outs), (ins), "ret",  [(DCPU16retflag)]>;
+  def RETI : II16r<0x0, (outs), (ins), "reti", [(DCPU16retiflag)]>;
 }
 
 let isBranch = 1, isTerminator = 1 in {
@@ -196,7 +196,7 @@ let Uses = [SRW] in
   def JCC : CJForm<0, 0,
                    (outs), (ins jmptarget:$dst, cc:$cc),
                    "j$cc\t$dst",
-                   [(MSP430brcc bb:$dst, imm:$cc)]>;
+                   [(DCPU16brcc bb:$dst, imm:$cc)]>;
 } // isBranch, isTerminator
 
 //===----------------------------------------------------------------------===//
@@ -211,13 +211,13 @@ let isCall = 1 in
       Uses = [SPW] in {
     def CALLi     : II16i<0x0,
                           (outs), (ins i16imm:$dst, variable_ops),
-                          "call\t$dst", [(MSP430call imm:$dst)]>;
+                          "call\t$dst", [(DCPU16call imm:$dst)]>;
     def CALLr     : II16r<0x0,
                           (outs), (ins GR16:$dst, variable_ops),
-                          "call\t$dst", [(MSP430call GR16:$dst)]>;
+                          "call\t$dst", [(DCPU16call GR16:$dst)]>;
     def CALLm     : II16m<0x0,
                           (outs), (ins memsrc:$dst, variable_ops),
-                          "call\t${dst:mem}", [(MSP430call (load addr:$dst))]>;
+                          "call\t${dst:mem}", [(DCPU16call (load addr:$dst))]>;
   }
 
 
@@ -940,34 +940,34 @@ def SBC16mm : I16mm<0x0,
 def SAR8r1  : II8r<0x0,
                    (outs GR8:$dst), (ins GR8:$src),
                    "rra.b\t$dst",
-                   [(set GR8:$dst, (MSP430rra GR8:$src)),
+                   [(set GR8:$dst, (DCPU16rra GR8:$src)),
                     (implicit SRW)]>;
 def SAR16r1 : II16r<0x0,
                     (outs GR16:$dst), (ins GR16:$src),
                     "rra.w\t$dst",
-                    [(set GR16:$dst, (MSP430rra GR16:$src)),
+                    [(set GR16:$dst, (DCPU16rra GR16:$src)),
                      (implicit SRW)]>;
 
 def SHL8r1  : I8rr<0x0,
                    (outs GR8:$dst), (ins GR8:$src),
                    "rla.b\t$dst",
-                   [(set GR8:$dst, (MSP430rla GR8:$src)),
+                   [(set GR8:$dst, (DCPU16rla GR8:$src)),
                     (implicit SRW)]>;
 def SHL16r1 : I16rr<0x0,
                     (outs GR16:$dst), (ins GR16:$src),
                     "rla.w\t$dst",
-                    [(set GR16:$dst, (MSP430rla GR16:$src)),
+                    [(set GR16:$dst, (DCPU16rla GR16:$src)),
                      (implicit SRW)]>;
 
 def SAR8r1c  : Pseudo<(outs GR8:$dst), (ins GR8:$src),
                       "clrc\n\t"
                       "rrc.b\t$dst",
-                      [(set GR8:$dst, (MSP430rrc GR8:$src)),
+                      [(set GR8:$dst, (DCPU16rrc GR8:$src)),
                        (implicit SRW)]>;
 def SAR16r1c : Pseudo<(outs GR16:$dst), (ins GR16:$src),
                       "clrc\n\t"
                       "rrc.w\t$dst",
-                      [(set GR16:$dst, (MSP430rrc GR16:$src)),
+                      [(set GR16:$dst, (DCPU16rrc GR16:$src)),
                        (implicit SRW)]>;
 
 // FIXME: Memory sext's ?
@@ -997,52 +997,52 @@ let Defs = [SRW] in {
 def CMP8rr  : I8rr<0x0,
                    (outs), (ins GR8:$src, GR8:$src2),
                    "cmp.b\t{$src2, $src}",
-                   [(MSP430cmp GR8:$src, GR8:$src2), (implicit SRW)]>;
+                   [(DCPU16cmp GR8:$src, GR8:$src2), (implicit SRW)]>;
 def CMP16rr : I16rr<0x0,
                     (outs), (ins GR16:$src, GR16:$src2),
                     "cmp.w\t{$src2, $src}",
-                    [(MSP430cmp GR16:$src, GR16:$src2), (implicit SRW)]>;
+                    [(DCPU16cmp GR16:$src, GR16:$src2), (implicit SRW)]>;
 
 def CMP8ri  : I8ri<0x0,
                    (outs), (ins GR8:$src, i8imm:$src2),
                    "cmp.b\t{$src2, $src}",
-                   [(MSP430cmp GR8:$src, imm:$src2), (implicit SRW)]>;
+                   [(DCPU16cmp GR8:$src, imm:$src2), (implicit SRW)]>;
 def CMP16ri : I16ri<0x0,
                     (outs), (ins GR16:$src, i16imm:$src2),
                     "cmp.w\t{$src2, $src}",
-                    [(MSP430cmp GR16:$src, imm:$src2), (implicit SRW)]>;
+                    [(DCPU16cmp GR16:$src, imm:$src2), (implicit SRW)]>;
 
 def CMP8mi  : I8mi<0x0,
                    (outs), (ins memsrc:$src, i8imm:$src2),
                    "cmp.b\t{$src2, $src}",
-                   [(MSP430cmp (load addr:$src),
+                   [(DCPU16cmp (load addr:$src),
                                (i8 imm:$src2)), (implicit SRW)]>;
 def CMP16mi : I16mi<0x0,
                     (outs), (ins memsrc:$src, i16imm:$src2),
                     "cmp.w\t{$src2, $src}",
-                     [(MSP430cmp (load addr:$src),
+                     [(DCPU16cmp (load addr:$src),
                                  (i16 imm:$src2)), (implicit SRW)]>;
 
 def CMP8rm  : I8rm<0x0,
                    (outs), (ins GR8:$src, memsrc:$src2),
                    "cmp.b\t{$src2, $src}",
-                   [(MSP430cmp GR8:$src, (load addr:$src2)), 
+                   [(DCPU16cmp GR8:$src, (load addr:$src2)), 
                     (implicit SRW)]>;
 def CMP16rm : I16rm<0x0,
                     (outs), (ins GR16:$src, memsrc:$src2),
                     "cmp.w\t{$src2, $src}",
-                    [(MSP430cmp GR16:$src, (load addr:$src2)),
+                    [(DCPU16cmp GR16:$src, (load addr:$src2)),
                      (implicit SRW)]>;
 
 def CMP8mr  : I8mr<0x0,
                    (outs), (ins memsrc:$src, GR8:$src2),
                    "cmp.b\t{$src2, $src}",
-                   [(MSP430cmp (load addr:$src), GR8:$src2),
+                   [(DCPU16cmp (load addr:$src), GR8:$src2),
                     (implicit SRW)]>;
 def CMP16mr : I16mr<0x0,
                     (outs), (ins memsrc:$src, GR16:$src2),
                     "cmp.w\t{$src2, $src}",
-                    [(MSP430cmp (load addr:$src), GR16:$src2), 
+                    [(DCPU16cmp (load addr:$src), GR16:$src2), 
                      (implicit SRW)]>;
 
 
@@ -1052,69 +1052,69 @@ let isCommutable = 1 in {
 def BIT8rr  : I8rr<0x0,
                    (outs), (ins GR8:$src, GR8:$src2),
                    "bit.b\t{$src2, $src}",
-                   [(MSP430cmp (and_su GR8:$src, GR8:$src2), 0),
+                   [(DCPU16cmp (and_su GR8:$src, GR8:$src2), 0),
                     (implicit SRW)]>;
 def BIT16rr : I16rr<0x0,
                     (outs), (ins GR16:$src, GR16:$src2),
                     "bit.w\t{$src2, $src}",
-                    [(MSP430cmp (and_su GR16:$src, GR16:$src2), 0),
+                    [(DCPU16cmp (and_su GR16:$src, GR16:$src2), 0),
                      (implicit SRW)]>;
 }
 def BIT8ri  : I8ri<0x0,
                    (outs), (ins GR8:$src, i8imm:$src2),
                    "bit.b\t{$src2, $src}",
-                   [(MSP430cmp (and_su GR8:$src, imm:$src2), 0),
+                   [(DCPU16cmp (and_su GR8:$src, imm:$src2), 0),
                     (implicit SRW)]>;
 def BIT16ri : I16ri<0x0,
                     (outs), (ins GR16:$src, i16imm:$src2),
                     "bit.w\t{$src2, $src}",
-                    [(MSP430cmp (and_su GR16:$src, imm:$src2), 0),
+                    [(DCPU16cmp (and_su GR16:$src, imm:$src2), 0),
                      (implicit SRW)]>;
 
 def BIT8rm  : I8rm<0x0,
                    (outs), (ins GR8:$src, memdst:$src2),
                    "bit.b\t{$src2, $src}",
-                   [(MSP430cmp (and_su GR8:$src,  (load addr:$src2)), 0),
+                   [(DCPU16cmp (and_su GR8:$src,  (load addr:$src2)), 0),
                     (implicit SRW)]>;
 def BIT16rm : I16rm<0x0,
                     (outs), (ins GR16:$src, memdst:$src2),
                     "bit.w\t{$src2, $src}",
-                    [(MSP430cmp (and_su GR16:$src,  (load addr:$src2)), 0),
+                    [(DCPU16cmp (and_su GR16:$src,  (load addr:$src2)), 0),
                      (implicit SRW)]>;
 
 def BIT8mr  : I8mr<0x0,
                   (outs), (ins memsrc:$src, GR8:$src2),
                   "bit.b\t{$src2, $src}",
-                  [(MSP430cmp (and_su (load addr:$src), GR8:$src2), 0),
+                  [(DCPU16cmp (and_su (load addr:$src), GR8:$src2), 0),
                    (implicit SRW)]>;
 def BIT16mr : I16mr<0x0,
                     (outs), (ins memsrc:$src, GR16:$src2),
                     "bit.w\t{$src2, $src}",
-                    [(MSP430cmp (and_su (load addr:$src), GR16:$src2), 0),
+                    [(DCPU16cmp (and_su (load addr:$src), GR16:$src2), 0),
                      (implicit SRW)]>;
 
 def BIT8mi  : I8mi<0x0,
                    (outs), (ins memsrc:$src, i8imm:$src2),
                    "bit.b\t{$src2, $src}",
-                   [(MSP430cmp (and_su (load addr:$src), (i8 imm:$src2)), 0),
+                   [(DCPU16cmp (and_su (load addr:$src), (i8 imm:$src2)), 0),
                     (implicit SRW)]>;
 def BIT16mi : I16mi<0x0,
                     (outs), (ins memsrc:$src, i16imm:$src2),
                     "bit.w\t{$src2, $src}",
-                    [(MSP430cmp (and_su (load addr:$src), (i16 imm:$src2)), 0),
+                    [(DCPU16cmp (and_su (load addr:$src), (i16 imm:$src2)), 0),
                      (implicit SRW)]>;
 
 def BIT8mm  : I8mm<0x0,
                    (outs), (ins memsrc:$src, memsrc:$src2),
                    "bit.b\t{$src2, $src}",
-                   [(MSP430cmp (and_su (i8 (load addr:$src)),
+                   [(DCPU16cmp (and_su (i8 (load addr:$src)),
                                        (load addr:$src2)),
                                  0),
                       (implicit SRW)]>;
 def BIT16mm : I16mm<0x0,
                     (outs), (ins memsrc:$src, memsrc:$src2),
                     "bit.w\t{$src2, $src}",
-                    [(MSP430cmp (and_su (i16 (load addr:$src)),
+                    [(DCPU16cmp (and_su (i16 (load addr:$src)),
                                         (load addr:$src2)),
                                  0),
                      (implicit SRW)]>;
@@ -1135,28 +1135,28 @@ def : Pat<(i8 (trunc GR16:$src)),
           (EXTRACT_SUBREG GR16:$src, subreg_8bit)>;
 
 // GlobalAddress, ExternalSymbol
-def : Pat<(i16 (MSP430Wrapper tglobaladdr:$dst)), (MOV16ri tglobaladdr:$dst)>;
-def : Pat<(i16 (MSP430Wrapper texternalsym:$dst)), (MOV16ri texternalsym:$dst)>;
-def : Pat<(i16 (MSP430Wrapper tblockaddress:$dst)), (MOV16ri tblockaddress:$dst)>;
+def : Pat<(i16 (DCPU16Wrapper tglobaladdr:$dst)), (MOV16ri tglobaladdr:$dst)>;
+def : Pat<(i16 (DCPU16Wrapper texternalsym:$dst)), (MOV16ri texternalsym:$dst)>;
+def : Pat<(i16 (DCPU16Wrapper tblockaddress:$dst)), (MOV16ri tblockaddress:$dst)>;
 
-def : Pat<(add GR16:$src, (MSP430Wrapper tglobaladdr :$src2)),
+def : Pat<(add GR16:$src, (DCPU16Wrapper tglobaladdr :$src2)),
           (ADD16ri GR16:$src, tglobaladdr:$src2)>;
-def : Pat<(add GR16:$src, (MSP430Wrapper texternalsym:$src2)),
+def : Pat<(add GR16:$src, (DCPU16Wrapper texternalsym:$src2)),
           (ADD16ri GR16:$src, texternalsym:$src2)>;
-def : Pat<(add GR16:$src, (MSP430Wrapper tblockaddress:$src2)),
+def : Pat<(add GR16:$src, (DCPU16Wrapper tblockaddress:$src2)),
           (ADD16ri GR16:$src, tblockaddress:$src2)>;
 
-def : Pat<(store (i16 (MSP430Wrapper tglobaladdr:$src)), addr:$dst),
+def : Pat<(store (i16 (DCPU16Wrapper tglobaladdr:$src)), addr:$dst),
           (MOV16mi addr:$dst, tglobaladdr:$src)>;
-def : Pat<(store (i16 (MSP430Wrapper texternalsym:$src)), addr:$dst),
+def : Pat<(store (i16 (DCPU16Wrapper texternalsym:$src)), addr:$dst),
           (MOV16mi addr:$dst, texternalsym:$src)>;
-def : Pat<(store (i16 (MSP430Wrapper tblockaddress:$src)), addr:$dst),
+def : Pat<(store (i16 (DCPU16Wrapper tblockaddress:$src)), addr:$dst),
           (MOV16mi addr:$dst, tblockaddress:$src)>;
 
 // calls
-def : Pat<(MSP430call (i16 tglobaladdr:$dst)),
+def : Pat<(DCPU16call (i16 tglobaladdr:$dst)),
           (CALLi tglobaladdr:$dst)>;
-def : Pat<(MSP430call (i16 texternalsym:$dst)),
+def : Pat<(DCPU16call (i16 texternalsym:$dst)),
           (CALLi texternalsym:$dst)>;
 
 // add and sub always produce carry
@@ -1206,6 +1206,6 @@ def : Pat<(store (subc (load addr:$dst), (i8 (load addr:$src))), addr:$dst),
 
 // peephole patterns
 def : Pat<(and GR16:$src, 255), (ZEXT16r GR16:$src)>;
-def : Pat<(MSP430cmp (trunc (and_su GR16:$src, GR16:$src2)), 0),
+def : Pat<(DCPU16cmp (trunc (and_su GR16:$src, GR16:$src2)), 0),
           (BIT8rr (EXTRACT_SUBREG GR16:$src, subreg_8bit),
                   (EXTRACT_SUBREG GR16:$src2, subreg_8bit))>;

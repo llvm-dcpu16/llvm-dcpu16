@@ -1,4 +1,4 @@
-//==- MSP430FrameLowering.h - Define frame lowering for MSP430 --*- C++ -*--==//
+//==- DCPU16FrameLowering.h - Define frame lowering for DCPU16 --*- C++ -*--==//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -11,22 +11,22 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef MSP430_FRAMEINFO_H
-#define MSP430_FRAMEINFO_H
+#ifndef DCPU16_FRAMEINFO_H
+#define DCPU16_FRAMEINFO_H
 
-#include "MSP430.h"
-#include "MSP430Subtarget.h"
+#include "DCPU16.h"
+#include "DCPU16Subtarget.h"
 #include "llvm/Target/TargetFrameLowering.h"
 
 namespace llvm {
-  class MSP430Subtarget;
+  class DCPU16Subtarget;
 
-class MSP430FrameLowering : public TargetFrameLowering {
+class DCPU16FrameLowering : public TargetFrameLowering {
 protected:
-  const MSP430Subtarget &STI;
+  const DCPU16Subtarget &STI;
 
 public:
-  explicit MSP430FrameLowering(const MSP430Subtarget &sti)
+  explicit DCPU16FrameLowering(const DCPU16Subtarget &sti)
     : TargetFrameLowering(TargetFrameLowering::StackGrowsDown, 2, -2), STI(sti) {
   }
 

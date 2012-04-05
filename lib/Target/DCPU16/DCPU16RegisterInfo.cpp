@@ -1,4 +1,4 @@
-//===-- MSP430RegisterInfo.cpp - MSP430 Register Information --------------===//
+//===-- DCPU16RegisterInfo.cpp - DCPU16 Register Information --------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,16 +7,16 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file contains the MSP430 implementation of the TargetRegisterInfo class.
+// This file contains the DCPU16 implementation of the TargetRegisterInfo class.
 //
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "msp430-reg-info"
 
-#include "MSP430RegisterInfo.h"
-#include "MSP430.h"
-#include "MSP430MachineFunctionInfo.h"
-#include "MSP430TargetMachine.h"
+#include "DCPU16RegisterInfo.h"
+#include "DCPU16.h"
+#include "DCPU16MachineFunctionInfo.h"
+#include "DCPU16TargetMachine.h"
 #include "llvm/Function.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineFunction.h"
@@ -27,80 +27,80 @@
 #include "llvm/Support/ErrorHandling.h"
 
 #define GET_REGINFO_TARGET_DESC
-#include "MSP430GenRegisterInfo.inc"
+#include "DCPU16GenRegisterInfo.inc"
 
 using namespace llvm;
 
 // FIXME: Provide proper call frame setup / destroy opcodes.
-MSP430RegisterInfo::MSP430RegisterInfo(MSP430TargetMachine &tm,
+DCPU16RegisterInfo::DCPU16RegisterInfo(DCPU16TargetMachine &tm,
                                        const TargetInstrInfo &tii)
-  : MSP430GenRegisterInfo(MSP430::PCW), TM(tm), TII(tii) {
+  : DCPU16GenRegisterInfo(DCPU16::PCW), TM(tm), TII(tii) {
   StackAlign = TM.getFrameLowering()->getStackAlignment();
 }
 
 const uint16_t*
-MSP430RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
+DCPU16RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
   const TargetFrameLowering *TFI = MF->getTarget().getFrameLowering();
   const Function* F = MF->getFunction();
   static const uint16_t CalleeSavedRegs[] = {
-    MSP430::FPW, MSP430::R5W, MSP430::R6W, MSP430::R7W,
-    MSP430::R8W, MSP430::R9W, MSP430::R10W, MSP430::R11W,
+    DCPU16::FPW, DCPU16::R5W, DCPU16::R6W, DCPU16::R7W,
+    DCPU16::R8W, DCPU16::R9W, DCPU16::R10W, DCPU16::R11W,
     0
   };
   static const uint16_t CalleeSavedRegsFP[] = {
-    MSP430::R5W, MSP430::R6W, MSP430::R7W,
-    MSP430::R8W, MSP430::R9W, MSP430::R10W, MSP430::R11W,
+    DCPU16::R5W, DCPU16::R6W, DCPU16::R7W,
+    DCPU16::R8W, DCPU16::R9W, DCPU16::R10W, DCPU16::R11W,
     0
   };
   static const uint16_t CalleeSavedRegsIntr[] = {
-    MSP430::FPW,  MSP430::R5W,  MSP430::R6W,  MSP430::R7W,
-    MSP430::R8W,  MSP430::R9W,  MSP430::R10W, MSP430::R11W,
-    MSP430::R12W, MSP430::R13W, MSP430::R14W, MSP430::R15W,
+    DCPU16::FPW,  DCPU16::R5W,  DCPU16::R6W,  DCPU16::R7W,
+    DCPU16::R8W,  DCPU16::R9W,  DCPU16::R10W, DCPU16::R11W,
+    DCPU16::R12W, DCPU16::R13W, DCPU16::R14W, DCPU16::R15W,
     0
   };
   static const uint16_t CalleeSavedRegsIntrFP[] = {
-    MSP430::R5W,  MSP430::R6W,  MSP430::R7W,
-    MSP430::R8W,  MSP430::R9W,  MSP430::R10W, MSP430::R11W,
-    MSP430::R12W, MSP430::R13W, MSP430::R14W, MSP430::R15W,
+    DCPU16::R5W,  DCPU16::R6W,  DCPU16::R7W,
+    DCPU16::R8W,  DCPU16::R9W,  DCPU16::R10W, DCPU16::R11W,
+    DCPU16::R12W, DCPU16::R13W, DCPU16::R14W, DCPU16::R15W,
     0
   };
 
   if (TFI->hasFP(*MF))
-    return (F->getCallingConv() == CallingConv::MSP430_INTR ?
+    return (F->getCallingConv() == CallingConv::DCPU16_INTR ?
             CalleeSavedRegsIntrFP : CalleeSavedRegsFP);
   else
-    return (F->getCallingConv() == CallingConv::MSP430_INTR ?
+    return (F->getCallingConv() == CallingConv::DCPU16_INTR ?
             CalleeSavedRegsIntr : CalleeSavedRegs);
 
 }
 
-BitVector MSP430RegisterInfo::getReservedRegs(const MachineFunction &MF) const {
+BitVector DCPU16RegisterInfo::getReservedRegs(const MachineFunction &MF) const {
   BitVector Reserved(getNumRegs());
   const TargetFrameLowering *TFI = MF.getTarget().getFrameLowering();
 
   // Mark 4 special registers with subregisters as reserved.
-  Reserved.set(MSP430::PCB);
-  Reserved.set(MSP430::SPB);
-  Reserved.set(MSP430::SRB);
-  Reserved.set(MSP430::CGB);
-  Reserved.set(MSP430::PCW);
-  Reserved.set(MSP430::SPW);
-  Reserved.set(MSP430::SRW);
-  Reserved.set(MSP430::CGW);
+  Reserved.set(DCPU16::PCB);
+  Reserved.set(DCPU16::SPB);
+  Reserved.set(DCPU16::SRB);
+  Reserved.set(DCPU16::CGB);
+  Reserved.set(DCPU16::PCW);
+  Reserved.set(DCPU16::SPW);
+  Reserved.set(DCPU16::SRW);
+  Reserved.set(DCPU16::CGW);
 
   // Mark frame pointer as reserved if needed.
   if (TFI->hasFP(MF))
-    Reserved.set(MSP430::FPW);
+    Reserved.set(DCPU16::FPW);
 
   return Reserved;
 }
 
 const TargetRegisterClass *
-MSP430RegisterInfo::getPointerRegClass(unsigned Kind) const {
-  return &MSP430::GR16RegClass;
+DCPU16RegisterInfo::getPointerRegClass(unsigned Kind) const {
+  return &DCPU16::GR16RegClass;
 }
 
-void MSP430RegisterInfo::
+void DCPU16RegisterInfo::
 eliminateCallFramePseudoInstr(MachineFunction &MF, MachineBasicBlock &MBB,
                               MachineBasicBlock::iterator I) const {
   const TargetFrameLowering *TFI = MF.getTarget().getFrameLowering();
@@ -121,8 +121,8 @@ eliminateCallFramePseudoInstr(MachineFunction &MF, MachineBasicBlock &MBB,
       MachineInstr *New = 0;
       if (Old->getOpcode() == TII.getCallFrameSetupOpcode()) {
         New = BuildMI(MF, Old->getDebugLoc(),
-                      TII.get(MSP430::SUB16ri), MSP430::SPW)
-          .addReg(MSP430::SPW).addImm(Amount);
+                      TII.get(DCPU16::SUB16ri), DCPU16::SPW)
+          .addReg(DCPU16::SPW).addImm(Amount);
       } else {
         assert(Old->getOpcode() == TII.getCallFrameDestroyOpcode());
         // factor out the amount the callee already popped.
@@ -130,8 +130,8 @@ eliminateCallFramePseudoInstr(MachineFunction &MF, MachineBasicBlock &MBB,
         Amount -= CalleeAmt;
         if (Amount)
           New = BuildMI(MF, Old->getDebugLoc(),
-                        TII.get(MSP430::ADD16ri), MSP430::SPW)
-            .addReg(MSP430::SPW).addImm(Amount);
+                        TII.get(DCPU16::ADD16ri), DCPU16::SPW)
+            .addReg(DCPU16::SPW).addImm(Amount);
       }
 
       if (New) {
@@ -148,8 +148,8 @@ eliminateCallFramePseudoInstr(MachineFunction &MF, MachineBasicBlock &MBB,
     if (uint64_t CalleeAmt = I->getOperand(1).getImm()) {
       MachineInstr *Old = I;
       MachineInstr *New =
-        BuildMI(MF, Old->getDebugLoc(), TII.get(MSP430::SUB16ri),
-                MSP430::SPW).addReg(MSP430::SPW).addImm(CalleeAmt);
+        BuildMI(MF, Old->getDebugLoc(), TII.get(DCPU16::SUB16ri),
+                DCPU16::SPW).addReg(DCPU16::SPW).addImm(CalleeAmt);
       // The SRW implicit def is dead.
       New->getOperand(3).setIsDead();
 
@@ -161,7 +161,7 @@ eliminateCallFramePseudoInstr(MachineFunction &MF, MachineBasicBlock &MBB,
 }
 
 void
-MSP430RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
+DCPU16RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
                                         int SPAdj, RegScavenger *RS) const {
   assert(SPAdj == 0 && "Unexpected");
 
@@ -178,7 +178,7 @@ MSP430RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
 
   int FrameIndex = MI.getOperand(i).getIndex();
 
-  unsigned BasePtr = (TFI->hasFP(MF) ? MSP430::FPW : MSP430::SPW);
+  unsigned BasePtr = (TFI->hasFP(MF) ? DCPU16::FPW : DCPU16::SPW);
   int Offset = MF.getFrameInfo()->getObjectOffset(FrameIndex);
 
   // Skip the saved PC
@@ -192,12 +192,12 @@ MSP430RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   // Fold imm into offset
   Offset += MI.getOperand(i+1).getImm();
 
-  if (MI.getOpcode() == MSP430::ADD16ri) {
+  if (MI.getOpcode() == DCPU16::ADD16ri) {
     // This is actually "load effective address" of the stack slot
     // instruction. We have only two-address instructions, thus we need to
     // expand it into mov + add
 
-    MI.setDesc(TII.get(MSP430::MOV16rr));
+    MI.setDesc(TII.get(DCPU16::MOV16rr));
     MI.getOperand(i).ChangeToRegister(BasePtr, false);
 
     if (Offset == 0)
@@ -206,10 +206,10 @@ MSP430RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
     // We need to materialize the offset via add instruction.
     unsigned DstReg = MI.getOperand(0).getReg();
     if (Offset < 0)
-      BuildMI(MBB, llvm::next(II), dl, TII.get(MSP430::SUB16ri), DstReg)
+      BuildMI(MBB, llvm::next(II), dl, TII.get(DCPU16::SUB16ri), DstReg)
         .addReg(DstReg).addImm(-Offset);
     else
-      BuildMI(MBB, llvm::next(II), dl, TII.get(MSP430::ADD16ri), DstReg)
+      BuildMI(MBB, llvm::next(II), dl, TII.get(DCPU16::ADD16ri), DstReg)
         .addReg(DstReg).addImm(Offset);
 
     return;
@@ -220,7 +220,7 @@ MSP430RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
 }
 
 void
-MSP430RegisterInfo::processFunctionBeforeFrameFinalized(MachineFunction &MF)
+DCPU16RegisterInfo::processFunctionBeforeFrameFinalized(MachineFunction &MF)
                                                                          const {
   const TargetFrameLowering *TFI = MF.getTarget().getFrameLowering();
 
@@ -233,8 +233,8 @@ MSP430RegisterInfo::processFunctionBeforeFrameFinalized(MachineFunction &MF)
   }
 }
 
-unsigned MSP430RegisterInfo::getFrameRegister(const MachineFunction &MF) const {
+unsigned DCPU16RegisterInfo::getFrameRegister(const MachineFunction &MF) const {
   const TargetFrameLowering *TFI = MF.getTarget().getFrameLowering();
 
-  return TFI->hasFP(MF) ? MSP430::FPW : MSP430::SPW;
+  return TFI->hasFP(MF) ? DCPU16::FPW : DCPU16::SPW;
 }

@@ -1,4 +1,4 @@
-//= MSP430InstPrinter.h - Convert MSP430 MCInst to assembly syntax -*- C++ -*-//
+//= DCPU16InstPrinter.h - Convert DCPU16 MCInst to assembly syntax -*- C++ -*-//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,21 +7,21 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This class prints a MSP430 MCInst to a .s file.
+// This class prints a DCPU16 MCInst to a .s file.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef MSP430INSTPRINTER_H
-#define MSP430INSTPRINTER_H
+#ifndef DCPU16INSTPRINTER_H
+#define DCPU16INSTPRINTER_H
 
 #include "llvm/MC/MCInstPrinter.h"
 
 namespace llvm {
   class MCOperand;
 
-  class MSP430InstPrinter : public MCInstPrinter {
+  class DCPU16InstPrinter : public MCInstPrinter {
   public:
-    MSP430InstPrinter(const MCAsmInfo &MAI, const MCInstrInfo &MII,
+    DCPU16InstPrinter(const MCAsmInfo &MAI, const MCInstrInfo &MII,
                       const MCRegisterInfo &MRI)
       : MCInstPrinter(MAI, MII, MRI) {}
 
