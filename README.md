@@ -12,7 +12,7 @@ Below are the instructions how to build and try (tested on Ubuntu 11.10 x86_64)
 First, of all, you need to install prerequisites:
 
     sudo apt-get install gcc g++ git subversion git-svn\
-    perl gawk expect tcl texinfo awk autoconf automake cmake
+    perl gawk expect tcl texinfo bison autoconf automake cmake
 
 Next, get the sources and build it:
 
