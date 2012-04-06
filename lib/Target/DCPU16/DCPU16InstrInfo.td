@@ -175,7 +175,7 @@ let isBranch = 1, isTerminator = 1 in {
 let isBarrier = 1 in {
   // Short branch
   def JMP : CJForm<0, 0, (outs), (ins jmptarget:$dst),
-                   "jmp\t$dst",
+                   "SET\t{PC, $dst} ; The Notch order",
                    [(br bb:$dst)]>;
   let isIndirectBranch = 1 in {
     // Long branches
