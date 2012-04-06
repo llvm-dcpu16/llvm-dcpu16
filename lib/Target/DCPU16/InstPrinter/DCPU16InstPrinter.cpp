@@ -101,16 +101,16 @@ void DCPU16InstPrinter::printCCOperand(const MCInst *MI, unsigned OpNo,
    O << "IFN\tO, 0 ; The Notch order, jne\n\tSET\tPC,";
    break;
   case DCPU16CC::COND_HS:
-   O << "IFN\tO, 0xFFFF ; The Notch order, jhs\n\tSET\tPC,";
+   O << "IFN\tO, 65535 ; The Notch order, jhs\n\tSET\tPC,";
    break;
   case DCPU16CC::COND_LO:
-   O << "IFE\tO, 0xFFFF ; The Notch order, jlo\n\tSET\tPC,";
+   O << "IFE\tO, 65535 ; The Notch order, jlo\n\tSET\tPC,";
    break;
   case DCPU16CC::COND_GE:
-   O << "IFN\tO, 0xFFFF ; The Notch order, jge\n\tSET\tPC,";
+   O << "IFN\tO, 65535 ; The Notch order, jge\n\tSET\tPC,";
    break;
   case DCPU16CC::COND_L:
-   O << "IFE\tO, 0xFFFF ; The Notch order, jl\n\tSET\tPC,";
+   O << "IFE\tO, 65535 ; The Notch order, jl\n\tSET\tPC,";
    break;
   }
 }
