@@ -27,13 +27,12 @@ class DCPU16RegWithSubregs<bits<4> num, string n, list<Register> subregs>
 //===----------------------------------------------------------------------===//
 
 def PCB  : DCPU16Reg<0,  "r0">;
-def SPB  : DCPU16Reg<1,  "SP">;
+def SPB  : DCPU16Reg<1,  "C">;
 def SRB  : DCPU16Reg<2,  "r2">;
 def CGB  : DCPU16Reg<3,  "r3">;
 def FPB  : DCPU16Reg<4,  "r4">;
 def R1AB : DCPU16Reg<5,  "A">;
 def R2BB : DCPU16Reg<6,  "B">;
-def R3CB : DCPU16Reg<7,  "C">;
 def R4XB : DCPU16Reg<8,  "X">;
 def R5YB : DCPU16Reg<9,  "Y">;
 def R6ZB : DCPU16Reg<10, "Z">;
@@ -47,13 +46,12 @@ def subreg_8bit : SubRegIndex { let Namespace = "DCPU16"; }
 
 let SubRegIndices = [subreg_8bit] in {
 def PCW  : DCPU16RegWithSubregs<0,  "r0",  [PCB]>;
-def SPW  : DCPU16RegWithSubregs<1,  "SP",  [SPB]>;
+def SPW  : DCPU16RegWithSubregs<1,  "C",  [SPB]>;
 def SRW  : DCPU16RegWithSubregs<2,  "r2",  [SRB]>;
 def CGW  : DCPU16RegWithSubregs<3,  "r3",  [CGB]>;
 def FPW  : DCPU16RegWithSubregs<4,  "r4",  [FPB]>;
 def R1A  : DCPU16RegWithSubregs<5,  "A",   [R1AB]>;
 def R2B  : DCPU16RegWithSubregs<6,  "B",   [R2BB]>;
-def R3C  : DCPU16RegWithSubregs<7,  "C",   [R3CB]>;
 def R4X  : DCPU16RegWithSubregs<8,  "X",   [R4XB]>;
 def R5Y  : DCPU16RegWithSubregs<9,  "Y",   [R5YB]>;
 def R6Z  : DCPU16RegWithSubregs<10, "Z",   [R6ZB]>;
@@ -66,7 +64,7 @@ def R15W : DCPU16RegWithSubregs<15, "r15", [R15B]>;
 
 def GR8 : RegisterClass<"DCPU16", [i8], 8,
    // Volatile registers
-  (add R8JB, R13B, R14B, R15B, R7IB, R6ZB, R5YB, R4XB, R3CB, R2BB, R1AB,
+  (add R8JB, R13B, R14B, R15B, R7IB, R6ZB, R5YB, R4XB, R2BB, R1AB,
    // Frame pointer, sometimes allocable
    FPB,
    // Volatile, but not allocable
@@ -74,7 +72,7 @@ def GR8 : RegisterClass<"DCPU16", [i8], 8,
 
 def GR16 : RegisterClass<"DCPU16", [i16], 16,
    // Volatile registers
-  (add R8J, R13W, R14W, R15W, R7I, R6Z, R5Y, R4X, R3C, R2B, R1A,
+  (add R8J, R13W, R14W, R15W, R7I, R6Z, R5Y, R4X, R2B, R1A,
    // Frame pointer, sometimes allocable
    FPW,
    // Volatile, but not allocable
