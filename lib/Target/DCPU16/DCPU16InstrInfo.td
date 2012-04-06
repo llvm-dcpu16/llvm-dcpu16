@@ -1000,7 +1000,11 @@ def CMP8rr  : I8rr<0x0,
                    [(DCPU16cmp GR8:$src, GR8:$src2), (implicit SRW)]>;
 def CMP16rr : I16rr<0x0,
                     (outs), (ins GR16:$src, GR16:$src2),
-                    "cmp.w\t{$src2, $src}",
+		    "SET\tO, 0xFFFF ; The Notch order, cmp {$src2, $src}, start\n"
+		    "\tIFE\t{$src2, $src} ; The Notch order\n"
+		    "\tSET\tO, 0 ; The Notch order\n"
+		    "\tIFG\t{$src2, $src} ; The Notch order\n"
+		    "\tSET\tO, 1 ; The Notch order, end",
                     [(DCPU16cmp GR16:$src, GR16:$src2), (implicit SRW)]>;
 
 def CMP8ri  : I8ri<0x0,
@@ -1009,7 +1013,11 @@ def CMP8ri  : I8ri<0x0,
                    [(DCPU16cmp GR8:$src, imm:$src2), (implicit SRW)]>;
 def CMP16ri : I16ri<0x0,
                     (outs), (ins GR16:$src, i16imm:$src2),
-                    "cmp.w\t{$src2, $src}",
+		    "SET\tO, 0xFFFF ; The Notch order, cmp {$src2, $src}, start\n"
+		    "\tIFE\t{$src2, $src} ; The Notch order\n"
+		    "\tSET\tO, 0 ; The Notch order\n"
+		    "\tIFG\t{$src2, $src} ; The Notch order\n"
+		    "\tSET\tO, 1 ; The Notch order, end",
                     [(DCPU16cmp GR16:$src, imm:$src2), (implicit SRW)]>;
 
 def CMP8mi  : I8mi<0x0,
@@ -1019,7 +1027,11 @@ def CMP8mi  : I8mi<0x0,
                                (i8 imm:$src2)), (implicit SRW)]>;
 def CMP16mi : I16mi<0x0,
                     (outs), (ins memsrc:$src, i16imm:$src2),
-                    "cmp.w\t{$src2, $src}",
+		    "SET\tO, 0xFFFF ; The Notch order, cmp {$src2, $src}, start\n"
+		    "\tIFE\t{$src2, $src} ; The Notch order\n"
+		    "\tSET\tO, 0 ; The Notch order\n"
+		    "\tIFG\t{$src2, $src} ; The Notch order\n"
+		    "\tSET\tO, 1 ; The Notch order, end",
                      [(DCPU16cmp (load addr:$src),
                                  (i16 imm:$src2)), (implicit SRW)]>;
 
@@ -1030,7 +1042,11 @@ def CMP8rm  : I8rm<0x0,
                     (implicit SRW)]>;
 def CMP16rm : I16rm<0x0,
                     (outs), (ins GR16:$src, memsrc:$src2),
-                    "cmp.w\t{$src2, $src}",
+      		    "SET\tO, 0xFFFF ; The Notch order, cmp {$src2, $src}, start\n"
+		    "\tIFE\t{$src2, $src} ; The Notch order\n"
+		    "\tSET\tO, 0 ; The Notch order\n"
+		    "\tIFG\t{$src2, $src} ; The Notch order\n"
+		    "\tSET\tO, 1 ; The Notch order, end",
                     [(DCPU16cmp GR16:$src, (load addr:$src2)),
                      (implicit SRW)]>;
 
@@ -1041,7 +1057,11 @@ def CMP8mr  : I8mr<0x0,
                     (implicit SRW)]>;
 def CMP16mr : I16mr<0x0,
                     (outs), (ins memsrc:$src, GR16:$src2),
-                    "cmp.w\t{$src2, $src}",
+		    "SET\tO, 0xFFFF ; The Notch order, cmp {$src2, $src}, start\n"
+		    "\tIFE\t{$src2, $src} ; The Notch order\n"
+		    "\tSET\tO, 0 ; The Notch order\n"
+		    "\tIFG\t{$src2, $src} ; The Notch order\n"
+		    "\tSET\tO, 1 ; The Notch order, end",
                     [(DCPU16cmp (load addr:$src), GR16:$src2), 
                      (implicit SRW)]>;
 
