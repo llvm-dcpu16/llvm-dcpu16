@@ -104,6 +104,7 @@ So, in order to get your program running, for now, you will have to:
 3. in the beginning of your program, please, put the initialization:
 
     SET C, SP
+
     SUB C, 256
 
 This is because SP is not addressable and LLVM backend only uses it as an instruction stack pointer.
@@ -112,12 +113,14 @@ As you may mention, 256 is the limit for recursion. You may choose your own limi
 
 So, the program that you can run would look like:
 
+:init
       SET C, SP
       SUB C, 256
     
+:start
       SET X, 4
-      JSR fib
-      SET PC, break
+      JSR fib         ; call fib(4)
+      SET PC, break   ; halt
     
     :fib                                    ; @fib
     ; BB#0:                                 ; %entry
