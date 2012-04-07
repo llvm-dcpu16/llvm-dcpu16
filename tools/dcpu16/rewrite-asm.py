@@ -35,6 +35,4 @@ result = result + """
   SET PC, crash
 """
 
-# Must be changed to print(result) for Python 3+
-print result
 out.write(result)
