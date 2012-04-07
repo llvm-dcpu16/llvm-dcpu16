@@ -16,7 +16,7 @@ First, of all, you need to install prerequisites:
 
 Next, get the sources and build it:
 
-    git clone git@github.com:krasin/llvm-dcpu16.git
+    git clone git://github.com/krasin/llvm-dcpu16.git
     cd llvm-dcpu16
     mkdir cbuild
     cd cbuild
