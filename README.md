@@ -112,11 +112,11 @@ As you may mention, 256 is the limit for recursion. You may choose your own limi
 
 So, the program that you can run would look like:
 
-:init
+    :init
       SET C, SP
       SUB C, 256
     
-:start
+    :start
       SET X, 4
       JSR fib         ; call fib(4)
       SET PC, break   ; halt
