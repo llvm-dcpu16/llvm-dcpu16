@@ -106,6 +106,7 @@ So, in order to get your program running, for now, you will have to:
         SET C, SP
         SUB C, 256
 
+You may want find tools/dcpu16/asm-rewriter.py useful (it should make the above changes for you!)
 
 This is because SP is not addressable and LLVM backend only uses it as an instruction stack pointer.
 For data stack pointer, C register is used.
