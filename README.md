@@ -90,7 +90,8 @@ fib.s:
 
 Although, this program is perfectly valid, no existing DCPU16 assembly accepts it because of two primary reasons:
 
-- Label declarations in most 'regular' assemblers are defined as label: but DCPU16 assemblers prefer :label syntax.
+- Label declarations in most 'regular' assemblers are defined as label: (colon at the end of line),
+  but DCPU16 assemblers prefer :label (colon at the beginning) syntax.
   I have not yet decided what to do here: make hacks to LLVM to teach the new label syntax or
   convince DCPU16 assemblers to accept both formats (which is pretty safe).
 
@@ -105,7 +106,8 @@ So, in order to get your program running, for now, you will have to:
     SET C, SP
     SUB C, 256
 
-This is because SP is not addressable stack and LLVM backend only uses it as an instruction stack. For data stack pointer, C is used.
+This is because SP is not addressable and LLVM backend only uses it as an instruction stack pointer.
+For data stack pointer, C register is used.
 As you may mention, 256 is the limit for recursion. You may choose your own limit.
 
 So, the program that you can run would look like:
