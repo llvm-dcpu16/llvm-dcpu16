@@ -160,5 +160,36 @@ So, the program that you can run would look like:
       SET PC, crash
 
 You may want to try it in the [online DCPU assembler and debugger by Mappum](http://mappum.github.com/DCPU-16/)
+After you compile and run the program, the final state should be:
+
+    ==== REGISTERS: ====
+    A:  0000
+    B:  0000
+    C:  ff00
+    X:  0008
+    Y:  0000
+    Z:  0000
+    I:  0000
+    J:  0004
+    
+    PC: 0034
+    SP: 0000
+    O:  0000
+    
+    CPU CYCLES: 178
+    
+    ======= RAM: =======
+    0000:*6c21*7c23 0100 9031 7c10 0008 7dc1 0033
+    0008: a823 0d21 0008 8521 0006 8521 0004 8121
+    0010: 0002 4871 0002 7dd1 ffff 487c 0008 81d1
+    0018: 487e 0008 85d1 7ddd ffff 7dc1 002f 4871
+    0020: 0006 4872 0004 1d21 0000 4921 0004 0006
+    0028: 4921 0006 0000 8522 0002 7dc1 0011 4831
+    0030: 0006 a822 61c1 0020[7dc1]0034 0000 0000
+    fef0: 0000 0000 0000 0000 0000 0000 0008 0000
+    fef8: 0004 0000 0005 0000 0008 0000 0004 0000
+    fff8: 0000 0000 0000 0000 0000 0000 0000 0006       	   
+
+X=8 has the value of Fib_4 (you may want to play with the value of argument to fib other than 4).
 
 Enjoy and, please, [report bugs](https://github.com/krasin/llvm-dcpu16/issues)!
