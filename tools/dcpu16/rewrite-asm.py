@@ -3,13 +3,14 @@
 
 import sys
 file = open(sys.argv[1])
-
-import sys
-file = open(sys.argv[1])
 out = open(sys.argv[2], "w")
-result = """:init
+result = """:autoinit
   SET C, SP
   SUB C, 256
+:automain
+  ;; Please put your startup code below
+  ;; <here>
+  SET PC, break
 """
 
 for line in file.readlines():
@@ -17,12 +18,12 @@ for line in file.readlines():
         for symbol in ["file", "text", "globl", "align", "type", "size"]:
             if line.strip().find("."+symbol) == 0:
                 raise Error
-            except:
-                continue
-            if len(line.split()) and line.strip()[0] != ";":
-                if line.split()[0][-1] == ":":
-                    line =  " ".join([":"+line.split(" ")[0][:-1]]  + line.split(" ")[1:])
-                    result = result + line
+    except:
+        continue
+    if len(line.split()) and line.strip()[0] != ";":
+        if line.split()[0][-1] == ":":
+            line =  " ".join([":"+line.split(" ")[0][:-1]]  + line.split(" ")[1:])
+    result = result + line
                     
 result = result + """
 :break
