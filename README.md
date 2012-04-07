@@ -43,8 +43,11 @@ fib.c:
     }
 
 
-Assuming that you have a 'normal' clang in the $PATH, let's translate this C program to DCPU16 assembly:
+Assuming that you have a 'normal' clang in the $PATH, let's translate this C program to DCPU16 assembly.
+You need at least clang 3.0, but building from source is recommended (in a separate directory).
+You may use [Getting Started: Building and Running Clang](http://clang.llvm.org/get_started.html) to save your time.
 
+    clang --version # Check the version of Clang
     clang -ccc-host-triple msp430 -c -emit-llvm fib.c
     bin/llc -filetype=asm -mtriple dcpu16 fib.o -o fib.s
 
