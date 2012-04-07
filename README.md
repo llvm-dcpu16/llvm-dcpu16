@@ -4,8 +4,8 @@ DCPU-16 is the processor from Mojang's new game [0x10c](http://0x10c.com/).
 This project has a goal to make a full-featured LLVM backend for DCPU-16 and
 port Clang to support this architecture.
 
-Currently, llvm backend is only partially implemented, but simple programs work.
-Using clang is also possible, but one should target to msp430 to get the LLVM bitcode.
+Currently, llvm backend and Clang support are only partially implemented,
+but simple programs work.
 
 Below are the instructions how to build and try (tested on Ubuntu 11.10 x86_64)
 
@@ -14,18 +14,19 @@ First, of all, you need to install prerequisites:
     sudo apt-get install gcc g++ git subversion git-svn\
      perl gawk expect tcl texinfo bison autoconf automake cmake
 
+Note, that Arch Linux users experience [the issue with cmake](https://github.com/krasin/llvm-dcpu16/issues/43).
+
 Next, get the sources and build it:
 
-    git clone git://github.com/krasin/llvm-dcpu16.git
-    cd llvm-dcpu16
-    mkdir cbuild
-    cd cbuild
+    git clone git://github.com/krasin/llvm-dcpu16.git # Checkout LLVM
+    cd llvm-dcpu16/tools
+    git clone git://github.com/krasin/clang-dcpu16.git clang # Checkout Clang
+    mkdir ../cbuild
+    cd ../cbuild
     cmake ..
     make -j4
 
 It should build w/o a problem. Please, file an issue with the output, in case you have any troubles with this step.
-
-Now, you have llvm tools built, in particular, bin/llc that translates LLVM bitcode to native code.
 
 Consider the following C file:
 
@@ -42,14 +43,9 @@ fib.c:
       return cur;
     }
 
+Now, let's translate C to DCPU16 assembly:
 
-Assuming that you have a 'normal' clang in the $PATH, let's translate this C program to DCPU16 assembly.
-You need at least clang 3.0, but building from source is recommended (in a separate directory).
-You may use [Getting Started: Building and Running Clang](http://clang.llvm.org/get_started.html) to save your time.
-
-    clang --version # Check the version of Clang
-    clang -ccc-host-triple msp430 -c -emit-llvm fib.c
-    bin/llc -filetype=asm -mtriple dcpu16 fib.o -o fib.s
+    bin/clang -ccc-host-triple dcpu16 -S fib.c
 
 fib.s:
 
