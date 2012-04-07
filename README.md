@@ -1,3 +1,10 @@
+
+# main branch is deprecated in favor of dcpu16 branch. #
+# It's my fault but I had no other choice to fix it.
+# See https://github.com/krasin/llvm-dcpu16/issues/19
+# Sorry.
+
+
 # LLVM backend for DCPU-16 #
 
 DCPU-16 is the processor from Mojang's new game [0x10c](http://0x10c.com/).
