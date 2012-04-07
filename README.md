@@ -103,9 +103,8 @@ So, in order to get your program running, for now, you will have to:
 2. remove .size, .align, .globl, .type, etc
 3. in the beginning of your program, please, put the initialization:
 
-
-      SET C, SP
-      SUB C, 256
+        SET C, SP
+        SUB C, 256
 
 
 This is because SP is not addressable and LLVM backend only uses it as an instruction stack pointer.
