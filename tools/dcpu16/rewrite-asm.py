@@ -1,6 +1,8 @@
 #!/usr/bin/python
 # Copyright (c) 2012, BungaDunga from Reddit
 
+# Usage: ./rewrite-asm.py inputFileName outputFileName
+
 import sys
 file = open(sys.argv[1])
 out = open(sys.argv[2], "w")
@@ -32,5 +34,7 @@ result = result + """
 :crash
   SET PC, crash
 """
+
+# Must be changed to print(result) for Python 3+
 print result
 out.write(result)
