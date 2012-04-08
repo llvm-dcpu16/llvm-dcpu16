@@ -605,54 +605,6 @@ def MUL16mm : I16mm<0x0,
                      (implicit SRW)]>;
 }
 
-
-def MUL16rr : I16rr<0x0,
-                    (outs GR16:$dst), (ins GR16:$src, GR16:$src2),
-                    "MUL\t{$dst, $src2} ; The Notch order",
-                    [(set GR16:$dst, (mul GR16:$src, GR16:$src2)),
-                     (implicit SRW)]>;
-
-def MUL16ri : I16ri<0x0,
-                    (outs GR16:$dst), (ins GR16:$src, i16imm:$src2),
-                    "MUL\t{$dst, $src2} ; The Notch order",
-                    [(set GR16:$dst, (mul GR16:$src, imm:$src2)),
-                     (implicit SRW)]>;
-
-def MUL16rm : I16rm<0x0,
-                    (outs GR16:$dst), (ins GR16:$src, memsrc:$src2),
-                    "MUL\t{$dst, $src2} ; The Notch order",
-                    [(set GR16:$dst, (mul GR16:$src, (load addr:$src2))),
-                     (implicit SRW)]>;
-
-let mayLoad = 1, hasExtraDefRegAllocReq = 1, 
-Constraints = "$base = $base_wb, $src = $dst" in {
-def MUL16rm_POST : IForm16<0x0, DstReg, SrcPostInc, Size2Bytes,
-                          (outs GR16:$dst, GR16:$base_wb),
-                          (ins GR16:$src, GR16:$base),
-                          "MUL\t{$dst, @$base+} ; The Notch order", []>;
-}
-
-let Constraints = "" in {
-def MUL16mr : I16mr<0x0,
-                    (outs), (ins memdst:$dst, GR16:$src),
-                    "MUL\t{$dst, $src} ; The Notch order",
-                    [(store (mul (load addr:$dst), GR16:$src), addr:$dst),
-                     (implicit SRW)]>;
-
-def MUL16mi : I16mi<0x0,
-                    (outs), (ins memdst:$dst, i16imm:$src),
-                    "MUL\t{$dst, $src} ; The Notch order",
-                    [(store (mul (load addr:$dst), (i16 imm:$src)), addr:$dst),
-                     (implicit SRW)]>;
-
-def MUL16mm : I16mm<0x0,
-                    (outs), (ins memdst:$dst, memsrc:$src),
-                    "MUL\t{$dst, $src} ; The Notch order",
-                    [(store (mul (load addr:$dst), 
-                                 (i16 (load addr:$src))), addr:$dst),
-                     (implicit SRW)]>;
-}
-
 let Uses = [SRW] in {
 def SBC16rr : I16rr<0x0,
                     (outs GR16:$dst), (ins GR16:$src, GR16:$src2),
