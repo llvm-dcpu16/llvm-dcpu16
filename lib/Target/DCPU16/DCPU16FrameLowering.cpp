@@ -27,11 +27,7 @@
 using namespace llvm;
 
 bool DCPU16FrameLowering::hasFP(const MachineFunction &MF) const {
-  const MachineFrameInfo *MFI = MF.getFrameInfo();
-
-  return (MF.getTarget().Options.DisableFramePointerElim(MF) ||
-          MF.getFrameInfo()->hasVarSizedObjects() ||
-          MFI->isFrameAddressTaken());
+  return false;
 }
 
 bool DCPU16FrameLowering::hasReservedCallFrame(const MachineFunction &MF) const {
