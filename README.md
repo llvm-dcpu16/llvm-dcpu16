@@ -7,7 +7,7 @@ port Clang to support this architecture.
 Currently, llvm backend and Clang support are only partially implemented,
 but simple programs work.
 
-### [Binary distribution for Linux x64 is available.](https://s3.amazonaws.com/llvm-dcpu16/llvm-dcpu16.v0.0.1.tar.gz) (170MB) ###
+### [Binary distribution for Linux x64 is available.](https://s3.amazonaws.com/llvm-dcpu16/llvm-dcpu16.v0.0.2.tar.gz) (v0.0.2, 170MB) ###
 
 Tested on Ubuntu 11.10 x86-64.
 Please, [let me know](https://github.com/krasin/llvm-dcpu16/issues), if it does not work for you.
