@@ -615,7 +615,7 @@ def CMP16rr : I16rr<0x0,
 		    "\tSET\tO, 0 ; The Notch order\n"
 		    "\tIFG\t{$src, $src2} ; The Notch order\n"
 		    "\tSET\tO, 1 ; The Notch order",
-                    [(DCPU16cmp GR16:$src, GR16:$src2), (implicit SRW)]>;
+                    [(DCPU16cmp GR16:$src, GR16:$src2)]>;
 
 def CMP16ri : I16ri<0x0,
                     (outs), (ins GR16:$src, i16imm:$src2),
@@ -624,7 +624,7 @@ def CMP16ri : I16ri<0x0,
 		    "\tSET\tO, 0 ; The Notch order\n"
 		    "\tIFG\t{$src, $src2} ; The Notch order\n"
 		    "\tSET\tO, 1 ; The Notch order",
-                    [(DCPU16cmp GR16:$src, imm:$src2), (implicit SRW)]>;
+                    [(DCPU16cmp GR16:$src, imm:$src2)]>;
 
 def CMP16mi : I16mi<0x0,
                     (outs), (ins memsrc:$src, i16imm:$src2),
