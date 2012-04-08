@@ -38,25 +38,6 @@
 #include "llvm/Support/raw_ostream.h"
 using namespace llvm;
 
-typedef enum {
-  NoHWMult,
-  HWMultIntr,
-  HWMultNoIntr
-} HWMultUseMode;
-
-static cl::opt<HWMultUseMode>
-HWMultMode("dcpu16-hwmult-mode",
-           cl::desc("Hardware multiplier use mode"),
-           cl::init(HWMultNoIntr),
-           cl::values(
-             clEnumValN(NoHWMult, "no",
-                "Do not use hardware multiplier"),
-             clEnumValN(HWMultIntr, "interrupts",
-                "Assume hardware multiplier can be used inside interrupts"),
-             clEnumValN(HWMultNoIntr, "use",
-                "Assume hardware multiplier cannot be used inside interrupts"),
-             clEnumValEnd));
-
 DCPU16TargetLowering::DCPU16TargetLowering(DCPU16TargetMachine &tm) :
   TargetLowering(tm, new TargetLoweringObjectFileELF()),
   Subtarget(*tm.getSubtargetImpl()), TM(tm) {
@@ -144,7 +125,6 @@ DCPU16TargetLowering::DCPU16TargetLowering(DCPU16TargetMachine &tm) :
   setOperationAction(ISD::MULHU,            MVT::i8,    Expand);
   setOperationAction(ISD::SMUL_LOHI,        MVT::i8,    Expand);
   setOperationAction(ISD::UMUL_LOHI,        MVT::i8,    Expand);
-  setOperationAction(ISD::MUL,              MVT::i16,   Expand);
   setOperationAction(ISD::MULHS,            MVT::i16,   Expand);
   setOperationAction(ISD::MULHU,            MVT::i16,   Expand);
   setOperationAction(ISD::SMUL_LOHI,        MVT::i16,   Expand);
@@ -162,13 +142,6 @@ DCPU16TargetLowering::DCPU16TargetLowering(DCPU16TargetMachine &tm) :
   setOperationAction(ISD::SDIV,             MVT::i16,   Expand);
   setOperationAction(ISD::SDIVREM,          MVT::i16,   Expand);
   setOperationAction(ISD::SREM,             MVT::i16,   Expand);
-
-  // Libcalls names.
-  if (HWMultMode == HWMultIntr) {
-    setLibcallName(RTLIB::MUL_I16, "__mulhi3hw");
-  } else if (HWMultMode == HWMultNoIntr) {
-    setLibcallName(RTLIB::MUL_I16, "__mulhi3hw_noint");
-  }
 
   setMinFunctionAlignment(1);
   setPrefFunctionAlignment(2);
