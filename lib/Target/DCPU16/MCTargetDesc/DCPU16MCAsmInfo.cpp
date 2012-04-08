@@ -18,6 +18,8 @@ using namespace llvm;
 void DCPU16MCAsmInfo::anchor() { }
 
 DCPU16MCAsmInfo::DCPU16MCAsmInfo(const Target &T, StringRef TT) {
+  LabelPrefix = ":";
+  LabelSuffix = "";
   PointerSize = 2;
 
   PrivateGlobalPrefix = ".L";

@@ -239,7 +239,7 @@ void PTXMCAsmStreamer::EmitLabel(MCSymbol *Symbol) {
   assert(!Symbol->isVariable() && "Cannot emit a variable symbol!");
   assert(getCurrentSection() && "Cannot emit before setting section!");
 
-  OS << *Symbol << MAI.getLabelSuffix();
+  OS << MAI.getLabelPrefix() << *Symbol << MAI.getLabelSuffix();
   EmitEOL();
   Symbol->setSection(*getCurrentSection());
 }
