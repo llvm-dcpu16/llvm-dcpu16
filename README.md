@@ -23,7 +23,8 @@ First, of all, you need to install prerequisites:
     sudo apt-get install gcc g++ git subversion git-svn\
      perl gawk expect tcl texinfo bison autoconf automake cmake
 
-Note, that Arch Linux users experience [the issue with cmake](https://github.com/krasin/llvm-dcpu16/issues/43).
+Note, that when your python executable points to python3 (you can check that by running python --version) 
+you have to replace "cmake .." with "cmake  -DPYTHON_EXECUTABLE=/path/to/python2 .." in the following steps (path is /usr/bin/python2 in most cases)
 
 Next, get the sources and build it:
 
