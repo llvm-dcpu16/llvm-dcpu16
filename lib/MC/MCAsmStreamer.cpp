@@ -768,7 +768,9 @@ bool MCAsmStreamer::EmitValueToOffset(const MCExpr *Offset,
 
 void MCAsmStreamer::EmitFileDirective(StringRef Filename) {
   assert(MAI.hasSingleParameterDotFile());
-  OS << "\t.file\t";
+  // TODO(krasin): enable .file directive
+  // https://github.com/krasin/llvm-dcpu16/issues/51
+  OS << "\t; .file\t";
   PrintQuotedString(Filename, OS);
   EmitEOL();
 }
