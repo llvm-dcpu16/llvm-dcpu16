@@ -513,8 +513,6 @@ def SUB16mm : I16mm<0x0,
                     [(store (sub (load addr:$dst), 
                                  (i16 (load addr:$src))), addr:$dst)]>;
 
-<<<<<<< HEAD
-
 def MUL16rr : I16rr<0x0,
                     (outs GR16:$dst), (ins GR16:$src, GR16:$src2),
                     "MUL\t{$dst, $src2} ; The Notch order",
