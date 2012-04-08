@@ -40,3 +40,4 @@ projects/*
 tools/clang
 # LLDB, which is tracked independently.
 tools/lldb
+cbuild/
