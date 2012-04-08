@@ -5725,16 +5725,14 @@ SDValue DAGCombiner::visitFDIV(SDNode *N) {
   if (N0CFP && N1CFP && VT != MVT::ppcf128)
     return DAG.getNode(ISD::FDIV, N->getDebugLoc(), VT, N0, N1);
 
-  // fold (fdiv X, c2) -> fmul X, 1/c2 if there is no precision loss or if
-  // losing precision is acceptable.
-  if (N1CFP && VT != MVT::ppcf128) {
+  // fold (fdiv X, c2) -> fmul X, 1/c2 if losing precision is acceptable.
+  if (N1CFP && VT != MVT::ppcf128 && DAG.getTarget().Options.UnsafeFPMath) {
     // Compute the reciprocal 1.0 / c2.
     APFloat N1APF = N1CFP->getValueAPF();
     APFloat Recip(N1APF.getSemantics(), 1); // 1.0
     APFloat::opStatus st = Recip.divide(N1APF, APFloat::rmNearestTiesToEven);
     // Only do the transform if the reciprocal is not too horrible (eg not NaN).
-    if (st == APFloat::opOK || (st == APFloat::opInexact &&
-                                DAG.getTarget().Options.UnsafeFPMath))
+    if (st == APFloat::opOK || st == APFloat::opInexact)
       return DAG.getNode(ISD::FMUL, N->getDebugLoc(), VT, N0,
                          DAG.getConstantFP(Recip, VT));
   }
@@ -7795,19 +7793,20 @@ SDValue DAGCombiner::visitVECTOR_SHUFFLE(SDNode *N) {
   }
 
   // If this shuffle node is simply a swizzle of another shuffle node,
-  // optimize shuffle(shuffle(x, y), undef) -> shuffle(x, y).
+  // and it reverses the swizzle of the previous shuffle then we can
+  // optimize shuffle(shuffle(x, undef), undef) -> x.
   if (N0.getOpcode() == ISD::VECTOR_SHUFFLE && Level < AfterLegalizeDAG &&
       N1.getOpcode() == ISD::UNDEF) {
 
-    SmallVector<int, 8> NewMask;
     ShuffleVectorSDNode *OtherSV = cast<ShuffleVectorSDNode>(N0);
 
-    // If the source shuffle has more than one user then do not try to optimize
-    // it because it may generate a more complex shuffle node. However, if the
-    // source shuffle is also a swizzle (a single source shuffle), our
-    // transformation is still likely to reduce the number of shuffles and only
-    // generate a simple shuffle node.
-    if (N0.getOperand(1).getOpcode() != ISD::UNDEF && !N0.hasOneUse())
+    // Shuffle nodes can only reverse shuffles with a single non-undef value.
+    if (N0.getOperand(1).getOpcode() != ISD::UNDEF)
+      return SDValue();
+
+    // The incoming shuffle must be of the same type as the result of the current
+    // shuffle.
+    if (OtherSV->getOperand(0).getValueType() != VT)
       return SDValue();
 
     EVT InVT = N0.getValueType();
@@ -7824,11 +7823,12 @@ SDValue DAGCombiner::visitVECTOR_SHUFFLE(SDNode *N) {
       if (Idx >= 0)
         Idx = OtherSV->getMaskElt(Idx);
 
-      NewMask.push_back(Idx);
+      // The combined shuffle must map each index to itself.
+      if ((unsigned)Idx != i && Idx != -1)
+        return SDValue();
     }
-    assert(NewMask.size() == VT.getVectorNumElements() && "Invalid mask size");
-    return DAG.getVectorShuffle(VT, N->getDebugLoc(), OtherSV->getOperand(0),
-                                OtherSV->getOperand(1), &NewMask[0]);
+
+    return OtherSV->getOperand(0);
   }
 
   return SDValue();
