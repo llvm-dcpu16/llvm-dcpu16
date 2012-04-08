@@ -337,7 +337,9 @@ void MCAsmStreamer::EmitLabel(MCSymbol *Symbol) {
   assert(Symbol->isUndefined() && "Cannot define a symbol twice!");
   MCStreamer::EmitLabel(Symbol);
 
-  OS << *Symbol << MAI.getLabelSuffix();
+  // TODO(krasin): implement DCPU16MCAsmStreamer
+  // https://github.com/krasin/llvm-dcpu16/issues/29
+  OS << MAI.getLabelSuffix() << *Symbol;
   EmitEOL();
 }
 
