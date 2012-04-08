@@ -55,7 +55,7 @@ DCPU16TargetLowering::DCPU16TargetLowering(DCPU16TargetMachine &tm) :
   // Division is expensive
   setIntDivIsCheap(false);
 
-  setStackPointerRegisterToSaveRestore(DCPU16::SPW);
+  setStackPointerRegisterToSaveRestore(DCPU16::RC);
   setBooleanContents(ZeroOrOneBooleanContent);
   setBooleanVectorContents(ZeroOrOneBooleanContent); // FIXME: Is this correct?
 
@@ -442,7 +442,7 @@ DCPU16TargetLowering::LowerCCCCallTo(SDValue Chain, SDValue Callee,
       assert(VA.isMemLoc());
 
       if (StackPtr.getNode() == 0)
-        StackPtr = DAG.getCopyFromReg(Chain, dl, DCPU16::SPW, getPointerTy());
+        StackPtr = DAG.getCopyFromReg(Chain, dl, DCPU16::RC, getPointerTy());
 
       SDValue PtrOff = DAG.getNode(ISD::ADD, dl, getPointerTy(),
                                    StackPtr,
@@ -708,6 +708,7 @@ SDValue DCPU16TargetLowering::LowerBR_CC(SDValue Op, SelectionDAG &DAG) const {
                      Chain, Dest, TargetCC, Flag);
 }
 
+// TODO: This need rework! Or our branch prediction is WAY off
 SDValue DCPU16TargetLowering::LowerSETCC(SDValue Op, SelectionDAG &DAG) const {
   SDValue LHS   = Op.getOperand(0);
   SDValue RHS   = Op.getOperand(1);
@@ -767,7 +768,8 @@ SDValue DCPU16TargetLowering::LowerSETCC(SDValue Op, SelectionDAG &DAG) const {
   EVT VT = Op.getValueType();
   SDValue One  = DAG.getConstant(1, VT);
   if (Convert) {
-    SDValue SR = DAG.getCopyFromReg(DAG.getEntryNode(), dl, DCPU16::SRW,
+	// TODO: Okay what did the SRW register do? Is this whole function still needed?
+    SDValue SR = DAG.getCopyFromReg(DAG.getEntryNode(), dl, DCPU16::RC, // FIXME (was: SRW)
                                     MVT::i16, Flag);
     if (Shift)
       // FIXME: somewhere this is turned into a SRL, lower it MSP specific?
@@ -864,6 +866,7 @@ SDValue DCPU16TargetLowering::LowerRETURNADDR(SDValue Op,
                      RetAddrFI, MachinePointerInfo(), false, false, false, 0);
 }
 
+// TODO: Do we need this? We don't have a FP anymore!
 SDValue DCPU16TargetLowering::LowerFRAMEADDR(SDValue Op,
                                              SelectionDAG &DAG) const {
   MachineFrameInfo *MFI = DAG.getMachineFunction().getFrameInfo();
@@ -873,7 +876,7 @@ SDValue DCPU16TargetLowering::LowerFRAMEADDR(SDValue Op,
   DebugLoc dl = Op.getDebugLoc();  // FIXME probably not meaningful
   unsigned Depth = cast<ConstantSDNode>(Op.getOperand(0))->getZExtValue();
   SDValue FrameAddr = DAG.getCopyFromReg(DAG.getEntryNode(), dl,
-                                         DCPU16::FPW, VT);
+                                         DCPU16::RC, VT); // TODO: Was: FPW
   while (Depth--)
     FrameAddr = DAG.getLoad(VT, dl, DAG.getEntryNode(), FrameAddr,
                             MachinePointerInfo(),

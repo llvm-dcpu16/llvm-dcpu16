@@ -48,31 +48,7 @@ void DCPU16FrameLowering::emitPrologue(MachineFunction &MF) const {
   uint64_t StackSize = MFI->getStackSize();
 
   uint64_t NumBytes = 0;
-  if (hasFP(MF)) {
-    // Calculate required stack adjustment
-    uint64_t FrameSize = StackSize - 2;
-    NumBytes = FrameSize - DCPU16FI->getCalleeSavedFrameSize();
-
-    // Get the offset of the stack slot for the EBP register... which is
-    // guaranteed to be the last slot by processFunctionBeforeFrameFinalized.
-    // Update the frame offset adjustment.
-    MFI->setOffsetAdjustment(-NumBytes);
-
-    // Save FPW into the appropriate stack slot...
-    BuildMI(MBB, MBBI, DL, TII.get(DCPU16::PUSH16r))
-      .addReg(DCPU16::FPW, RegState::Kill);
-
-    // Update FPW with the new base value...
-    BuildMI(MBB, MBBI, DL, TII.get(DCPU16::MOV16rr), DCPU16::FPW)
-      .addReg(DCPU16::SPW);
-
-    // Mark the FramePtr as live-in in every block except the entry.
-    for (MachineFunction::iterator I = llvm::next(MF.begin()), E = MF.end();
-         I != E; ++I)
-      I->addLiveIn(DCPU16::FPW);
-
-  } else
-    NumBytes = StackSize - DCPU16FI->getCalleeSavedFrameSize();
+  NumBytes = StackSize - DCPU16FI->getCalleeSavedFrameSize();
 
   // Skip the callee-saved push instructions.
   while (MBBI != MBB.end() && (MBBI->getOpcode() == DCPU16::PUSH16r))
@@ -81,19 +57,19 @@ void DCPU16FrameLowering::emitPrologue(MachineFunction &MF) const {
   if (MBBI != MBB.end())
     DL = MBBI->getDebugLoc();
 
-  if (NumBytes) { // adjust stack pointer: SPW -= numbytes
-    // If there is an SUB16ri of SPW immediately before this instruction, merge
+  if (NumBytes) { // adjust stack pointer: RC -= numbytes
+    // If there is an SUB16ri of RC immediately before this instruction, merge
     // the two.
     //NumBytes -= mergeSPUpdates(MBB, MBBI, true);
-    // If there is an ADD16ri or SUB16ri of SPW immediately after this
+    // If there is an ADD16ri or SUB16ri of RC immediately after this
     // instruction, merge the two instructions.
     // mergeSPUpdatesDown(MBB, MBBI, &NumBytes);
 
     if (NumBytes) {
       MachineInstr *MI =
-        BuildMI(MBB, MBBI, DL, TII.get(DCPU16::SUB16ri), DCPU16::SPW)
-        .addReg(DCPU16::SPW).addImm(NumBytes);
-      // The SRW implicit def is dead.
+        BuildMI(MBB, MBBI, DL, TII.get(DCPU16::SUB16ri), DCPU16::RC)
+        .addReg(DCPU16::RC).addImm(NumBytes);
+      // TODO: STILL NEEDED? Old comment: The SRW implicit def is dead.
       MI->getOperand(3).setIsDead();
     }
   }
@@ -116,17 +92,9 @@ void DCPU16FrameLowering::emitEpilogue(MachineFunction &MF,
   // Get the number of bytes to allocate from the FrameInfo
   uint64_t StackSize = MFI->getStackSize();
   unsigned CSSize = DCPU16FI->getCalleeSavedFrameSize();
+
   uint64_t NumBytes = 0;
-
-  if (hasFP(MF)) {
-    // Calculate required stack adjustment
-    uint64_t FrameSize = StackSize - 2;
-    NumBytes = FrameSize - CSSize;
-
-    // pop FPW.
-    BuildMI(MBB, MBBI, DL, TII.get(DCPU16::POP16r), DCPU16::FPW);
-  } else
-    NumBytes = StackSize - CSSize;
+  NumBytes = StackSize - CSSize;
 
   // Skip the callee-saved pop instructions.
   while (MBBI != MBB.begin()) {
@@ -139,31 +107,18 @@ void DCPU16FrameLowering::emitEpilogue(MachineFunction &MF,
 
   DL = MBBI->getDebugLoc();
 
-  // If there is an ADD16ri or SUB16ri of SPW immediately before this
+  // If there is an ADD16ri or SUB16ri of RC immediately before this
   // instruction, merge the two instructions.
-  //if (NumBytes || MFI->hasVarSizedObjects())
+  //if (NumBytes)
   //  mergeSPUpdatesUp(MBB, MBBI, StackPtr, &NumBytes);
 
-  if (MFI->hasVarSizedObjects()) {
-    BuildMI(MBB, MBBI, DL,
-            TII.get(DCPU16::MOV16rr), DCPU16::SPW).addReg(DCPU16::FPW);
-    if (CSSize) {
-      MachineInstr *MI =
-        BuildMI(MBB, MBBI, DL,
-                TII.get(DCPU16::SUB16ri), DCPU16::SPW)
-        .addReg(DCPU16::SPW).addImm(CSSize);
-      // The SRW implicit def is dead.
-      MI->getOperand(3).setIsDead();
-    }
-  } else {
-    // adjust stack pointer back: SPW += numbytes
-    if (NumBytes) {
-      MachineInstr *MI =
-        BuildMI(MBB, MBBI, DL, TII.get(DCPU16::ADD16ri), DCPU16::SPW)
-        .addReg(DCPU16::SPW).addImm(NumBytes);
-      // The SRW implicit def is dead.
-      MI->getOperand(3).setIsDead();
-    }
+  // adjust stack pointer back: RC += numbytes
+  if (NumBytes) {
+    MachineInstr *MI =
+      BuildMI(MBB, MBBI, DL, TII.get(DCPU16::ADD16ri), DCPU16::RC)
+      .addReg(DCPU16::RC).addImm(NumBytes);
+    // TODO: STILL NEEDED? Old comment: The SRW implicit def is dead.
+    MI->getOperand(3).setIsDead();
   }
 }
 
