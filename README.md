@@ -52,9 +52,9 @@ fib.c:
       return cur;
     }
 
-   int main(void) {
-     return fib(5);
-   }
+    int main(void) {
+      return fib(5);
+    }
 
 
 Now, let's translate C to DCPU16 assembly:
