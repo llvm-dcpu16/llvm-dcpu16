@@ -59,7 +59,7 @@ fib.c:
 
 Now, let's translate C to DCPU16 assembly:
 
-    bin/clang -ccc-host-triple dcpu16 -S fib.c
+    bin/clang -ccc-host-triple dcpu16 -S fib.c -o fib.s
 
 fib.s:
 
