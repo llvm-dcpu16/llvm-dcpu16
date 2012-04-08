@@ -12,7 +12,7 @@ Please, [let me know](https://github.com/krasin/llvm-dcpu16/issues), if it does 
 
 Basic Clang usage is:
 
-    path/to/bin/clang -ccc-host-triple dcpu16 -S lala.c
+    path/to/bin/clang -ccc-host-triple dcpu16 -S lala.c -o lala.s
 
 Below are the instructions how to build the toolchain from sources and try:
 
