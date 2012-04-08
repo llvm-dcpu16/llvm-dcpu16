@@ -170,7 +170,7 @@ void DCPU16AsmPrinter::EmitStartOfAsmFile(Module &M) {
     "\tSUB C, 256\n\n"
     ":autostart\n"
     "\tJSR main\n"
-    ":autohalt SET PC autohalt\n"));
+    ":autohalt SET PC, autohalt\n"));
 }
 
 // Force static initialization.
