@@ -50,26 +50,11 @@ DCPU16RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
     DCPU16::R1A, DCPU16::R2B, DCPU16::R7I,
     0
   };
-  static const uint16_t CalleeSavedRegsIntr[] = {
-    DCPU16::FPW,  DCPU16::R1A,  DCPU16::R2B,
-    DCPU16::R4X,  DCPU16::R5Y,  DCPU16::R6Z, DCPU16::R7I,
-    DCPU16::R8J,
-    0
-  };
-  static const uint16_t CalleeSavedRegsIntrFP[] = {
-    DCPU16::R1A,  DCPU16::R2B,
-    DCPU16::R4X,  DCPU16::R5Y,  DCPU16::R6Z, DCPU16::R7I,
-    DCPU16::R8J,
-    0
-  };
 
   if (TFI->hasFP(*MF))
-    return (F->getCallingConv() == CallingConv::DCPU16_INTR ?
-            CalleeSavedRegsIntrFP : CalleeSavedRegsFP);
+    return CalleeSavedRegsFP;
   else
-    return (F->getCallingConv() == CallingConv::DCPU16_INTR ?
-            CalleeSavedRegsIntr : CalleeSavedRegs);
-
+    return CalleeSavedRegs;
 }
 
 BitVector DCPU16RegisterInfo::getReservedRegs(const MachineFunction &MF) const {

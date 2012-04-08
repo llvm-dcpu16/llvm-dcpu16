@@ -518,7 +518,6 @@ lltok::Kind LLLexer::LexIdentifier() {
   KEYWORD(arm_aapcscc);
   KEYWORD(arm_aapcs_vfpcc);
   KEYWORD(msp430_intrcc);
-  KEYWORD(dcpu16_intrcc);
   KEYWORD(ptx_kernel);
   KEYWORD(ptx_device);
 
