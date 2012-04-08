@@ -70,10 +70,7 @@ void DCPU16InstPrinter::printSrcMemOperand(const MCInst *MI, unsigned OpNo,
   // vs
   //   SET r2, glb(r1) ; The Notch order
   // Otherwise (!) dcpu16-as will silently miscompile the output :(
-  if (!Base.getReg())
-    O << '&';
-  else
-    O << '[';
+  O << '[';
 
   if (Disp.isExpr())
     O << *Disp.getExpr();
@@ -84,7 +81,8 @@ void DCPU16InstPrinter::printSrcMemOperand(const MCInst *MI, unsigned OpNo,
 
   // Print register base field
   if (Base.getReg())
-    O << '+' << getRegisterName(Base.getReg()) << ']';
+    O << '+' << getRegisterName(Base.getReg());
+  O << ']';
 }
 
 void DCPU16InstPrinter::printCCOperand(const MCInst *MI, unsigned OpNo,
