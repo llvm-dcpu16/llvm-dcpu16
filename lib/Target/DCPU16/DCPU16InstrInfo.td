@@ -516,20 +516,17 @@ def SUB16mm : I16mm<0x0,
 def MUL16rr : I16rr<0x0,
                     (outs GR16:$dst), (ins GR16:$src, GR16:$src2),
                     "MUL\t{$dst, $src2} ; The Notch order",
-                    [(set GR16:$dst, (mul GR16:$src, GR16:$src2)),
-                     (implicit SRW)]>;
+                    [(set GR16:$dst, (mul GR16:$src, GR16:$src2))]>;
 
 def MUL16ri : I16ri<0x0,
                     (outs GR16:$dst), (ins GR16:$src, i16imm:$src2),
                     "MUL\t{$dst, $src2} ; The Notch order",
-                    [(set GR16:$dst, (mul GR16:$src, imm:$src2)),
-                     (implicit SRW)]>;
+                    [(set GR16:$dst, (mul GR16:$src, imm:$src2))]>;
 
 def MUL16rm : I16rm<0x0,
                     (outs GR16:$dst), (ins GR16:$src, memsrc:$src2),
                     "MUL\t{$dst, $src2} ; The Notch order",
-                    [(set GR16:$dst, (mul GR16:$src, (load addr:$src2))),
-                     (implicit SRW)]>;
+                    [(set GR16:$dst, (mul GR16:$src, (load addr:$src2)))]>;
 
 let mayLoad = 1, hasExtraDefRegAllocReq = 1, 
 Constraints = "$base = $base_wb, $src = $dst" in {
