@@ -58,149 +58,93 @@ Now, let's translate C to DCPU16 assembly:
 
 fib.s:
 
-        .file    "fib.o"
-        .text
-        .globl    fib
-        .align    2
-        .type    fib,@function
-    fib:                                    ; @fib
-    ; BB#0:                                 ; %entry
-      SUB C, 10 ; The Notch order
-      SET [8+C], X ; The Notch order
-      SET [6+C], 1 ; The Notch order
-      SET [4+C], 1 ; The Notch order
-      SET [2+C], 0 ; The Notch order
-    .LBB0_1:                                ; %for.cond
-                                            ; =>This Inner Loop Header: Depth=1
-      SET J, [2+C] ; The Notch order
-      SET O, 65535 ; The Notch order, cmp [8+C], J, start
-      IFE J, [8+C] ; The Notch order
-      SET O, 0 ; The Notch order
-      IFG J, [8+C] ; The Notch order
-      SET O, 1 ; The Notch order, end
-      IFN O, 65535 ; The Notch order, jge
-      SET PC, .LBB0_3 ; The Notch order
-    ; BB#2:                                 ; %for.body
-                                            ;   in Loop: Header=BB0_1 Depth=1
-      SET J, [6+C] ; The Notch order
-      ADD J, [4+C] ; The Notch order
-      SET [0+C], J ; The Notch order
-      SET [4+C], [6+C] ; The Notch order
-      SET [6+C], [0+C] ; The Notch order
-      ADD [2+C], 1 ; The Notch order
-      SET PC, .LBB0_1 ; The Notch order
-    .LBB0_3:                                ; %for.end
-      SET X, [6+C] ; The Notch order
-      ADD C, 10 ; The Notch order
-      SET PC, POP ; The Notch order
-    .Ltmp0:
-        .size    fib, .Ltmp0-fib
-
-Although, this program is perfectly valid, no existing DCPU16 assembly accepts it because of two primary reasons:
-
-- Label declarations in most 'regular' assemblers are defined as label: (colon at the end of line),
-  but DCPU16 assemblers prefer :label (colon at the beginning) syntax.
-  I have not yet decided what to do here: make hacks to LLVM to teach the new label syntax or
-  convince DCPU16 assemblers to accept both formats (which is pretty safe).
-
-- Standard symbol declarations like .file, .text, .size, .align, .globl, .type are currently not supported by DCPU16 assemblers.
-
-So, in order to get your program running, for now, you will have to:
-
-1. replace all label: declarations with :label
-2. remove .size, .align, .globl, .type, etc
-3. in the beginning of your program, please, put the initialization:
-
-        SET C, SP
-        SUB C, 256
-
-You may want find [tools/dcpu16/asm-rewriter.py](https://github.com/krasin/llvm-dcpu16/blob/main/tools/dcpu16/rewrite-asm.py)
-useful (it should make the above changes for you!)
-
-This is because SP is not addressable and LLVM backend only uses it as an instruction stack pointer.
-For data stack pointer, C register is used.
-As you may mention, 256 is the limit for recursion. You may choose your own limit.
-
-So, the program that you can run would look like:
-
-    :init
+:autoinit    ;;Init data stack register C
       SET C, SP
       SUB C, 256
-    
-    :start
-      SET X, 4
-      JSR fib         ; call fib(4)
-      SET PC, break   ; halt
-    
-    :fib                                    ; @fib
-    ; BB#0:                                 ; %entry
-      SUB C, 10
-      SET [8+C], X
-      SET [6+C], 1
-      SET [4+C], 1
-      SET [2+C], 0
-    :.LBB0_1                                ; %for.cond
-                                            ; =>This Inner Loop Header: Depth=1
-      SET J, [2+C]
-      SET O, 65535
-      IFE J, [8+C]
-      SET O, 0
-      IFG J, [8+C]
-      SET O, 1
-      IFN O, 65535
-      SET PC, .LBB0_3
-    ; BB#2:                                 ; %for.body
-                                            ;   in Loop: Header=BB0_1 Depth=1
-      SET J, [6+C]
-      ADD J, [4+C]
-      SET [0+C], J
-      SET [4+C], [6+C]
-      SET [6+C], [0+C]
-      ADD [2+C], 1
-    
-      SET PC, .LBB0_1
-    :.LBB0_3                                ; %for.end
-      SET X, [6+C]
-      ADD  C, 10
-      SET PC, POP
-    
-    :break
-      BRK
-    
-    :crash
-      SET PC, crash
 
-You may want to try it in the [online DCPU assembler and debugger by Mappum](http://mappum.github.com/DCPU-16/)
-After you compile and run the program, the final state should be:
+:autostart
+  JSR main
+:autohalt SET PC, autohalt
+    ; .file "/home/krasin/fib.c"
+    ; .align  2
+:fib
+  SUB  C, 12 ; The Notch order
+  SET  [10+C], X ; The Notch order
+  SET  [8+C], 1 ; The Notch order
+  SET  [6+C], 1 ; The Notch order
+  SET  [4+C], 0 ; The Notch order
+  SET  [0+C], X ; The Notch order
+:.LBB0_1
+  SET  J, [4+C] ; The Notch order
+  SET  Z, [10+C] ; The Notch order
+  SET  O, 65535 ; The Notch order, cmp Z, J, start
+  IFE  J, Z ; The Notch order
+  SET  O, 0 ; The Notch order
+  IFG  J, Z ; The Notch order
+  SET  O, 1 ; The Notch order, end
+  IFN  O, 65535 ; The Notch order, jge
+  SET  PC, .LBB0_4 ; The Notch order
+  SET  PC, .LBB0_2 ; The Notch order
+:.LBB0_2
+  SET  J, [8+C] ; The Notch order
+  SET  Z, [6+C] ; The Notch order
+  ADD  J, Z ; The Notch order
+  SET  [2+C], J ; The Notch order
+  SET  J, [8+C] ; The Notch order
+  SET  [6+C], J ; The Notch order
+  SET  J, [2+C] ; The Notch order
+  SET  [8+C], J ; The Notch order
+  SET  J, [4+C] ; The Notch order
+  ADD  J, 1 ; The Notch order
+  SET  [4+C], J ; The Notch order
+  SET  PC, .LBB0_1 ; The Notch order
+:.LBB0_4
+  SET  X, [8+C] ; The Notch order
+  ADD  C, 12 ; The Notch order
+  SET PC, POP ; The Notch order
 
-    ==== REGISTERS: ====
-    A:  0000
-    B:  0000
-    C:  ff00
-    X:  0008
-    Y:  0000
-    Z:  0000
-    I:  0000
-    J:  0004
-    
-    PC: 0034
-    SP: 0000
-    O:  0000
-    
-    CPU CYCLES: 178
-    
-    ======= RAM: =======
-    0000:*6c21*7c23 0100 9031 7c10 0008 7dc1 0033
-    0008: a823 0d21 0008 8521 0006 8521 0004 8121
-    0010: 0002 4871 0002 7dd1 ffff 487c 0008 81d1
-    0018: 487e 0008 85d1 7ddd ffff 7dc1 002f 4871
-    0020: 0006 4872 0004 1d21 0000 4921 0004 0006
-    0028: 4921 0006 0000 8522 0002 7dc1 0011 4831
-    0030: 0006 a822 61c1 0020[7dc1]0034 0000 0000
-    fef0: 0000 0000 0000 0000 0000 0000 0008 0000
-    fef8: 0004 0000 0005 0000 0008 0000 0004 0000
-    fff8: 0000 0000 0000 0000 0000 0000 0000 0006       	   
+  ; .align    2
+:main
+  SUB  C, 2 ; The Notch order
+  SET  [0+C], 0 ; The Notch order
+  SET  X, 5 ; The Notch order
+  JSR  fib ; The Notch order
+  ADD  C, 2 ; The Notch order
+  SET PC, POP ; The Notch order
 
-X=8 has the value of Fib_4 (you may want to play with the value of argument to fib other than 4).
+You may want to try it in one of the [online DCPU assembler and debugger by Mappum](http://mappum.github.com/DCPU-16/)
+After you compile and run the program, the final state would be something like:
+
+==== REGISTERS: ====
+A:  0000
+B:  0000
+C:  ff00
+X:  000d
+Y:  0000
+Z:  0005
+I:  0000
+J:  0005
+
+PC: 0005
+SP: 0000
+O:  0000
+
+CPU CYCLES: 5834
+
+======= RAM: =======
+0000:*6c21*7c23 0100 7c10 003c[7dc1]0005 b023
+0008: 0d21 000a 8521 0008 8521 0006 8121 0004
+0010: 0d21 0000 4871 0004 4851 000a 7dd1 ffff
+0018: 147c 81d1 147e 85d1 7ddd ffff 7dc1 0038
+0020: 7dc1 0022 4871 0008 4851 0006 1472 1d21
+0028: 0002 4871 0008 1d21 0006 4871 0002 1d21
+0030: 0008 4871 0004 8472 1d21 0004 7dc1 0012
+0038: 4831 0008 b022 61c1 8823 8121 0000 9431
+0040: 7c10 0007 8822 61c1 0000 0000 0000 0000
+fef0: 0000 0000 0005 0000 000d 0000 0005 0000
+fef8: 0008 0000 000d 0000 0005 0000 0000 0000
+fff8: 0000 0000 0000 0000 0000 0000 0042 0005
+
+X=13 has the value of Fib_5 (you may want to play other values of argument to fib).
 
 Enjoy and, please, [report bugs](https://github.com/krasin/llvm-dcpu16/issues)!
