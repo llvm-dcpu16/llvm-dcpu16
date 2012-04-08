@@ -110,12 +110,8 @@ void DCPU16FrameLowering::emitEpilogue(MachineFunction &MF,
   unsigned RetOpcode = MBBI->getOpcode();
   DebugLoc DL = MBBI->getDebugLoc();
 
-  switch (RetOpcode) {
-  case DCPU16::RET:
-  case DCPU16::RETI: break;  // These are ok
-  default:
+  if (RetOpcode != DCPU16::RET)
     llvm_unreachable("Can only insert epilog into returning blocks");
-  }
 
   // Get the number of bytes to allocate from the FrameInfo
   uint64_t StackSize = MFI->getStackSize();

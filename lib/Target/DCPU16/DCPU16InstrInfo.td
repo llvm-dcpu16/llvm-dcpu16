@@ -40,8 +40,6 @@ def SDT_DCPU16Shift        : SDTypeProfile<1, 2, [SDTCisSameAs<0, 1>,
 //===----------------------------------------------------------------------===//
 def DCPU16retflag  : SDNode<"DCPU16ISD::RET_FLAG", SDTNone,
                        [SDNPHasChain, SDNPOptInGlue]>;
-def DCPU16retiflag : SDNode<"DCPU16ISD::RETI_FLAG", SDTNone,
-                       [SDNPHasChain, SDNPOptInGlue]>;
 
 def DCPU16rra     : SDNode<"DCPU16ISD::RRA", SDTIntUnaryOp, []>;
 def DCPU16rla     : SDNode<"DCPU16ISD::RLA", SDTIntUnaryOp, []>;
@@ -147,7 +145,6 @@ def NOP : Pseudo<(outs), (ins), "nop", []>;
 let isReturn = 1, isTerminator = 1, isBarrier = 1 in {
   def RET  : IForm16<0x0, DstReg, SrcPostInc, Size2Bytes,
                      (outs), (ins), "SET PC, POP ; The Notch order",  [(DCPU16retflag)]>;
-  def RETI : II16r<0x0, (outs), (ins), "reti", [(DCPU16retiflag)]>;
 }
 
 let isBranch = 1, isTerminator = 1 in {
