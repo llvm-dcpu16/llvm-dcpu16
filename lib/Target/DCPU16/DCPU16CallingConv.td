@@ -13,8 +13,8 @@
 // DCPU16 Return Value Calling Convention
 //===----------------------------------------------------------------------===//
 def RetCC_DCPU16 : CallingConv<[
-  // i8 are returned in registers R4XB, R5YB, R6ZB, R8JB
-  CCIfType<[i8], CCAssignToReg<[R4XB, R5YB, R6ZB, R8JB]>>,
+  // i8 are returned in registers R4X, R5Y, R6Z, R8J
+  CCIfType<[i8], CCAssignToReg<[R4X, R5Y, R6Z, R8J]>>,
 
   // i16 are returned in registers R4X, R5Y, R6Z, R8J
   CCIfType<[i16], CCAssignToReg<[R4X, R5Y, R6Z, R8J]>>
