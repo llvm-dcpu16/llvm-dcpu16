@@ -99,6 +99,9 @@ namespace llvm {
     /// assembler.
     const char *CommentString;               // Defaults to "#"
 
+    /// LabelPrefix - This is prefixed to emitted labels.
+    const char *LabelPrefix;                 // Defaults to ""
+
     /// LabelSuffix - This is appended to emitted labels.
     const char *LabelSuffix;                 // Defaults to ":"
 
@@ -449,6 +452,9 @@ namespace llvm {
     }
     const char *getCommentString() const {
       return CommentString;
+    }
+    const char *getLabelPrefix() const {
+      return LabelPrefix;
     }
     const char *getLabelSuffix() const {
       return LabelSuffix;
