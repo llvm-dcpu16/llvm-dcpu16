@@ -94,12 +94,7 @@ namespace CallingConv {
 
     /// MBLAZE_INTR - Calling convention used for MBlaze interrupt support
     /// routines (i.e. GCC's save_volatiles attribute).
-    MBLAZE_SVOL = 74,
-
-    /// DCPU16_INTR - Calling convention used for DCPU16 interrupt routines.
-    /// TODO(krasin): DCPU16 does not have interrupts. Cleanup.
-    /// Tracked by https://github.com/krasin/llvm-dcpu16/issues/7
-    DCPU16_INTR = 75
+    MBLAZE_SVOL = 74
   };
 } // End CallingConv namespace
 
