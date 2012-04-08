@@ -13,6 +13,7 @@
 
 #include "DCPU16TargetMachine.h"
 #include "DCPU16.h"
+#include "MCTargetDesc/DCPU16MCAsmInfo.h"
 #include "llvm/PassManager.h"
 #include "llvm/CodeGen/Passes.h"
 #include "llvm/MC/MCAsmInfo.h"
