@@ -28,4 +28,5 @@ DCPU16MCAsmInfo::DCPU16MCAsmInfo(const Target &T, StringRef TT) {
   AlignmentIsInBytes = false;
   AllowNameToStartWithDigit = true;
   UsesELFSectionDirectiveForBSS = true;
+  HasDotTypeDotSizeDirective = false;
 }
