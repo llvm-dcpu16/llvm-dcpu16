@@ -23,10 +23,6 @@ namespace llvm {
   class DCPU16MCAsmInfo : public MCAsmInfo {
     virtual void anchor();
   public:
-    DCPU16MCAsmInfo() : MCAsmInfo() {
-      LabelPrefix = ":";
-      LabelSuffix = "";
-    }
     explicit DCPU16MCAsmInfo(const Target &T, StringRef TT);
   };
 

@@ -37,9 +37,7 @@ DCPU16TargetMachine::DCPU16TargetMachine(const Target &T,
     // FIXME: Check TargetData string.
     DataLayout("e-p:16:16:16-i8:8:8-i16:16:16-i32:16:32-n8:16"),
     InstrInfo(*this), TLInfo(*this), TSInfo(*this),
-    FrameLowering(Subtarget) {
-        AsmInfo = new DCPU16MCAsmInfo();
-    }
+    FrameLowering(Subtarget) { }
 
 namespace {
 /// DCPU16 Code Generator Pass Configuration Options.
