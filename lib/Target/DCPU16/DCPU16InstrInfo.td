@@ -207,7 +207,7 @@ let isCall = 1 in
   // a use to prevent stack-pointer assignments that appear immediately
   // before calls from potentially appearing dead. Uses for argument
   // registers are added manually.
-  let Defs = [R8J, R13W, R14W, R15W, SRW],
+  let Defs = [R8J, SRW],
       Uses = [SPW] in {
     def CALLi     : II16i<0x0,
                           (outs), (ins i16imm:$dst, variable_ops),
