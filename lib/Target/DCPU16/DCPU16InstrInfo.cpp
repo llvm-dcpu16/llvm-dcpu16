@@ -51,10 +51,6 @@ void DCPU16InstrInfo::storeRegToStackSlot(MachineBasicBlock &MBB,
     BuildMI(MBB, MI, DL, get(DCPU16::MOV16mr))
       .addFrameIndex(FrameIdx).addImm(0)
       .addReg(SrcReg, getKillRegState(isKill)).addMemOperand(MMO);
-  else if (RC == &DCPU16::GR8RegClass)
-    BuildMI(MBB, MI, DL, get(DCPU16::MOV8mr))
-      .addFrameIndex(FrameIdx).addImm(0)
-      .addReg(SrcReg, getKillRegState(isKill)).addMemOperand(MMO);
   else
     llvm_unreachable("Cannot store this register to stack slot!");
 }
@@ -78,9 +74,6 @@ void DCPU16InstrInfo::loadRegFromStackSlot(MachineBasicBlock &MBB,
   if (RC == &DCPU16::GR16RegClass)
     BuildMI(MBB, MI, DL, get(DCPU16::MOV16rm))
       .addReg(DestReg).addFrameIndex(FrameIdx).addImm(0).addMemOperand(MMO);
-  else if (RC == &DCPU16::GR8RegClass)
-    BuildMI(MBB, MI, DL, get(DCPU16::MOV8rm))
-      .addReg(DestReg).addFrameIndex(FrameIdx).addImm(0).addMemOperand(MMO);
   else
     llvm_unreachable("Cannot store this register to stack slot!");
 }
@@ -92,8 +85,6 @@ void DCPU16InstrInfo::copyPhysReg(MachineBasicBlock &MBB,
   unsigned Opc;
   if (DCPU16::GR16RegClass.contains(DestReg, SrcReg))
     Opc = DCPU16::MOV16rr;
-  else if (DCPU16::GR8RegClass.contains(DestReg, SrcReg))
-    Opc = DCPU16::MOV8rr;
   else
     llvm_unreachable("Impossible reg-to-reg copy");
 
@@ -312,7 +303,6 @@ unsigned DCPU16InstrInfo::GetInstSizeInBytes(const MachineInstr *MI) const {
   case DCPU16II::SizeSpecial:
     switch (MI->getOpcode()) {
     default: llvm_unreachable("Unknown instruction size!");
-    case DCPU16::SAR8r1c:
     case DCPU16::SAR16r1c:
       return 4;
     }

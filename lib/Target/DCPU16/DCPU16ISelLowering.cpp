@@ -64,7 +64,6 @@ DCPU16TargetLowering::DCPU16TargetLowering(DCPU16TargetMachine &tm) :
   TD = getTargetData();
 
   // Set up the register classes.
-  addRegisterClass(MVT::i8,  DCPU16::GR8RegisterClass);
   addRegisterClass(MVT::i16, DCPU16::GR16RegisterClass);
 
   // Compute derived properties from the register classes
@@ -80,7 +79,7 @@ DCPU16TargetLowering::DCPU16TargetLowering(DCPU16TargetMachine &tm) :
   setBooleanVectorContents(ZeroOrOneBooleanContent); // FIXME: Is this correct?
 
   // We have post-incremented loads / stores.
-  setIndexedLoadAction(ISD::POST_INC, MVT::i8, Legal);
+  setIndexedLoadAction(ISD::POST_INC, MVT::i8, Expand);
   setIndexedLoadAction(ISD::POST_INC, MVT::i16, Legal);
 
   setLoadExtAction(ISD::EXTLOAD,  MVT::i1,  Promote);
@@ -92,9 +91,9 @@ DCPU16TargetLowering::DCPU16TargetLowering(DCPU16TargetMachine &tm) :
   // We don't have any truncstores
   setTruncStoreAction(MVT::i16, MVT::i8, Expand);
 
-  setOperationAction(ISD::SRA,              MVT::i8,    Custom);
-  setOperationAction(ISD::SHL,              MVT::i8,    Custom);
-  setOperationAction(ISD::SRL,              MVT::i8,    Custom);
+  setOperationAction(ISD::SRA,              MVT::i8,    Expand);
+  setOperationAction(ISD::SHL,              MVT::i8,    Expand);
+  setOperationAction(ISD::SRL,              MVT::i8,    Expand);
   setOperationAction(ISD::SRA,              MVT::i16,   Custom);
   setOperationAction(ISD::SHL,              MVT::i16,   Custom);
   setOperationAction(ISD::SRL,              MVT::i16,   Custom);
@@ -106,14 +105,14 @@ DCPU16TargetLowering::DCPU16TargetLowering(DCPU16TargetMachine &tm) :
   setOperationAction(ISD::ExternalSymbol,   MVT::i16,   Custom);
   setOperationAction(ISD::BlockAddress,     MVT::i16,   Custom);
   setOperationAction(ISD::BR_JT,            MVT::Other, Expand);
-  setOperationAction(ISD::BR_CC,            MVT::i8,    Custom);
+  setOperationAction(ISD::BR_CC,            MVT::i8,    Expand);
   setOperationAction(ISD::BR_CC,            MVT::i16,   Custom);
   setOperationAction(ISD::BRCOND,           MVT::Other, Expand);
-  setOperationAction(ISD::SETCC,            MVT::i8,    Custom);
+  setOperationAction(ISD::SETCC,            MVT::i8,    Expand);
   setOperationAction(ISD::SETCC,            MVT::i16,   Custom);
   setOperationAction(ISD::SELECT,           MVT::i8,    Expand);
   setOperationAction(ISD::SELECT,           MVT::i16,   Expand);
-  setOperationAction(ISD::SELECT_CC,        MVT::i8,    Custom);
+  setOperationAction(ISD::SELECT_CC,        MVT::i8,    Expand);
   setOperationAction(ISD::SELECT_CC,        MVT::i16,   Custom);
   setOperationAction(ISD::SIGN_EXTEND,      MVT::i16,   Custom);
   setOperationAction(ISD::DYNAMIC_STACKALLOC, MVT::i8, Expand);
@@ -166,10 +165,8 @@ DCPU16TargetLowering::DCPU16TargetLowering(DCPU16TargetMachine &tm) :
 
   // Libcalls names.
   if (HWMultMode == HWMultIntr) {
-    setLibcallName(RTLIB::MUL_I8,  "__mulqi3hw");
     setLibcallName(RTLIB::MUL_I16, "__mulhi3hw");
   } else if (HWMultMode == HWMultNoIntr) {
-    setLibcallName(RTLIB::MUL_I8,  "__mulqi3hw_noint");
     setLibcallName(RTLIB::MUL_I16, "__mulhi3hw_noint");
   }
 
@@ -225,9 +222,6 @@ getRegForInlineAsmConstraint(const std::string &Constraint,
     switch (Constraint[0]) {
     default: break;
     case 'r':   // GENERAL_REGS
-      if (VT == MVT::i8)
-        return std::make_pair(0U, DCPU16::GR8RegisterClass);
-
       return std::make_pair(0U, DCPU16::GR16RegisterClass);
     }
   }
@@ -734,7 +728,7 @@ static SDValue EmitCMP(SDValue &LHS, SDValue &RHS, SDValue &TargetCC,
     break;
   }
 
-  TargetCC = DAG.getConstant(TCC, MVT::i8);
+  TargetCC = DAG.getConstant(TCC, MVT::i16);
   return DAG.getNode(DCPU16ISD::CMP, dl, MVT::Glue, LHS, RHS);
 }
 
@@ -941,7 +935,7 @@ bool DCPU16TargetLowering::getPostIndexedAddressParts(SDNode *N, SDNode *Op,
     return false;
 
   EVT VT = LD->getMemoryVT();
-  if (VT != MVT::i8 && VT != MVT::i16)
+  if (VT != MVT::i16)
     return false;
 
   if (Op->getOpcode() != ISD::ADD)
@@ -949,8 +943,7 @@ bool DCPU16TargetLowering::getPostIndexedAddressParts(SDNode *N, SDNode *Op,
 
   if (ConstantSDNode *RHS = dyn_cast<ConstantSDNode>(Op->getOperand(1))) {
     uint64_t RHSC = RHS->getZExtValue();
-    if ((VT == MVT::i16 && RHSC != 2) ||
-        (VT == MVT::i8 && RHSC != 1))
+    if (VT == MVT::i16 && RHSC != 2)
       return false;
 
     Base = Op->getOperand(0);
@@ -961,7 +954,6 @@ bool DCPU16TargetLowering::getPostIndexedAddressParts(SDNode *N, SDNode *Op,
 
   return false;
 }
-
 
 const char *DCPU16TargetLowering::getTargetNodeName(unsigned Opcode) const {
   switch (Opcode) {
@@ -981,31 +973,6 @@ const char *DCPU16TargetLowering::getTargetNodeName(unsigned Opcode) const {
   }
 }
 
-bool DCPU16TargetLowering::isTruncateFree(Type *Ty1,
-                                          Type *Ty2) const {
-  if (!Ty1->isIntegerTy() || !Ty2->isIntegerTy())
-    return false;
-
-  return (Ty1->getPrimitiveSizeInBits() > Ty2->getPrimitiveSizeInBits());
-}
-
-bool DCPU16TargetLowering::isTruncateFree(EVT VT1, EVT VT2) const {
-  if (!VT1.isInteger() || !VT2.isInteger())
-    return false;
-
-  return (VT1.getSizeInBits() > VT2.getSizeInBits());
-}
-
-bool DCPU16TargetLowering::isZExtFree(Type *Ty1, Type *Ty2) const {
-  // DCPU16 implicitly zero-extends 8-bit results in 16-bit registers.
-  return 0 && Ty1->isIntegerTy(8) && Ty2->isIntegerTy(16);
-}
-
-bool DCPU16TargetLowering::isZExtFree(EVT VT1, EVT VT2) const {
-  // DCPU16 implicitly zero-extends 8-bit results in 16-bit registers.
-  return 0 && VT1 == MVT::i8 && VT2 == MVT::i16;
-}
-
 //===----------------------------------------------------------------------===//
 //  Other Lowering Code
 //===----------------------------------------------------------------------===//
@@ -1022,25 +989,13 @@ DCPU16TargetLowering::EmitShiftInstr(MachineInstr *MI,
   const TargetRegisterClass * RC;
   switch (MI->getOpcode()) {
   default: llvm_unreachable("Invalid shift opcode!");
-  case DCPU16::Shl8:
-   Opc = DCPU16::SHL8r1;
-   RC = DCPU16::GR8RegisterClass;
-   break;
   case DCPU16::Shl16:
    Opc = DCPU16::SHL16r1;
    RC = DCPU16::GR16RegisterClass;
    break;
-  case DCPU16::Sra8:
-   Opc = DCPU16::SAR8r1;
-   RC = DCPU16::GR8RegisterClass;
-   break;
   case DCPU16::Sra16:
    Opc = DCPU16::SAR16r1;
    RC = DCPU16::GR16RegisterClass;
-   break;
-  case DCPU16::Srl8:
-   Opc = DCPU16::SAR8r1c;
-   RC = DCPU16::GR8RegisterClass;
    break;
   case DCPU16::Srl16:
    Opc = DCPU16::SAR16r1c;
@@ -1072,8 +1027,8 @@ DCPU16TargetLowering::EmitShiftInstr(MachineInstr *MI,
   LoopBB->addSuccessor(RemBB);
   LoopBB->addSuccessor(LoopBB);
 
-  unsigned ShiftAmtReg = RI.createVirtualRegister(DCPU16::GR8RegisterClass);
-  unsigned ShiftAmtReg2 = RI.createVirtualRegister(DCPU16::GR8RegisterClass);
+  unsigned ShiftAmtReg = RI.createVirtualRegister(DCPU16::GR16RegisterClass);
+  unsigned ShiftAmtReg2 = RI.createVirtualRegister(DCPU16::GR16RegisterClass);
   unsigned ShiftReg = RI.createVirtualRegister(RC);
   unsigned ShiftReg2 = RI.createVirtualRegister(RC);
   unsigned ShiftAmtSrcReg = MI->getOperand(2).getReg();
@@ -1083,7 +1038,7 @@ DCPU16TargetLowering::EmitShiftInstr(MachineInstr *MI,
   // BB:
   // cmp 0, N
   // je RemBB
-  BuildMI(BB, dl, TII.get(DCPU16::CMP8ri))
+  BuildMI(BB, dl, TII.get(DCPU16::CMP16ri))
     .addReg(ShiftAmtSrcReg).addImm(0);
   BuildMI(BB, dl, TII.get(DCPU16::JCC))
     .addMBB(RemBB)
@@ -1102,7 +1057,7 @@ DCPU16TargetLowering::EmitShiftInstr(MachineInstr *MI,
     .addReg(ShiftAmtReg2).addMBB(LoopBB);
   BuildMI(LoopBB, dl, TII.get(Opc), ShiftReg2)
     .addReg(ShiftReg);
-  BuildMI(LoopBB, dl, TII.get(DCPU16::SUB8ri), ShiftAmtReg2)
+  BuildMI(LoopBB, dl, TII.get(DCPU16::SUB16ri), ShiftAmtReg2)
     .addReg(ShiftAmtReg).addImm(1);
   BuildMI(LoopBB, dl, TII.get(DCPU16::JCC))
     .addMBB(LoopBB)
@@ -1123,15 +1078,15 @@ DCPU16TargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
                                                   MachineBasicBlock *BB) const {
   unsigned Opc = MI->getOpcode();
 
-  if (Opc == DCPU16::Shl8 || Opc == DCPU16::Shl16 ||
-      Opc == DCPU16::Sra8 || Opc == DCPU16::Sra16 ||
-      Opc == DCPU16::Srl8 || Opc == DCPU16::Srl16)
+  if (Opc == DCPU16::Shl16 ||
+      Opc == DCPU16::Sra16 ||
+      Opc == DCPU16::Srl16)
     return EmitShiftInstr(MI, BB);
 
   const TargetInstrInfo &TII = *getTargetMachine().getInstrInfo();
   DebugLoc dl = MI->getDebugLoc();
 
-  assert((Opc == DCPU16::Select16 || Opc == DCPU16::Select8) &&
+  assert((Opc == DCPU16::Select16) &&
          "Unexpected instr type to insert");
 
   // To "insert" a SELECT instruction, we actually have to insert the diamond
