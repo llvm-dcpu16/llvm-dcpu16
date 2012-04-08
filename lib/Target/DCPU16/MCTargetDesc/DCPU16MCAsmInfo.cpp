@@ -26,6 +26,9 @@ DCPU16MCAsmInfo::DCPU16MCAsmInfo(const Target &T, StringRef TT) {
   CommentString = ";";
 
   AlignmentIsInBytes = false;
+  // TODO(krasin): support .align
+  // https://github.com/krasin/llvm-dcpu16/issues/52
+  AlignDirective = "\t; .align\t";
   AllowNameToStartWithDigit = true;
   UsesELFSectionDirectiveForBSS = true;
   HasDotTypeDotSizeDirective = false;
