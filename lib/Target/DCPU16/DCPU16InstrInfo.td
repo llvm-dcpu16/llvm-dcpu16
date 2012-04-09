@@ -105,7 +105,7 @@ def and_su : PatFrag<(ops node:$lhs, node:$rhs), (and node:$lhs, node:$rhs), [{
 // ADJCALLSTACKDOWN/UP implicitly use/def SP because they may be expanded into
 // a stack adjustment and the codegen must know that they may modify the stack
 // pointer before prolog-epilog rewriting occurs.
-let Defs = [RJ], Uses = [RJ] in {
+let Defs = [SPW], Uses = [SPW] in {
 def ADJCALLSTACKDOWN : Pseudo<(outs), (ins i16imm:$amt),
                               "#ADJCALLSTACKDOWN",
                               [(DCPU16callseq_start timm:$amt)]>;
@@ -178,11 +178,11 @@ let isBarrier = 1 in {
 //  Call Instructions...
 //
 let isCall = 1 in
-  // All calls clobber the non-callee saved registers. RJ is marked as
+  // All calls clobber the non-callee saved registers. SPW is marked as
   // a use to prevent stack-pointer assignments that appear immediately
   // before calls from potentially appearing dead. Uses for argument
   // registers are added manually.
-  let Uses = [RJ] in {
+  let Uses = [SPW] in {
     def CALLi     : II16i<0x0,
                           (outs), (ins i16imm:$dst, variable_ops),
                           "JSR\t$dst ; The Notch order", [(DCPU16call imm:$dst)]>;
@@ -198,7 +198,7 @@ let isCall = 1 in
 //===----------------------------------------------------------------------===//
 //  Miscellaneous Instructions...
 //
-let Defs = [RJ], Uses = [RJ], neverHasSideEffects=1 in {
+let Defs = [SPW], Uses = [SPW], neverHasSideEffects=1 in {
 let mayLoad = 1 in
 def POP16r   : IForm16<0x0, DstReg, SrcPostInc, Size2Bytes,
                        (outs GR16:$reg), (ins), "pop.w\t$reg", []>;

@@ -31,34 +31,45 @@
 
 using namespace llvm;
 
-bool DCPU16FrameLowering::hasFP(const MachineFunction &MF) const {
-  return false;
-}
-
 // FIXME: Provide proper call frame setup / destroy opcodes.
 DCPU16RegisterInfo::DCPU16RegisterInfo(DCPU16TargetMachine &tm,
                                        const TargetInstrInfo &tii)
-  : DCPU16GenRegisterInfo(DCPU16::RA), TM(tm), TII(tii) {
+  : DCPU16GenRegisterInfo(DCPU16::PCW), TM(tm), TII(tii) {
   StackAlign = TM.getFrameLowering()->getStackAlignment();
 }
 
 const uint16_t*
 DCPU16RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
+  const TargetFrameLowering *TFI = MF->getTarget().getFrameLowering();
+  const Function* F = MF->getFunction();
   static const uint16_t CalleeSavedRegs[] = {
-    DCPU16::RX, DCPU16::RY, DCPU16::RZ, DCPU16::RI, // DCPU16::RJ,
+    DCPU16::FPW, DCPU16::R1A, DCPU16::R2B, DCPU16::R7I,
     0
   };
-  return CalleeSavedRegs;
+  static const uint16_t CalleeSavedRegsFP[] = {
+    DCPU16::R1A, DCPU16::R2B, DCPU16::R7I,
+    0
+  };
+
+  if (TFI->hasFP(*MF))
+    return CalleeSavedRegsFP;
+  else
+    return CalleeSavedRegs;
 }
 
 BitVector DCPU16RegisterInfo::getReservedRegs(const MachineFunction &MF) const {
   BitVector Reserved(getNumRegs());
   const TargetFrameLowering *TFI = MF.getTarget().getFrameLowering();
 
-  // Mark 3 special registers as reserved.
-  Reserved.set(DCPU16::RSP);
-  Reserved.set(DCPU16::RO);
-  Reserved.set(DCPU16::RJ);
+  // Mark 4 special registers with subregisters as reserved.
+  Reserved.set(DCPU16::PCW);
+  Reserved.set(DCPU16::SPW);
+  Reserved.set(DCPU16::SRW);
+  Reserved.set(DCPU16::CGW);
+
+  // Mark frame pointer as reserved if needed.
+  if (TFI->hasFP(MF))
+    Reserved.set(DCPU16::FPW);
 
   return Reserved;
 }
@@ -75,8 +86,8 @@ eliminateCallFramePseudoInstr(MachineFunction &MF, MachineBasicBlock &MBB,
 
   if (!TFI->hasReservedCallFrame(MF)) {
     // If the stack pointer can be changed after prologue, turn the
-    // adjcallstackup instruction into a 'sub RJ, <amt>' and the
-    // adjcallstackdown instruction into 'add RJ, <amt>'
+    // adjcallstackup instruction into a 'sub SPW, <amt>' and the
+    // adjcallstackdown instruction into 'add SPW, <amt>'
     // TODO: consider using push / pop instead of sub + store / add
     MachineInstr *Old = I;
     uint64_t Amount = Old->getOperand(0).getImm();
@@ -89,8 +100,8 @@ eliminateCallFramePseudoInstr(MachineFunction &MF, MachineBasicBlock &MBB,
       MachineInstr *New = 0;
       if (Old->getOpcode() == TII.getCallFrameSetupOpcode()) {
         New = BuildMI(MF, Old->getDebugLoc(),
-                      TII.get(DCPU16::SUB16ri), DCPU16::RJ)
-          .addReg(DCPU16::RJ).addImm(Amount);
+                      TII.get(DCPU16::SUB16ri), DCPU16::SPW)
+          .addReg(DCPU16::SPW).addImm(Amount);
       } else {
         assert(Old->getOpcode() == TII.getCallFrameDestroyOpcode());
         // factor out the amount the callee already popped.
@@ -98,11 +109,14 @@ eliminateCallFramePseudoInstr(MachineFunction &MF, MachineBasicBlock &MBB,
         Amount -= CalleeAmt;
         if (Amount)
           New = BuildMI(MF, Old->getDebugLoc(),
-                        TII.get(DCPU16::ADD16ri), DCPU16::RJ)
-            .addReg(DCPU16::RJ).addImm(Amount);
+                        TII.get(DCPU16::ADD16ri), DCPU16::SPW)
+            .addReg(DCPU16::SPW).addImm(Amount);
       }
 
       if (New) {
+        // The SRW implicit def is dead.
+        New->getOperand(3).setIsDead();
+
         // Replace the pseudo instruction with a new instruction...
         MBB.insert(I, New);
       }
@@ -114,7 +128,10 @@ eliminateCallFramePseudoInstr(MachineFunction &MF, MachineBasicBlock &MBB,
       MachineInstr *Old = I;
       MachineInstr *New =
         BuildMI(MF, Old->getDebugLoc(), TII.get(DCPU16::SUB16ri),
-                DCPU16::RJ).addReg(DCPU16::RJ).addImm(CalleeAmt);
+                DCPU16::SPW).addReg(DCPU16::SPW).addImm(CalleeAmt);
+      // The SRW implicit def is dead.
+      New->getOperand(3).setIsDead();
+
       MBB.insert(I, New);
     }
   }
@@ -140,7 +157,7 @@ DCPU16RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
 
   int FrameIndex = MI.getOperand(i).getIndex();
 
-  unsigned BasePtr = DCPU16::RJ;
+  unsigned BasePtr = (TFI->hasFP(MF) ? DCPU16::FPW : DCPU16::SPW);
   int Offset = MF.getFrameInfo()->getObjectOffset(FrameIndex);
 
   // Skip the saved PC
@@ -198,5 +215,5 @@ DCPU16RegisterInfo::processFunctionBeforeFrameFinalized(MachineFunction &MF)
 unsigned DCPU16RegisterInfo::getFrameRegister(const MachineFunction &MF) const {
   const TargetFrameLowering *TFI = MF.getTarget().getFrameLowering();
 
-  return DCPU16::RJ;
+  return TFI->hasFP(MF) ? DCPU16::FPW : DCPU16::SPW;
 }
