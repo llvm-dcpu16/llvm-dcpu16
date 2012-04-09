@@ -166,8 +166,8 @@ void DCPU16AsmPrinter::EmitInstruction(const MachineInstr *MI) {
 void DCPU16AsmPrinter::EmitStartOfAsmFile(Module &M) {
   OutStreamer.EmitRawText(Twine(
     ":autoinit\t\t;;Init data stack register C\n"
-    "\tSET C, SP\n"
-    "\tSUB C, 256\n\n"
+    "\tSET I, SP\n"
+    "\tSUB I, 256\n\n"
     ":autostart\n"
     "\tJSR main\n"
     ":autohalt SET PC, autohalt\n"));
