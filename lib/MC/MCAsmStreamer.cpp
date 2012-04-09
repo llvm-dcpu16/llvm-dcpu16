@@ -314,9 +314,6 @@ static inline int64_t truncateToSize(int64_t Value, unsigned Bytes) {
 }
 
 void MCAsmStreamer::ChangeSection(const MCSection *Section) {
-  // TODO(krasin): enable sections
-  return;
-
   assert(Section && "Cannot switch to a null section!");
   Section->PrintSwitchToSection(MAI, OS);
 }
