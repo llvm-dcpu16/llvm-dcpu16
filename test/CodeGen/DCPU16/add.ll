@@ -14,9 +14,4 @@ entry:
   ret i16 %add
 }
 ; CHECK: :sum2
-; CHECK: SUB I, 4
-; CHECK: SET [2+I], A
-; CHECK: SET [0+I], B
-; CHECK: ADD A, [2+I]
-; CHECK: ADD I, 4
-; CHECK: SET PC, POP
+; CHECK: {{ ADD ., \[[0-9]\+.\] }}
