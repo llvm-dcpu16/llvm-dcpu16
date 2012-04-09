@@ -359,20 +359,20 @@ def ADC16mm : I8mm<0x0,
 let isCommutable = 1 in { // X = AND Y, Z  == X = AND Z, Y
 def AND16rr : I16rr<0x0,
                     (outs GR16:$dst), (ins GR16:$src, GR16:$src2),
-                    "AND\t{$src2, $dst}",
+                    "AND\t{$dst, $src2} ; The Notch order",
                     [(set GR16:$dst, (and GR16:$src, GR16:$src2)),
                      (implicit RO)]>;
 }
 
 def AND16ri : I16ri<0x0,
                     (outs GR16:$dst), (ins GR16:$src, i16imm:$src2),
-                    "AND\t{$src2, $dst}",
+                    "AND\t{$dst, $src2} ; The Notch order",
                     [(set GR16:$dst, (and GR16:$src, imm:$src2)),
                      (implicit RO)]>;
 
 def AND16rm : I16rm<0x0,
                     (outs GR16:$dst), (ins GR16:$src, memsrc:$src2),
-                    "AND\t{$src2, $dst}",
+                    "AND\t{$dst, $src2} ; The Notch order",
                     [(set GR16:$dst, (and GR16:$src, (load addr:$src2))),
                      (implicit RO)]>;
 
@@ -380,24 +380,24 @@ let mayLoad = 1, hasExtraDefRegAllocReq = 1 in {
 def AND16rm_POST : IForm16<0x0, DstReg, SrcPostInc, Size2Bytes,
                            (outs GR16:$dst, GR16:$base_wb),
                            (ins GR16:$src, GR16:$base),
-                           "AND\t{@$base+, $dst}", []>;
+                           "AND\t{$dst, @$base+} ; The Notch order", []>;
 }
 
 def AND16mr : I16mr<0x0,
                     (outs), (ins memdst:$dst, GR16:$src),
-                    "AND\t{$src, $dst}",
+                    "AND\t{$dst, $src} ; The Notch order",
                     [(store (and (load addr:$dst), GR16:$src), addr:$dst),
                      (implicit RO)]>;
 
 def AND16mi : I16mi<0x0,
                     (outs), (ins memdst:$dst, i16imm:$src),
-                    "AND\t{$src, $dst}",
+                    "AND\t{$dst, $src} ; The Notch order",
                     [(store (and (load addr:$dst), (i16 imm:$src)), addr:$dst),
                      (implicit RO)]>;
 
 def AND16mm : I16mm<0x0,
                     (outs), (ins memdst:$dst, memsrc:$src),
-                    "AND\t{$src, $dst}",
+                    "AND\t{$dst, $src} ; The Notch order",
                     [(store (and (load addr:$dst), 
                                  (i16 (load addr:$src))), addr:$dst),
                      (implicit RO)]>;
