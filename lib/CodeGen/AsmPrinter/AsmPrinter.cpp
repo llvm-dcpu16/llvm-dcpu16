@@ -209,10 +209,6 @@ bool AsmPrinter::doInitialization(Module &M) {
 }
 
 void AsmPrinter::EmitLinkage(unsigned Linkage, MCSymbol *GVSym) const {
-  // TODO(krasin): enable this again, when DCPU assemblers became mature
-  // https://github.com/krasin/llvm-dcpu16/issues/49
-  return;
-
   switch ((GlobalValue::LinkageTypes)Linkage) {
   case GlobalValue::CommonLinkage:
   case GlobalValue::LinkOnceAnyLinkage:
