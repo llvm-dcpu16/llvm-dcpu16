@@ -20,7 +20,7 @@ Below are the instructions how to build the toolchain from sources and try:
 
 First, of all, you need to install prerequisites:
 
-    sudo apt-get install gcc g++ git subversion git-svn\
+    sudo apt-get install gcc g++ git subversion git-svn make\
      perl gawk expect tcl texinfo bison autoconf automake cmake
 
 Note, that when your python executable points to python3 (you can check that by running python --version) 
