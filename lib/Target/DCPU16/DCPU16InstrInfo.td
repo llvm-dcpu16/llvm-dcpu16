@@ -207,11 +207,11 @@ let isCall = 1 in
 let Defs = [RI], Uses = [RI], neverHasSideEffects=1 in {
 let mayLoad = 1 in
 def POP16r   : IForm16<0x0, DstReg, SrcPostInc, Size2Bytes,
-                       (outs GR16:$reg), (ins), "pop.w\t$reg", []>;
+                       (outs GR16:$reg), (ins), "SET\t{$reg, POP}", []>;
 
 let mayStore = 1 in
 def PUSH16r  : II16r<0x0,
-                     (outs), (ins GR16:$reg), "push.w\t$reg",[]>;
+                     (outs), (ins GR16:$reg), "SET\t{PUSH, $reg}",[]>;
 }
 
 //===----------------------------------------------------------------------===//
