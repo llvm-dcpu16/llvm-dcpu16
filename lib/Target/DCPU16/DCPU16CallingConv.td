@@ -13,11 +13,11 @@
 // DCPU16 Return Value Calling Convention
 //===----------------------------------------------------------------------===//
 def RetCC_DCPU16 : CallingConv<[
-  // i8 are returned in registers R4X, R5Y, R6Z, R8J
-  CCIfType<[i8], CCAssignToReg<[R4X, R5Y, R6Z, R8J]>>,
+  // i8 are returned in registers RA, RB, RC
+  CCIfType<[i8], CCAssignToReg<[RA, RB, RC]>>,
 
-  // i16 are returned in registers R4X, R5Y, R6Z, R8J
-  CCIfType<[i16], CCAssignToReg<[R4X, R5Y, R6Z, R8J]>>
+  // i16 are returned in registers RA, RB, RC
+  CCIfType<[i16], CCAssignToReg<[RA, RB, RC]>>
 ]>;
 
 //===----------------------------------------------------------------------===//
@@ -29,8 +29,9 @@ def CC_DCPU16 : CallingConv<[
 
   // The first 4 integer arguments of non-varargs functions are passed in
   // integer registers.
-  CCIfNotVarArg<CCIfType<[i16], CCAssignToReg<[R4X, R5Y, R6Z, R8J]>>>,
+  CCIfNotVarArg<CCIfType<[i16], CCAssignToReg<[RA, RB, RC]>>>,
 
+  // FIXME: Word addressing!
   // Integer values get stored in stack slots that are 2 bytes in
   // size and 2-byte aligned.
   CCIfType<[i16], CCAssignToStack<2, 2>>
