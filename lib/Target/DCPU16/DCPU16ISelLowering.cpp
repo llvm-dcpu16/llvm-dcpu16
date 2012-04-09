@@ -55,7 +55,7 @@ DCPU16TargetLowering::DCPU16TargetLowering(DCPU16TargetMachine &tm) :
   // Division is expensive
   setIntDivIsCheap(false);
 
-  setStackPointerRegisterToSaveRestore(DCPU16::RJ);
+  setStackPointerRegisterToSaveRestore(DCPU16::SPW);
   setBooleanContents(ZeroOrOneBooleanContent);
   setBooleanVectorContents(ZeroOrOneBooleanContent); // FIXME: Is this correct?
 
@@ -143,7 +143,6 @@ DCPU16TargetLowering::DCPU16TargetLowering(DCPU16TargetMachine &tm) :
   setOperationAction(ISD::SDIVREM,          MVT::i16,   Expand);
   setOperationAction(ISD::SREM,             MVT::i16,   Expand);
 
-  // FIXME: Word addressing!
   setMinFunctionAlignment(1);
   setPrefFunctionAlignment(2);
 }
@@ -443,7 +442,7 @@ DCPU16TargetLowering::LowerCCCCallTo(SDValue Chain, SDValue Callee,
       assert(VA.isMemLoc());
 
       if (StackPtr.getNode() == 0)
-        StackPtr = DAG.getCopyFromReg(Chain, dl, DCPU16::RJ, getPointerTy());
+        StackPtr = DAG.getCopyFromReg(Chain, dl, DCPU16::SPW, getPointerTy());
 
       SDValue PtrOff = DAG.getNode(ISD::ADD, dl, getPointerTy(),
                                    StackPtr,
@@ -709,7 +708,6 @@ SDValue DCPU16TargetLowering::LowerBR_CC(SDValue Op, SelectionDAG &DAG) const {
                      Chain, Dest, TargetCC, Flag);
 }
 
-// TODO: We probably need to deactivate this function
 SDValue DCPU16TargetLowering::LowerSETCC(SDValue Op, SelectionDAG &DAG) const {
   SDValue LHS   = Op.getOperand(0);
   SDValue RHS   = Op.getOperand(1);
@@ -745,31 +743,31 @@ SDValue DCPU16TargetLowering::LowerSETCC(SDValue Op, SelectionDAG &DAG) const {
     Convert = false;
     break;
    case DCPU16CC::COND_HS:
-     // Res = RJ & 1, no processing is required
+     // Res = SRW & 1, no processing is required
      break;
    case DCPU16CC::COND_LO:
-     // Res = ~(RJ & 1)
+     // Res = ~(SRW & 1)
      Invert = true;
      break;
    case DCPU16CC::COND_NE:
      if (andCC) {
-       // C = ~Z, thus Res = RJ & 1, no processing is required
+       // C = ~Z, thus Res = SRW & 1, no processing is required
      } else {
-       // Res = ~((RJ >> 1) & 1)
+       // Res = ~((SRW >> 1) & 1)
        Shift = true;
        Invert = true;
      }
      break;
    case DCPU16CC::COND_E:
      Shift = true;
-     // C = ~Z for AND instruction, thus we can put Res = ~(RJ & 1), however,
-     // Res = (RJ >> 1) & 1 is 1 word shorter.
+     // C = ~Z for AND instruction, thus we can put Res = ~(SRW & 1), however,
+     // Res = (SRW >> 1) & 1 is 1 word shorter.
      break;
   }
   EVT VT = Op.getValueType();
   SDValue One  = DAG.getConstant(1, VT);
   if (Convert) {
-    SDValue SR = DAG.getCopyFromReg(DAG.getEntryNode(), dl, DCPU16::RJ,
+    SDValue SR = DAG.getCopyFromReg(DAG.getEntryNode(), dl, DCPU16::SRW,
                                     MVT::i16, Flag);
     if (Shift)
       // FIXME: somewhere this is turned into a SRL, lower it MSP specific?
@@ -842,7 +840,6 @@ DCPU16TargetLowering::getReturnAddressFrameIndex(SelectionDAG &DAG) const {
   return DAG.getFrameIndex(ReturnAddrIndex, getPointerTy());
 }
 
-// FIXME: We might not need this (since it used the FP through LowerFRAMEADDR)
 SDValue DCPU16TargetLowering::LowerRETURNADDR(SDValue Op,
                                               SelectionDAG &DAG) const {
   MachineFrameInfo *MFI = DAG.getMachineFunction().getFrameInfo();
@@ -867,7 +864,6 @@ SDValue DCPU16TargetLowering::LowerRETURNADDR(SDValue Op,
                      RetAddrFI, MachinePointerInfo(), false, false, false, 0);
 }
 
-// FIXME: We might not need this (since it used the FP)
 SDValue DCPU16TargetLowering::LowerFRAMEADDR(SDValue Op,
                                              SelectionDAG &DAG) const {
   MachineFrameInfo *MFI = DAG.getMachineFunction().getFrameInfo();
@@ -877,7 +873,7 @@ SDValue DCPU16TargetLowering::LowerFRAMEADDR(SDValue Op,
   DebugLoc dl = Op.getDebugLoc();  // FIXME probably not meaningful
   unsigned Depth = cast<ConstantSDNode>(Op.getOperand(0))->getZExtValue();
   SDValue FrameAddr = DAG.getCopyFromReg(DAG.getEntryNode(), dl,
-                                         DCPU16::RJ, VT); // FIXME: Was the FP!
+                                         DCPU16::FPW, VT);
   while (Depth--)
     FrameAddr = DAG.getLoad(VT, dl, DAG.getEntryNode(), FrameAddr,
                             MachinePointerInfo(),
