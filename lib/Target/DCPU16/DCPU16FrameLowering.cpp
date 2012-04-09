@@ -81,15 +81,21 @@ void DCPU16FrameLowering::emitPrologue(MachineFunction &MF) const {
   if (MBBI != MBB.end())
     DL = MBBI->getDebugLoc();
 
-  if (NumBytes) {// adjust stack pointer: SPW -= numbytes
+  if (NumBytes) { // adjust stack pointer: SPW -= numbytes
     // If there is an SUB16ri of SPW immediately before this instruction, merge
     // the two.
     //NumBytes -= mergeSPUpdates(MBB, MBBI, true);
     // If there is an ADD16ri or SUB16ri of SPW immediately after this
     // instruction, merge the two instructions.
     // mergeSPUpdatesDown(MBB, MBBI, &NumBytes);
-    BuildMI(MBB, MBBI, DL, TII.get(DCPU16::SUB16ri), DCPU16::SPW)
-     .addReg(DCPU16::SPW).addImm(NumBytes);
+
+    if (NumBytes) {
+      MachineInstr *MI =
+        BuildMI(MBB, MBBI, DL, TII.get(DCPU16::SUB16ri), DCPU16::SPW)
+        .addReg(DCPU16::SPW).addImm(NumBytes);
+      // The SRW implicit def is dead.
+      MI->getOperand(3).setIsDead();
+    }
   }
 }
 
@@ -142,15 +148,21 @@ void DCPU16FrameLowering::emitEpilogue(MachineFunction &MF,
     BuildMI(MBB, MBBI, DL,
             TII.get(DCPU16::MOV16rr), DCPU16::SPW).addReg(DCPU16::FPW);
     if (CSSize) {
-      BuildMI(MBB, MBBI, DL,
-       TII.get(DCPU16::SUB16ri), DCPU16::SPW)
-       .addReg(DCPU16::SPW).addImm(CSSize);
+      MachineInstr *MI =
+        BuildMI(MBB, MBBI, DL,
+                TII.get(DCPU16::SUB16ri), DCPU16::SPW)
+        .addReg(DCPU16::SPW).addImm(CSSize);
+      // The SRW implicit def is dead.
+      MI->getOperand(3).setIsDead();
     }
   } else {
     // adjust stack pointer back: SPW += numbytes
     if (NumBytes) {
-      BuildMI(MBB, MBBI, DL, TII.get(DCPU16::ADD16ri), DCPU16::SPW)
-       .addReg(DCPU16::SPW).addImm(NumBytes);
+      MachineInstr *MI =
+        BuildMI(MBB, MBBI, DL, TII.get(DCPU16::ADD16ri), DCPU16::SPW)
+        .addReg(DCPU16::SPW).addImm(NumBytes);
+      // The SRW implicit def is dead.
+      MI->getOperand(3).setIsDead();
     }
   }
 }
