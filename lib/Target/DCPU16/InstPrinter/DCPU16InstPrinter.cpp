@@ -76,12 +76,19 @@ void DCPU16InstPrinter::printSrcMemOperand(const MCInst *MI, unsigned OpNo,
     O << *Disp.getExpr();
   else {
     assert(Disp.isImm() && "Expected immediate in displacement field");
-    O << Disp.getImm();
+    if(Disp.getImm() != 0) {
+        O << Disp.getImm();
+    }    
   }
 
   // Print register base field
-  if (Base.getReg())
-    O << '+' << getRegisterName(Base.getReg());
+  if (Base.getReg()) {
+    if(Disp.isImm() && Disp.getImm() != 0) {
+      O << '+';
+    }
+    O << getRegisterName(Base.getReg());
+  }
+    
   O << ']';
 }
 
