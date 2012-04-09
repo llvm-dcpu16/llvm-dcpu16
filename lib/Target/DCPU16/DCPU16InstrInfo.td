@@ -405,40 +405,40 @@ def AND16mm : I16mm<0x0,
 let isCommutable = 1 in { // X = OR Y, Z  == X = OR Z, Y
 def OR16rr : I16rr<0x0,
                    (outs GR16:$dst), (ins GR16:$src, GR16:$src2),
-                   "BOR\t{$src2, $dst}",
+                   "BOR\t{$dst, $src2} ; The Notch order",
                    [(set GR16:$dst, (or GR16:$src, GR16:$src2))]>;
 }
 
 def OR16ri : I16ri<0x0,
                    (outs GR16:$dst), (ins GR16:$src, i16imm:$src2),
-                   "BOR\t{$src2, $dst}",
+                   "BOR\t{$dst, $src2} ; The Notch order",
                    [(set GR16:$dst, (or GR16:$src, imm:$src2))]>;
 
 def OR16rm : I16rm<0x0,
                    (outs GR16:$dst), (ins GR16:$src, memsrc:$src2),
-                   "BOR\t{$src2, $dst}",
+                   "BOR\t{$dst, $src2} ; The Notch order",
                    [(set GR16:$dst, (or GR16:$src, (load addr:$src2)))]>;
 
 let mayLoad = 1, hasExtraDefRegAllocReq = 1 in {
 def OR16rm_POST : IForm16<0x0, DstReg, SrcPostInc, Size2Bytes,
                           (outs GR16:$dst, GR16:$base_wb),
                           (ins GR16:$src, GR16:$base),
-                          "BOR\t{@$base+, $dst}", []>;
+                          "BOR\t{$dst, @$base+} ; The Notch order", []>;
 }
 
 def OR16mr : I16mr<0x0,
                    (outs), (ins memdst:$dst, GR16:$src),
-                   "BOR\t{$src, $dst}",
+                   "BOR\t{$dst, $src} ; The Notch order",
                    [(store (or (load addr:$dst), GR16:$src), addr:$dst)]>;
 
 def OR16mi : I16mi<0x0,
                    (outs), (ins memdst:$dst, i16imm:$src),
-                   "BOR\t{$src, $dst}",
+                   "BOR\t{$dst, $src} ; The Notch order",
                    [(store (or (load addr:$dst), (i16 imm:$src)), addr:$dst)]>;
 
 def OR16mm : I16mm<0x0,
                    (outs), (ins memdst:$dst, memsrc:$src),
-                   "BOR\t{$src, $dst}",
+                   "BOR\t{$dst, $src} ; The Notch order",
                    [(store (or (i16 (load addr:$dst)),
                                (i16 (load addr:$src))), addr:$dst)]>;
 
