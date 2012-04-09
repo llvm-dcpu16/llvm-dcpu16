@@ -468,20 +468,20 @@ def BIC16mm : I16mm<0x0,
 let isCommutable = 1 in { // X = XOR Y, Z  == X = XOR Z, Y
 def XOR16rr : I16rr<0x0,
                     (outs GR16:$dst), (ins GR16:$src, GR16:$src2),
-                    "XOR\t{$src2, $dst}",
+                    "XOR\t{$dst, $src2} ; The Notch order",
                     [(set GR16:$dst, (xor GR16:$src, GR16:$src2)),
                      (implicit RO)]>;
 }
 
 def XOR16ri : I16ri<0x0,
                     (outs GR16:$dst), (ins GR16:$src, i16imm:$src2),
-                    "XOR\t{$src2, $dst}",
+                    "XOR\t{$dst, $src2} ; The Notch order",
                     [(set GR16:$dst, (xor GR16:$src, imm:$src2)),
                      (implicit RO)]>;
 
 def XOR16rm : I16rm<0x0,
                     (outs GR16:$dst), (ins GR16:$src, memsrc:$src2),
-                    "XOR\t{$src2, $dst}",
+                    "XOR\t{$dst, $src2} ; The Notch order",
                     [(set GR16:$dst, (xor GR16:$src, (load addr:$src2))),
                      (implicit RO)]>;
 
@@ -489,24 +489,24 @@ let mayLoad = 1, hasExtraDefRegAllocReq = 1 in {
 def XOR16rm_POST : IForm16<0x0, DstReg, SrcPostInc, Size2Bytes,
                            (outs GR16:$dst, GR16:$base_wb),
                            (ins GR16:$src, GR16:$base),
-                           "XOR\t{@$base+, $dst}", []>;
+                           "XOR\t{$dst, @$base+} ; The Notch order", []>;
 }
 
 def XOR16mr : I16mr<0x0,
                     (outs), (ins memdst:$dst, GR16:$src),
-                    "XOR\t{$src, $dst}",
+                    "XOR\t{$dst, $src} ; The Notch order",
                     [(store (xor (load addr:$dst), GR16:$src), addr:$dst),
                      (implicit RO)]>;
 
 def XOR16mi : I16mi<0x0,
                     (outs), (ins memdst:$dst, i16imm:$src),
-                    "XOR\t{$src, $dst}",
+                    "XOR\t{$dst, $src} ; The Notch order",
                     [(store (xor (load addr:$dst), (i16 imm:$src)), addr:$dst),
                      (implicit RO)]>;
 
 def XOR16mm : I16mm<0x0,
                     (outs), (ins memdst:$dst, memsrc:$src),
-                    "XOR\t{$src, $dst}",
+                    "XOR\t{$dst, $src} ; The Notch order",
                     [(store (xor (load addr:$dst), (i16 (load addr:$src))), addr:$dst),
                      (implicit RO)]>;
 
