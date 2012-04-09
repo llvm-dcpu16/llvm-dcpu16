@@ -69,7 +69,7 @@ void DCPU16FrameLowering::emitPrologue(MachineFunction &MF) const {
     // Mark the FramePtr as live-in in every block except the entry.
     for (MachineFunction::iterator I = llvm::next(MF.begin()), E = MF.end();
          I != E; ++I)
-      I->addLiveIn(DCPU16::RO);
+      I->addLiveIn(DCPU16::RJ);
 
   } else
     NumBytes = StackSize - DCPU16FI->getCalleeSavedFrameSize();
