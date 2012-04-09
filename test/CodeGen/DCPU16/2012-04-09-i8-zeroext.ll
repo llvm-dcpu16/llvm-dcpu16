@@ -1,3 +1,4 @@
+; XFAIL: *
 ; RUN: llc < %s -march=dcpu16 | not grep {UNREACHABLE|ERROR}
 target datalayout = "e-p:16:16:16-i1:8:8-i8:8:8-i16:16:16-i32:16:16"
 target triple = "dcpu16"
