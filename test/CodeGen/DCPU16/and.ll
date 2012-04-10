@@ -16,7 +16,8 @@ entry:
 ; CHECK: :f1
 ; CHECK: SET [2+I], A
 ; CHECK: SET [I], B
-; CHECK: AND A, [2+I]
+; CHECK: AND B, [2+I]
+; CHECK: SET A, B
 ; CHECK: ADD I, 4
 
 
