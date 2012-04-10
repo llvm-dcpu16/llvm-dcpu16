@@ -82,6 +82,8 @@ DCPU16TargetLowering::DCPU16TargetLowering(DCPU16TargetMachine &tm) :
   setOperationAction(ISD::ROTR,             MVT::i8,    Expand);
   setOperationAction(ISD::ROTL,             MVT::i16,   Expand);
   setOperationAction(ISD::ROTR,             MVT::i16,   Expand);
+  setOperationAction(ISD::BSWAP,            MVT::i8,    Expand);
+  setOperationAction(ISD::BSWAP,            MVT::i16,   Expand);
   setOperationAction(ISD::GlobalAddress,    MVT::i16,   Custom);
   setOperationAction(ISD::ExternalSymbol,   MVT::i16,   Custom);
   setOperationAction(ISD::BlockAddress,     MVT::i16,   Custom);
