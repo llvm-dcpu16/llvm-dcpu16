@@ -717,37 +717,43 @@ def CMP16mr : I16mr<0x0,
 let isCommutable = 1 in {
 def BIT16rr : I16rr<0x0,
                     (outs), (ins GR16:$src, GR16:$src2),
-                    "bit.w\t{$src2, $src}",
+                    "IFN\t{$src, $src2} ; The Notch order\n"
+		    "\tSET\tO, 1 ; The Notch order",
                     [(DCPU16cmp (and_su GR16:$src, GR16:$src2), 0),
                      (implicit RO)]>;
 }
 def BIT16ri : I16ri<0x0,
                     (outs), (ins GR16:$src, i16imm:$src2),
-                    "bit.w\t{$src2, $src}",
+                    "IFN\t{$src, $src2} ; The Notch order\n"
+		    "\tSET\tO, 1 ; The Notch order",
                     [(DCPU16cmp (and_su GR16:$src, imm:$src2), 0),
                      (implicit RO)]>;
 
 def BIT16rm : I16rm<0x0,
                     (outs), (ins GR16:$src, memdst:$src2),
-                    "bit.w\t{$src2, $src}",
+                    "IFN\t{$src, $src2} ; The Notch order\n"
+		    "\tSET\tO, 1 ; The Notch order",
                     [(DCPU16cmp (and_su GR16:$src,  (load addr:$src2)), 0),
                      (implicit RO)]>;
 
 def BIT16mr : I16mr<0x0,
                     (outs), (ins memsrc:$src, GR16:$src2),
-                    "bit.w\t{$src2, $src}",
+                    "IFN\t{$src, $src2} ; The Notch order\n"
+		    "\tSET\tO, 1 ; The Notch order",
                     [(DCPU16cmp (and_su (load addr:$src), GR16:$src2), 0),
                      (implicit RO)]>;
 
 def BIT16mi : I16mi<0x0,
                     (outs), (ins memsrc:$src, i16imm:$src2),
-                    "bit.w\t{$src2, $src}",
+                    "IFN\t{$src, $src2} ; The Notch order\n"
+		    "\tSET\tO, 1 ; The Notch order",
                     [(DCPU16cmp (and_su (load addr:$src), (i16 imm:$src2)), 0),
                      (implicit RO)]>;
 
 def BIT16mm : I16mm<0x0,
                     (outs), (ins memsrc:$src, memsrc:$src2),
-                    "bit.w\t{$src2, $src}",
+                    "IFN\t{$src, $src2} ; The Notch order\n"
+		    "\tSET\tO, 1 ; The Notch order",
                     [(DCPU16cmp (and_su (i16 (load addr:$src)),
                                         (load addr:$src2)),
                                  0),
