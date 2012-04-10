@@ -456,33 +456,6 @@ def OR16mm : I16mm<0x0,
 
 }
 
-// bic does not modify condition codes
-
-def BIC16rr : I16rr<0x0,
-                    (outs GR16:$dst), (ins GR16:$src, GR16:$src2),
-                    "bic.w\t{$src2, $dst}",
-                    [(set GR16:$dst, (and GR16:$src, (not GR16:$src2)))]>;
-
-def BIC16rm : I16rm<0x0,
-                    (outs GR16:$dst), (ins GR16:$src, memsrc:$src2),
-                    "bic.w\t{$src2, $dst}",
-                    [(set GR16:$dst, (and GR16:$src, (not (i16 (load addr:$src2)))))]>;
-
-let Constraints = "" in {
-
-def BIC16mr : I16mr<0x0,
-                    (outs), (ins memdst:$dst, GR16:$src),
-                    "bic.w\t{$src, $dst}",
-                    [(store (and (load addr:$dst), (not GR16:$src)), addr:$dst)]>;
-
-def BIC16mm : I16mm<0x0,
-                    (outs), (ins memdst:$dst, memsrc:$src),
-                    "bic.w\t{$src, $dst}",
-                    [(store (and (load addr:$dst),
-                                 (not (i16 (load addr:$src)))), addr:$dst)]>;
-
-}
-
 let isCommutable = 1 in { // X = XOR Y, Z  == X = XOR Z, Y
 def XOR16rr : I16rr<0x0,
                     (outs GR16:$dst), (ins GR16:$src, GR16:$src2),
@@ -683,13 +656,8 @@ def SAR16r1c : Pseudo<(outs GR16:$dst), (ins GR16:$src),
                       "rrc.w\t$dst",
                       [(set GR16:$dst, (DCPU16rrc GR16:$src)),
                        (implicit RO)]>;
-} // Defs = [RO]
 
-// FIXME: Memory bitswaps?
-def SWPB16r : II16r<0x0,
-                    (outs GR16:$dst), (ins GR16:$src),
-                    "swpb\t$dst",
-                    [(set GR16:$dst, (bswap GR16:$src))]>;
+} // Defs = [RO]
 
 } // Constraints = "$src = $dst"
 
