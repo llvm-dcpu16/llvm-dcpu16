@@ -82,11 +82,11 @@ void DCPU16InstrInfo::copyPhysReg(MachineBasicBlock &MBB,
                                   MachineBasicBlock::iterator I, DebugLoc DL,
                                   unsigned DestReg, unsigned SrcReg,
                                   bool KillSrc) const {
-  unsigned Opc;
-  if (DCPU16::GR16RegClass.contains(DestReg, SrcReg))
-    Opc = DCPU16::MOV16rr;
-  else
-    llvm_unreachable("Impossible reg-to-reg copy");
+
+  // An interesting aspect of DCPU16 is that all the registers,
+  // including PC, SP and O are valid SET arguments. So, it's
+  // legal to say SET PC, O; It just usually does not make sense.
+  unsigned Opc = DCPU16::MOV16rr;
 
   BuildMI(MBB, I, DL, get(Opc), DestReg)
     .addReg(SrcReg, getKillRegState(KillSrc));
