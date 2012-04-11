@@ -30,7 +30,7 @@ Next, get the sources and build it:
 
     git clone git://github.com/krasin/llvm-dcpu16.git # Checkout LLVM
     cd llvm-dcpu16/tools
-    git clone git://github.com/krasin/clang-dcpu16.git clang # Checkout Clang
+    git clone git://github.com/llvm-dcpu16/clang.git # Checkout Clang
     mkdir ../cbuild
     cd ../cbuild
     cmake ..
