@@ -2,7 +2,7 @@
 //
 //                     The LLVM Compiler Infrastructure
 //
-// This file is distributed under the University of Illinois Open Source 
+// This file is distributed under the University of Illinois Open Source
 // License. See LICENSE.TXT for details.
 //
 //===----------------------------------------------------------------------===//
@@ -30,7 +30,7 @@ def SDT_DCPU16Cmp          : SDTypeProfile<0, 2, [SDTCisSameAs<0, 1>]>;
 def SDT_DCPU16BrCC         : SDTypeProfile<0, 2, [SDTCisVT<0, OtherVT>,
                                                   SDTCisVT<1, i16>]>;
 def SDT_DCPU16SelectCC     : SDTypeProfile<1, 3, [SDTCisSameAs<0, 1>,
-                                                  SDTCisSameAs<1, 2>, 
+                                                  SDTCisSameAs<1, 2>,
                                                   SDTCisVT<3, i16>]>;
 def SDT_DCPU16Shift        : SDTypeProfile<1, 2, [SDTCisSameAs<0, 1>,
                                                   SDTCisI16<2>]>;
@@ -240,6 +240,13 @@ def MOV16rm : I16rm<0x0,
                     [(set GR16:$dst, (load addr:$src))]>;
 }
 
+let canFoldAsLoad = 1, isReMaterializable = 1 in {
+def MOV16rmi8 : I16rm<0x0,
+                    (outs GR16:$dst), (ins memsrc:$src),
+                    "SET\t{$dst, $src} ; The Notch order",
+                    [(set GR16:$dst, (zextloadi8 addr:$src))]>;
+}
+
 let mayLoad = 1, hasExtraDefRegAllocReq = 1, Constraints = "$base = $base_wb" in {
 def MOV16rm_POST : IForm16<0x0, DstReg, SrcPostInc, Size2Bytes,
                            (outs GR16:$dst, GR16:$base_wb), (ins GR16:$base),
@@ -282,6 +289,12 @@ def ADD16rm : I16rm<0x0,
                     [(set GR16:$dst, (add GR16:$src, (load addr:$src2))),
                      (implicit RO)]>;
 
+def ADD16rmi8 : I16rm<0x0,
+                    (outs GR16:$dst), (ins GR16:$src, memsrc:$src2),
+                    "ADD\t{$dst, $src2} ; The Notch order",
+                    [(set GR16:$dst, (add GR16:$src, (zextloadi8 addr:$src2))),
+                     (implicit RO)]>;
+
 let mayLoad = 1, hasExtraDefRegAllocReq = 1,
 Constraints = "$base = $base_wb, $src = $dst" in {
 def ADD16rm_POST : IForm16<0x0, DstReg, SrcPostInc, Size2Bytes,
@@ -313,7 +326,7 @@ def ADD16mi : I16mi<0x0,
 def ADD16mm : I16mm<0x0,
                     (outs), (ins memdst:$dst, memsrc:$src),
                     "ADD\t{$dst, $src} ; The Notch order",
-                    [(store (add (load addr:$dst), 
+                    [(store (add (load addr:$dst),
                                   (i16 (load addr:$src))), addr:$dst),
                      (implicit RO)]>;
 }
@@ -356,7 +369,7 @@ def ADC16mi : I16mi<0x0,
 def ADC16mm : I8mm<0x0,
                    (outs), (ins memdst:$dst, memsrc:$src),
                    "addc.w\t{$src, $dst}",
-                   [(store (adde (load addr:$dst), 
+                   [(store (adde (load addr:$dst),
                                  (i16 (load addr:$src))), addr:$dst),
                     (implicit RO)]>;
 }
@@ -383,6 +396,12 @@ def AND16rm : I16rm<0x0,
                     [(set GR16:$dst, (and GR16:$src, (load addr:$src2))),
                      (implicit RO)]>;
 
+def AND16rmi8 : I16rm<0x0,
+                    (outs GR16:$dst), (ins GR16:$src, memsrc:$src2),
+                    "AND\t{$dst, $src2} ; The Notch order",
+                    [(set GR16:$dst, (and GR16:$src, (zextloadi8 addr:$src2))),
+                     (implicit RO)]>;
+
 let mayLoad = 1, hasExtraDefRegAllocReq = 1,
 Constraints = "$base = $base_wb, $src = $dst" in {
 def AND16rm_POST : IForm16<0x0, DstReg, SrcPostInc, Size2Bytes,
@@ -407,7 +426,7 @@ def AND16mi : I16mi<0x0,
 def AND16mm : I16mm<0x0,
                     (outs), (ins memdst:$dst, memsrc:$src),
                     "AND\t{$dst, $src} ; The Notch order",
-                    [(store (and (load addr:$dst), 
+                    [(store (and (load addr:$dst),
                                  (i16 (load addr:$src))), addr:$dst),
                      (implicit RO)]>;
 }
@@ -428,6 +447,11 @@ def OR16rm : I16rm<0x0,
                    (outs GR16:$dst), (ins GR16:$src, memsrc:$src2),
                    "BOR\t{$dst, $src2} ; The Notch order",
                    [(set GR16:$dst, (or GR16:$src, (load addr:$src2)))]>;
+
+def OR16rmi8 : I16rm<0x0,
+                   (outs GR16:$dst), (ins GR16:$src, memsrc:$src2),
+                   "BOR\t{$dst, $src2} ; The Notch order",
+                   [(set GR16:$dst, (or GR16:$src, (zextloadi8 addr:$src2)))]>;
 
 let mayLoad = 1, hasExtraDefRegAllocReq = 1,
 Constraints = "$base = $base_wb, $src = $dst" in {
@@ -521,6 +545,12 @@ def SUB16rm : I16rm<0x0,
                     [(set GR16:$dst, (sub GR16:$src, (load addr:$src2))),
                      (implicit RO)]>;
 
+def SUB16rmi8 : I16rm<0x0,
+                    (outs GR16:$dst), (ins GR16:$src, memsrc:$src2),
+                    "SUB\t{$dst, $src2} ; The Notch order",
+                    [(set GR16:$dst, (sub GR16:$src, (zextloadi8 addr:$src2))),
+                     (implicit RO)]>;
+
 let mayLoad = 1, hasExtraDefRegAllocReq = 1,
 Constraints = "$base = $base_wb, $src = $dst" in {
 def SUB16rm_POST : IForm16<0x0, DstReg, SrcPostInc, Size2Bytes,
@@ -545,7 +575,7 @@ def SUB16mi : I16mi<0x0,
 def SUB16mm : I16mm<0x0,
                     (outs), (ins memdst:$dst, memsrc:$src),
                     "SUB\t{$dst, $src} ; The Notch order",
-                    [(store (sub (load addr:$dst), 
+                    [(store (sub (load addr:$dst),
                                  (i16 (load addr:$src))), addr:$dst),
                      (implicit RO)]>;
 }
@@ -566,7 +596,12 @@ def MUL16rm : I16rm<0x0,
                     "MUL\t{$dst, $src2} ; The Notch order",
                     [(set GR16:$dst, (mul GR16:$src, (load addr:$src2)))]>;
 
-let mayLoad = 1, hasExtraDefRegAllocReq = 1, 
+def MUL16rmi8 : I16rm<0x0,
+                    (outs GR16:$dst), (ins GR16:$src, memsrc:$src2),
+                    "MUL\t{$dst, $src2} ; The Notch order",
+                    [(set GR16:$dst, (mul GR16:$src, (zextloadi8 addr:$src2)))]>;
+
+let mayLoad = 1, hasExtraDefRegAllocReq = 1,
 Constraints = "$base = $base_wb, $src = $dst" in {
 def MUL16rm_POST : IForm16<0x0, DstReg, SrcPostInc, Size2Bytes,
                           (outs GR16:$dst, GR16:$base_wb),
@@ -590,7 +625,7 @@ def MUL16mi : I16mi<0x0,
 def MUL16mm : I16mm<0x0,
                     (outs), (ins memdst:$dst, memsrc:$src),
                     "MUL\t{$dst, $src} ; The Notch order",
-                    [(store (mul (load addr:$dst), 
+                    [(store (mul (load addr:$dst),
                                  (i16 (load addr:$src))), addr:$dst),
                      (implicit RO)]>;
 }
@@ -665,99 +700,52 @@ def SAR16r1c : Pseudo<(outs GR16:$dst), (ins GR16:$src),
 let Defs = [RO] in {
 def CMP16rr : I16rr<0x0,
                     (outs), (ins GR16:$src, GR16:$src2),
-		    "SET\tO, 65535 ; The Notch order\n"
-		    "\tIFE\t{$src, $src2} ; The Notch order\n"
-		    "\tSET\tO, 0 ; The Notch order\n"
-		    "\tIFG\t{$src, $src2} ; The Notch order\n"
-		    "\tSET\tO, 1 ; The Notch order",
+        "SET\tO, 65535 ; The Notch order\n"
+        "\tIFE\t{$src, $src2} ; The Notch order\n"
+        "\tSET\tO, 0 ; The Notch order\n"
+        "\tIFG\t{$src, $src2} ; The Notch order\n"
+        "\tSET\tO, 1 ; The Notch order",
                     [(DCPU16cmp GR16:$src, GR16:$src2)]>;
 
 def CMP16ri : I16ri<0x0,
                     (outs), (ins GR16:$src, i16imm:$src2),
-		    "SET\tO, 65535 ; The Notch order\n"
-		    "\tIFE\t{$src, $src2} ; The Notch order\n"
-		    "\tSET\tO, 0 ; The Notch order\n"
-		    "\tIFG\t{$src, $src2} ; The Notch order\n"
-		    "\tSET\tO, 1 ; The Notch order",
+        "SET\tO, 65535 ; The Notch order\n"
+        "\tIFE\t{$src, $src2} ; The Notch order\n"
+        "\tSET\tO, 0 ; The Notch order\n"
+        "\tIFG\t{$src, $src2} ; The Notch order\n"
+        "\tSET\tO, 1 ; The Notch order",
                     [(DCPU16cmp GR16:$src, imm:$src2)]>;
 
 def CMP16mi : I16mi<0x0,
                     (outs), (ins memsrc:$src, i16imm:$src2),
-		    "SET\tO, 65535 ; The Notch order\n"
-		    "\tIFE\t{$src, $src2} ; The Notch order\n"
-		    "\tSET\tO, 0 ; The Notch order\n"
-		    "\tIFG\t{$src, $src2} ; The Notch order\n"
-		    "\tSET\tO, 1 ; The Notch order",
+        "SET\tO, 65535 ; The Notch order\n"
+        "\tIFE\t{$src, $src2} ; The Notch order\n"
+        "\tSET\tO, 0 ; The Notch order\n"
+        "\tIFG\t{$src, $src2} ; The Notch order\n"
+        "\tSET\tO, 1 ; The Notch order",
                      [(DCPU16cmp (load addr:$src),
                                  (i16 imm:$src2)), (implicit RO)]>;
 
 def CMP16rm : I16rm<0x0,
                     (outs), (ins GR16:$src, memsrc:$src2),
-		    "SET\tO, 65535 ; The Notch order\n"
-		    "\tIFE\t{$src, $src2} ; The Notch order\n"
-		    "\tSET\tO, 0 ; The Notch order\n"
-		    "\tIFG\t{$src, $src2} ; The Notch order\n"
-		    "\tSET\tO, 1 ; The Notch order",
+        "SET\tO, 65535 ; The Notch order\n"
+        "\tIFE\t{$src, $src2} ; The Notch order\n"
+        "\tSET\tO, 0 ; The Notch order\n"
+        "\tIFG\t{$src, $src2} ; The Notch order\n"
+        "\tSET\tO, 1 ; The Notch order",
                     [(DCPU16cmp GR16:$src, (load addr:$src2)),
                      (implicit RO)]>;
 
 def CMP16mr : I16mr<0x0,
                     (outs), (ins memsrc:$src, GR16:$src2),
-		    "SET\tO, 65535 ; The Notch order\n"
-		    "\tIFE\t{$src, $src2} ; The Notch order\n"
-		    "\tSET\tO, 0 ; The Notch order\n"
-		    "\tIFG\t{$src, $src2} ; The Notch order\n"
-		    "\tSET\tO, 1 ; The Notch order",
-                    [(DCPU16cmp (load addr:$src), GR16:$src2), 
+        "SET\tO, 65535 ; The Notch order\n"
+        "\tIFE\t{$src, $src2} ; The Notch order\n"
+        "\tSET\tO, 0 ; The Notch order\n"
+        "\tIFG\t{$src, $src2} ; The Notch order\n"
+        "\tSET\tO, 1 ; The Notch order",
+                    [(DCPU16cmp (load addr:$src), GR16:$src2),
                      (implicit RO)]>;
 
-
-// BIT TESTS, just sets condition codes
-// Note that the C condition is set differently than when using CMP.
-let isCommutable = 1 in {
-def BIT16rr : I16rr<0x0,
-                    (outs), (ins GR16:$src, GR16:$src2),
-                    "IFN\t{$src, $src2} ; The Notch order\n"
-		    "\tSET\tO, 1 ; The Notch order",
-                    [(DCPU16cmp (and_su GR16:$src, GR16:$src2), 0),
-                     (implicit RO)]>;
-}
-def BIT16ri : I16ri<0x0,
-                    (outs), (ins GR16:$src, i16imm:$src2),
-                    "IFN\t{$src, $src2} ; The Notch order\n"
-		    "\tSET\tO, 1 ; The Notch order",
-                    [(DCPU16cmp (and_su GR16:$src, imm:$src2), 0),
-                     (implicit RO)]>;
-
-def BIT16rm : I16rm<0x0,
-                    (outs), (ins GR16:$src, memdst:$src2),
-                    "IFN\t{$src, $src2} ; The Notch order\n"
-		    "\tSET\tO, 1 ; The Notch order",
-                    [(DCPU16cmp (and_su GR16:$src,  (load addr:$src2)), 0),
-                     (implicit RO)]>;
-
-def BIT16mr : I16mr<0x0,
-                    (outs), (ins memsrc:$src, GR16:$src2),
-                    "IFN\t{$src, $src2} ; The Notch order\n"
-		    "\tSET\tO, 1 ; The Notch order",
-                    [(DCPU16cmp (and_su (load addr:$src), GR16:$src2), 0),
-                     (implicit RO)]>;
-
-def BIT16mi : I16mi<0x0,
-                    (outs), (ins memsrc:$src, i16imm:$src2),
-                    "IFN\t{$src, $src2} ; The Notch order\n"
-		    "\tSET\tO, 1 ; The Notch order",
-                    [(DCPU16cmp (and_su (load addr:$src), (i16 imm:$src2)), 0),
-                     (implicit RO)]>;
-
-def BIT16mm : I16mm<0x0,
-                    (outs), (ins memsrc:$src, memsrc:$src2),
-                    "IFN\t{$src, $src2} ; The Notch order\n"
-		    "\tSET\tO, 1 ; The Notch order",
-                    [(DCPU16cmp (and_su (i16 (load addr:$src)),
-                                        (load addr:$src2)),
-                                 0),
-                     (implicit RO)]>;
 } // Defs = [RO]
 
 //===----------------------------------------------------------------------===//
@@ -810,4 +798,3 @@ def : Pat<(store (subc (load addr:$dst), GR16:$src), addr:$dst),
           (SUB16mr addr:$dst, GR16:$src)>;
 def : Pat<(store (subc (load addr:$dst), (i16 (load addr:$src))), addr:$dst),
           (SUB16mm addr:$dst, addr:$src)>;
-
