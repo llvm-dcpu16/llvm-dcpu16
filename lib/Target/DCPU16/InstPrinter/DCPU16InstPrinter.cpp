@@ -34,7 +34,7 @@ void DCPU16InstPrinter::printInst(const MCInst *MI, raw_ostream &O,
 void DCPU16InstPrinter::printPCRelImmOperand(const MCInst *MI, unsigned OpNo,
                                              raw_ostream &O) {
   const MCOperand &Op = MI->getOperand(OpNo);
-  if (Op.isImm())
+  if (Op.isImm() && (Op.isImm() % 2 == 0))
     O << Op.getImm() / 2; // FIXME: I think this is safe
   else {
     assert(Op.isExpr() && "unknown pcrel immediate operand");
