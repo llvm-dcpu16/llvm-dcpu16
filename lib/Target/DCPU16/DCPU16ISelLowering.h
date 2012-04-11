@@ -71,7 +71,6 @@ namespace llvm {
     explicit DCPU16TargetLowering(DCPU16TargetMachine &TM);
 
     virtual MVT getShiftAmountTy(EVT LHSTy) const { return MVT::i16; }
-    virtual MVT getSetCCResultType(EVT VT) const { return MVT::i16; }
 
     /// LowerOperation - Provide custom lowering hooks for some operations.
     virtual SDValue LowerOperation(SDValue Op, SelectionDAG &DAG) const;
