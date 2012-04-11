@@ -35,7 +35,7 @@ void DCPU16InstPrinter::printPCRelImmOperand(const MCInst *MI, unsigned OpNo,
                                              raw_ostream &O) {
   const MCOperand &Op = MI->getOperand(OpNo);
   if (Op.isImm())
-    O << Op.getImm();
+    O << Op.getImm() / 2; // FIXME: I think this is safe
   else {
     assert(Op.isExpr() && "unknown pcrel immediate operand");
     O << *Op.getExpr();
@@ -77,7 +77,7 @@ void DCPU16InstPrinter::printSrcMemOperand(const MCInst *MI, unsigned OpNo,
   else {
     assert(Disp.isImm() && "Expected immediate in displacement field");
     if(Disp.getImm() != 0) {
-        O << Disp.getImm();
+        O << Disp.getImm() / 2;
     }    
   }
 
