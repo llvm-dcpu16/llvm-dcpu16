@@ -41,25 +41,14 @@ namespace llvm {
       /// and TargetGlobalAddress.
       Wrapper,
 
-      /// CMP - Compare instruction.
-      CMP,
-
-      /// SetCC - Operand 0 is condition code, and operand 1 is the flag
-      /// operand produced by a CMP instruction.
-      SETCC,
-
       /// DCPU16 conditional branches. Operand 0 is the chain operand, operand 1
-      /// is the block to branch if condition is true, operand 2 is the
-      /// condition code, and operand 3 is the flag operand produced by a CMP
-      /// instruction.
-      //
-      /// CC, LHS, RHS, DEST
+      /// is the condition code, operand 2 is the LHS, operand 3 is the RHS
+      /// and operand 4 is the block to branch if condition is true.
       BR_CC,
 
-      /// SELECT_CC - Operand 0 and operand 1 are selection variable, operand 3
-      /// is condition code and operand 4 is flag operand.
-      //
-      /// CC, LHS, RHS, TrueV, FalseV
+      /// SELECT_CC - Operand 0 is the condition code, operand 1 is the LHS,
+      /// operand 2 is the RHS, operand 3 is the value if the condition is true
+      /// and operand 4 is the value when the condition is false.
       SELECT_CC,
 
       /// SHL, SRA, SRL - Non-constant shifts.

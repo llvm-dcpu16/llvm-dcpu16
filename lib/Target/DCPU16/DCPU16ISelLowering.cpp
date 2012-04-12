@@ -827,7 +827,6 @@ const char *DCPU16TargetLowering::getTargetNodeName(unsigned Opcode) const {
   case DCPU16ISD::CALL:               return "DCPU16ISD::CALL";
   case DCPU16ISD::Wrapper:            return "DCPU16ISD::Wrapper";
   case DCPU16ISD::BR_CC:              return "DCPU16ISD::BR_CC";
-  case DCPU16ISD::CMP:                return "DCPU16ISD::CMP";
   case DCPU16ISD::SELECT_CC:          return "DCPU16ISD::SELECT_CC";
   case DCPU16ISD::SHL:                return "DCPU16ISD::SHL";
   case DCPU16ISD::SRA:                return "DCPU16ISD::SRA";

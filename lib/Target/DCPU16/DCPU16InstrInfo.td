@@ -26,7 +26,6 @@ def SDT_DCPU16CallSeqStart : SDCallSeqStart<[SDTCisVT<0, i16>]>;
 def SDT_DCPU16CallSeqEnd   : SDCallSeqEnd<[SDTCisVT<0, i16>, SDTCisVT<1, i16>]>;
 def SDT_DCPU16Wrapper      : SDTypeProfile<1, 1, [SDTCisSameAs<0, 1>,
                                                   SDTCisPtrTy<0>]>;
-def SDT_DCPU16Cmp          : SDTypeProfile<0, 2, [SDTCisSameAs<0, 1>]>;
 def SDT_DCPU16BrCC         : SDTypeProfile<0, 4, [SDTCisVT<0, i16>,
                                                   SDTCisSameAs<1, 0>,
                                                   SDTCisSameAs<2, 1>,
@@ -59,7 +58,6 @@ def DCPU16callseq_end :
                  SDNode<"ISD::CALLSEQ_END",   SDT_DCPU16CallSeqEnd,
                         [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue]>;
 def DCPU16Wrapper : SDNode<"DCPU16ISD::Wrapper", SDT_DCPU16Wrapper>;
-def DCPU16cmp     : SDNode<"DCPU16ISD::CMP", SDT_DCPU16Cmp, [SDNPOutGlue]>;
 def DCPU16brcc    : SDNode<"DCPU16ISD::BR_CC", SDT_DCPU16BrCC,
                             [SDNPHasChain]>;
 def DCPU16selectcc: SDNode<"DCPU16ISD::SELECT_CC", SDT_DCPU16SelectCC, []>;
@@ -699,58 +697,6 @@ def SAR16r1c : Pseudo<(outs GR16:$dst), (ins GR16:$src),
 } // Defs = [RO]
 
 } // Constraints = "$src = $dst"
-
-// Integer comparisons
-let Defs = [RO] in {
-def CMP16rr : I16rr<0x0,
-                    (outs), (ins GR16:$src, GR16:$src2),
-                    "SET\tO, 65535 ; The Notch order\n"
-                    "\tIFE\t{$src, $src2} ; The Notch order\n"
-                    "\tSET\tO, 0 ; The Notch order\n"
-                    "\tIFG\t{$src, $src2} ; The Notch order\n"
-                    "\tSET\tO, 1 ; The Notch order",
-                    [(DCPU16cmp GR16:$src, GR16:$src2)]>;
-
-def CMP16ri : I16ri<0x0,
-                    (outs), (ins GR16:$src, i16imm:$src2),
-                    "SET\tO, 65535 ; The Notch order\n"
-                    "\tIFE\t{$src, $src2} ; The Notch order\n"
-                    "\tSET\tO, 0 ; The Notch order\n"
-                    "\tIFG\t{$src, $src2} ; The Notch order\n"
-                    "\tSET\tO, 1 ; The Notch order",
-                    [(DCPU16cmp GR16:$src, imm:$src2)]>;
-
-def CMP16mi : I16mi<0x0,
-                    (outs), (ins memsrc:$src, i16imm:$src2),
-                    "SET\tO, 65535 ; The Notch order\n"
-                    "\tIFE\t{$src, $src2} ; The Notch order\n"
-                    "\tSET\tO, 0 ; The Notch order\n"
-                    "\tIFG\t{$src, $src2} ; The Notch order\n"
-                    "\tSET\tO, 1 ; The Notch order",
-                     [(DCPU16cmp (load addr:$src),
-                                 (i16 imm:$src2)), (implicit RO)]>;
-
-def CMP16rm : I16rm<0x0,
-                    (outs), (ins GR16:$src, memsrc:$src2),
-                    "SET\tO, 65535 ; The Notch order\n"
-                    "\tIFE\t{$src, $src2} ; The Notch order\n"
-                    "\tSET\tO, 0 ; The Notch order\n"
-                    "\tIFG\t{$src, $src2} ; The Notch order\n"
-                    "\tSET\tO, 1 ; The Notch order",
-                    [(DCPU16cmp GR16:$src, (load addr:$src2)),
-                     (implicit RO)]>;
-
-def CMP16mr : I16mr<0x0,
-                    (outs), (ins memsrc:$src, GR16:$src2),
-                    "SET\tO, 65535 ; The Notch order\n"
-                    "\tIFE\t{$src, $src2} ; The Notch order\n"
-                    "\tSET\tO, 0 ; The Notch order\n"
-                    "\tIFG\t{$src, $src2} ; The Notch order\n"
-                    "\tSET\tO, 1 ; The Notch order",
-                    [(DCPU16cmp (load addr:$src), GR16:$src2),
-                     (implicit RO)]>;
-
-} // Defs = [RO]
 
 //===----------------------------------------------------------------------===//
 // Non-Instruction Patterns
