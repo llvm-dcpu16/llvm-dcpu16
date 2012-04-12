@@ -640,8 +640,9 @@ static bool NeedsAdditionalEqualityCC(ISD::CondCode CC,
   return false;
 }
 
+template <class T>
 static DCPU16CC::CondCodes GetSimpleCC(ISD::CondCode CC,
-                                      SDValue &LHS, SDValue &RHS) {
+                                      T &LHS, T &RHS) {
   DCPU16CC::CondCodes TCC = DCPU16CC::COND_INVALID;
   switch (CC) {
   default: llvm_unreachable("Invalid integer condition!");
@@ -969,13 +970,22 @@ DCPU16TargetLowering::EmitSelectCCInstr(MachineInstr *MI,
   BB->addSuccessor(copy0MBB);
   BB->addSuccessor(copy1MBB);
 
-  DCPU16CC::CondCodes CC = (DCPU16CC::CondCodes) MI->getOperand(0).getImm();
-  MachineOperand &LHS = MI->getOperand(1);
-  MachineOperand &RHS = MI->getOperand(2);
+  ISD::CondCode CC = (ISD::CondCode) MI->getOperand(1).getImm();
+  MachineOperand LHS = MI->getOperand(2);
+  MachineOperand RHS = MI->getOperand(3);
 
+  ISD::CondCode nonEqualCC;
+  if (NeedsAdditionalEqualityCC(CC, &nonEqualCC)) {
+    BuildMI(BB, dl, TII.get(DCPU16::BR_CC))
+      .addImm(DCPU16CC::COND_E)
+      .addReg(LHS.getReg()).addReg(RHS.getReg())
+      .addMBB(copy1MBB);
+  }
+
+  DCPU16CC::CondCodes simpleCC = GetSimpleCC(nonEqualCC, LHS, RHS);
   BuildMI(BB, dl, TII.get(DCPU16::BR_CC))
-    .addImm(CC)
-    .addOperand(LHS).addOperand(RHS)
+    .addImm(simpleCC)
+    .addReg(LHS.getReg()).addReg(RHS.getReg())
     .addMBB(copy1MBB);
 
   //  copy0MBB:
@@ -992,8 +1002,8 @@ DCPU16TargetLowering::EmitSelectCCInstr(MachineInstr *MI,
   BB = copy1MBB;
   BuildMI(*BB, BB->begin(), dl, TII.get(DCPU16::PHI),
           MI->getOperand(0).getReg())
-    .addReg(MI->getOperand(2).getReg()).addMBB(copy0MBB)
-    .addReg(MI->getOperand(1).getReg()).addMBB(thisMBB);
+    .addReg(MI->getOperand(5).getReg()).addMBB(copy0MBB)
+    .addReg(MI->getOperand(4).getReg()).addMBB(thisMBB);
 
   MI->eraseFromParent();   // The pseudo instruction is gone now.
   return BB;
