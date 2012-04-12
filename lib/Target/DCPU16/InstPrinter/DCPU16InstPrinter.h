@@ -38,8 +38,6 @@ namespace llvm {
     void printSrcMemOperand(const MCInst *MI, unsigned OpNo, raw_ostream &O,
                             const char *Modifier = 0);
     void printCCOperand(const MCInst *MI, unsigned OpNo, raw_ostream &O);
-
-    void printImmHex(int64_t Imm, raw_ostream &O);
   };
 }
 

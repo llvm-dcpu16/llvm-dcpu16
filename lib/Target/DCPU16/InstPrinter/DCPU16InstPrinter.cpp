@@ -13,7 +13,6 @@
 
 #define DEBUG_TYPE "asm-printer"
 
-#include <sstream>
 #include "DCPU16.h"
 #include "DCPU16InstPrinter.h"
 #include "llvm/MC/MCInst.h"
@@ -36,11 +35,12 @@ void DCPU16InstPrinter::printPCRelImmOperand(const MCInst *MI, unsigned OpNo,
                                              raw_ostream &O) {
   const MCOperand &Op = MI->getOperand(OpNo);
   if (Op.isImm())  {
-        if (Op.getImm() % 2 == 0) {
-            printImmHex(Op.getImm() / 2, O);
-        } else {
-            llvm_unreachable("immediate is not word sized");
-        }
+	  if (Op.getImm() % 2 == 0) {
+        	O << "0x";
+        	O.write_hex((Op.getImm() / 2) & 0xFFFF);
+	  } else {
+		  llvm_unreachable("immediate is not word sized");
+	  }
   } else {
     assert(Op.isExpr() && "unknown pcrel immediate operand");
     O << *Op.getExpr();
@@ -54,7 +54,8 @@ void DCPU16InstPrinter::printOperand(const MCInst *MI, unsigned OpNo,
   if (Op.isReg()) {
     O << getRegisterName(Op.getReg());
   } else if (Op.isImm()) {
-    printImmHex(Op.getImm(), O);
+	  O << "0x";
+	  O.write_hex(Op.getImm() & 0xFFFF);
   } else {
     assert(Op.isExpr() && "unknown operand kind in printOperand");
     O << *Op.getExpr();
@@ -84,7 +85,8 @@ void DCPU16InstPrinter::printSrcMemOperand(const MCInst *MI, unsigned OpNo,
   }
   if (!Base.getReg() && Disp.isImm()) {
 	  if(Disp.getImm() != 0) {
-		  printImmHex(Disp.getImm(), O);
+		  O << "0x";
+		  O.write_hex((Disp.getImm()) & 0xFFFF);
 	  }
   } else if (Base.getReg()) {
 	  // Print register base field
@@ -126,12 +128,4 @@ void DCPU16InstPrinter::printCCOperand(const MCInst *MI, unsigned OpNo,
    O << "IFE\tO, 65535 ; The Notch order\n\tSET\tPC,";
    break;
   }
-}
-
-void DCPU16InstPrinter::printImmHex(int64_t Imm, raw_ostream &O) {
-	 std::stringstream diget;
-	 int16_t  value = Imm;
-	 uint16_t *value2 = reinterpret_cast<uint16_t*>(&value);
-	 diget << std::hex << *value2;
-	 O << "0x" << diget.str();
 }
