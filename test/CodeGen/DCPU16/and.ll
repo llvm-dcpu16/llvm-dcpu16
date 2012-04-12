@@ -14,9 +14,9 @@ entry:
   ret i16 %and
 }
 ; CHECK: :f1
-; CHECK: SET [2+I], A
+; CHECK: SET [1+I], A
 ; CHECK: SET [I], B
-; CHECK: AND B, [2+I]
+; CHECK: AND B, [1+I]
 ; CHECK: SET A, B
 ; CHECK: ADD I, 4
 

@@ -34,9 +34,13 @@ void DCPU16InstPrinter::printInst(const MCInst *MI, raw_ostream &O,
 void DCPU16InstPrinter::printPCRelImmOperand(const MCInst *MI, unsigned OpNo,
                                              raw_ostream &O) {
   const MCOperand &Op = MI->getOperand(OpNo);
-  if (Op.isImm())
-    O << Op.getImm();
-  else {
+  if (Op.isImm())  {
+        if (Op.getImm() % 2 == 0) {
+            O << Op.getImm() / 2;
+        } else {
+            llvm_unreachable("immediate is not word sized");
+        }
+  } else {
     assert(Op.isExpr() && "unknown pcrel immediate operand");
     O << *Op.getExpr();
   }
@@ -77,8 +81,12 @@ void DCPU16InstPrinter::printSrcMemOperand(const MCInst *MI, unsigned OpNo,
   else {
     assert(Disp.isImm() && "Expected immediate in displacement field");
     if(Disp.getImm() != 0) {
-        O << Disp.getImm();
-    }    
+	if (Disp.getImm() % 2 == 0) {
+            O << Disp.getImm() / 2;
+        } else {
+            llvm_unreachable("immediate is not word sized");
+        }
+    }
   }
 
   // Print register base field
@@ -88,7 +96,7 @@ void DCPU16InstPrinter::printSrcMemOperand(const MCInst *MI, unsigned OpNo,
     }
     O << getRegisterName(Base.getReg());
   }
-    
+
   O << ']';
 }
 
