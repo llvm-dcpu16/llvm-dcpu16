@@ -119,10 +119,6 @@ def ADJCALLSTACKUP   : Pseudo<(outs), (ins i16imm:$amt1, i16imm:$amt2),
 }
 
 let usesCustomInserter = 1 in {
-  def Select16 : Pseudo<(outs GR16:$dst), (ins i16imm:$cc, GR16:$lhs, GR16:$rhs, GR16:$trueV, GR16:$falseV),
-                        "# Select16 PSEUDO",
-                        [(set GR16:$dst,
-                          (DCPU16selectcc imm:$cc, GR16:$lhs, GR16:$rhs, GR16:$trueV, GR16:$falseV))]>;
   let Defs = [RO] in {
   def Shl16    : Pseudo<(outs GR16:$dst), (ins GR16:$src, GR16:$cnt),
                         "# Shl16 PSEUDO",
@@ -134,6 +130,54 @@ let usesCustomInserter = 1 in {
                         "# Srl16 PSEUDO",
                         [(set GR16:$dst, (DCPU16srl GR16:$src, GR16:$cnt))]>;
   }
+}
+
+// $dst _can_ be $falseV
+let Constraints = "@earlyclobber $dst" in {
+  // TODO: add more combinations, in particular memory access
+  def Select16rrrr : Pseudo<(outs GR16:$dst),
+                  (ins cc:$cc, GR16:$lhs, GR16:$rhs, GR16:$trueV, GR16:$falseV),
+                  "SET\t{$dst, $falseV}\n"
+                  "\t$cc\t{$lhs, $rhs}\n"
+                  "\tSET\t{$dst, $trueV}",
+                  [(set GR16:$dst,
+                    (DCPU16selectcc imm:$cc, GR16:$lhs, GR16:$rhs, GR16:$trueV, GR16:$falseV))]>;
+  def Select16rirr : Pseudo<(outs GR16:$dst),
+                  (ins cc:$cc, GR16:$lhs, i16imm:$rhs, GR16:$trueV, GR16:$falseV),
+                  "SET\t{$dst, $falseV}\n"
+                  "\t$cc\t{$lhs, $rhs}\n"
+                  "\tSET\t{$dst, $trueV}",
+                  [(set GR16:$dst,
+                    (DCPU16selectcc imm:$cc, GR16:$lhs, imm:$rhs, GR16:$trueV, GR16:$falseV))]>;
+  def Select16irrr : Pseudo<(outs GR16:$dst),
+                  (ins cc:$cc, i16imm:$lhs, GR16:$rhs, GR16:$trueV, GR16:$falseV),
+                  "SET\t{$dst, $falseV}\n"
+                  "\t$cc\t{$lhs, $rhs}\n"
+                  "\tSET\t{$dst, $trueV}",
+                  [(set GR16:$dst,
+                    (DCPU16selectcc imm:$cc, imm:$lhs, GR16:$rhs, GR16:$trueV, GR16:$falseV))]>;
+
+  def Select16rrii : Pseudo<(outs GR16:$dst),
+                  (ins cc:$cc, GR16:$lhs, GR16:$rhs, i16imm:$trueV, i16imm:$falseV),
+                  "SET\t{$dst, $falseV}\n"
+                  "\t$cc\t{$lhs, $rhs}\n"
+                  "\tSET\t{$dst, $trueV}",
+                  [(set GR16:$dst,
+                    (DCPU16selectcc imm:$cc, GR16:$lhs, GR16:$rhs, imm:$trueV, imm:$falseV))]>;
+  def Select16riii : Pseudo<(outs GR16:$dst),
+                  (ins cc:$cc, GR16:$lhs, i16imm:$rhs, i16imm:$trueV, i16imm:$falseV),
+                  "SET\t{$dst, $falseV}\n"
+                  "\t$cc\t{$lhs, $rhs}\n"
+                  "\tSET\t{$dst, $trueV}",
+                  [(set GR16:$dst,
+                    (DCPU16selectcc imm:$cc, GR16:$lhs, imm:$rhs, imm:$trueV, imm:$falseV))]>;
+  def Select16irii : Pseudo<(outs GR16:$dst),
+                  (ins cc:$cc, i16imm:$lhs, GR16:$rhs, i16imm:$trueV, i16imm:$falseV),
+                  "SET\t{$dst, $falseV}\n"
+                  "\t$cc\t{$lhs, $rhs}\n"
+                  "\tSET\t{$dst, $trueV}",
+                  [(set GR16:$dst,
+                    (DCPU16selectcc imm:$cc, imm:$lhs, GR16:$rhs, imm:$trueV, imm:$falseV))]>;
 }
 
 let neverHasSideEffects = 1 in
@@ -174,6 +218,7 @@ let isBarrier = 1 in {
 }
 
 // Conditional branches
+// TODO: add immediate and memory versions
 def BR_CC : CJForm<0, 0,
    (outs), (ins cc:$cc, GR16:$lhs, GR16:$rhs, jmptarget:$dst),
    "$cc\t{$lhs, $rhs} ; The Notch order\n"

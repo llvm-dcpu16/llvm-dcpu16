@@ -612,8 +612,13 @@ SDValue DCPU16TargetLowering::LowerBlockAddress(SDValue Op,
 }
 
 static bool NeedsAdditionalEqualityCC(ISD::CondCode CC,
-                                      ISD::CondCode *simpleCC) {
-  *simpleCC = CC;
+                                      ISD::CondCode *simpleCC,
+                                      ISD::CondCode *reverseCC) {
+  if (simpleCC)
+    *simpleCC = CC;
+  if (reverseCC)
+    // Fixme: what would be a good default value?
+    *reverseCC = (ISD::CondCode) -1;
   switch (CC) {
   default: llvm_unreachable("Invalid integer condition!");
   case ISD::SETEQ:
@@ -624,16 +629,28 @@ static bool NeedsAdditionalEqualityCC(ISD::CondCode CC,
   case ISD::SETGT:
     return false;
   case ISD::SETUGE:
-    *simpleCC = ISD::SETUGT;
+    if (simpleCC)
+      *simpleCC = ISD::SETUGT;
+    if (reverseCC)
+      *reverseCC = ISD::SETULT;
     return true;
   case ISD::SETULE:
-    *simpleCC = ISD::SETULT;
+    if (simpleCC)
+      *simpleCC = ISD::SETULT;
+    if (reverseCC)
+      *reverseCC = ISD::SETUGT;
     return true;
   case ISD::SETGE:
-    *simpleCC = ISD::SETGT;
+    if (simpleCC)
+      *simpleCC = ISD::SETGT;
+    if (reverseCC)
+      *reverseCC = ISD::SETLT;
     return true;
   case ISD::SETLE:
-    *simpleCC = ISD::SETLT;
+    if (simpleCC)
+      *simpleCC = ISD::SETLT;
+    if (reverseCC)
+      *reverseCC = ISD::SETGT;
     return true;
   }
   // Not reached
@@ -682,7 +699,7 @@ SDValue DCPU16TargetLowering::LowerBR_CC(SDValue Op, SelectionDAG &DAG) const {
   DebugLoc dl   = Op.getDebugLoc();
 
   ISD::CondCode nonEqualCC;
-  if (NeedsAdditionalEqualityCC(CC, &nonEqualCC)) {
+  if (NeedsAdditionalEqualityCC(CC, &nonEqualCC, NULL)) {
     SDValue eqCC = DAG.getConstant(DCPU16CC::COND_E, MVT::i16);
     Chain = DAG.getNode(DCPU16ISD::BR_CC, dl, Op.getValueType(),
                         Chain, eqCC, LHS, RHS, Dest);
@@ -702,9 +719,17 @@ SDValue DCPU16TargetLowering::LowerSELECT_CC(SDValue Op,
   ISD::CondCode CC = cast<CondCodeSDNode>(Op.getOperand(4))->get();
   DebugLoc dl    = Op.getDebugLoc();
 
+  ISD::CondCode reverseCC;
+  if (NeedsAdditionalEqualityCC(CC, NULL, &reverseCC)) {
+    // This makes sure we only need one SELECT_CC node.
+    std::swap(TrueV, FalseV);
+    CC = reverseCC;
+  }
+  DCPU16CC::CondCodes simpleCC = GetSimpleCC(CC, LHS, RHS);
+
   SDVTList VTs = DAG.getVTList(Op.getValueType());
   SmallVector<SDValue, 5> Ops;
-  Ops.push_back(DAG.getConstant(CC, MVT::i16));
+  Ops.push_back(DAG.getConstant(simpleCC, MVT::i16));
   Ops.push_back(LHS);
   Ops.push_back(RHS);
   Ops.push_back(TrueV);
@@ -935,81 +960,6 @@ DCPU16TargetLowering::EmitShiftInstr(MachineInstr *MI,
 }
 
 MachineBasicBlock*
-DCPU16TargetLowering::EmitSelectCCInstr(MachineInstr *MI,
-                                        MachineBasicBlock *BB) const {
-  const TargetInstrInfo &TII = *getTargetMachine().getInstrInfo();
-  DebugLoc dl = MI->getDebugLoc();
-
-  // To "insert" a SELECT instruction, we actually have to insert the diamond
-  // control-flow pattern.  The incoming instruction knows the destination vreg
-  // to set, the condition code register to branch on, the true/false values to
-  // select between, and a branch opcode to use.
-  const BasicBlock *LLVM_BB = BB->getBasicBlock();
-  MachineFunction::iterator I = BB;
-  ++I;
-
-  //  thisMBB:
-  //  ...
-  //   TrueVal = ...
-  //   cmpTY ccX, r1, r2
-  //   jCC copy1MBB
-  //   fallthrough --> copy0MBB
-  MachineBasicBlock *thisMBB = BB;
-  MachineFunction *F = BB->getParent();
-  MachineBasicBlock *copy0MBB = F->CreateMachineBasicBlock(LLVM_BB);
-  MachineBasicBlock *copy1MBB = F->CreateMachineBasicBlock(LLVM_BB);
-  F->insert(I, copy0MBB);
-  F->insert(I, copy1MBB);
-  // Update machine-CFG edges by transferring all successors of the current
-  // block to the new block which will contain the Phi node for the select.
-  copy1MBB->splice(copy1MBB->begin(), BB,
-                   llvm::next(MachineBasicBlock::iterator(MI)),
-                   BB->end());
-  copy1MBB->transferSuccessorsAndUpdatePHIs(BB);
-  // Next, add the true and fallthrough blocks as its successors.
-  BB->addSuccessor(copy0MBB);
-  BB->addSuccessor(copy1MBB);
-
-  ISD::CondCode CC = (ISD::CondCode) MI->getOperand(1).getImm();
-  MachineOperand LHS = MI->getOperand(2);
-  MachineOperand RHS = MI->getOperand(3);
-
-  ISD::CondCode nonEqualCC;
-  if (NeedsAdditionalEqualityCC(CC, &nonEqualCC)) {
-    BuildMI(BB, dl, TII.get(DCPU16::BR_CC))
-      .addImm(DCPU16CC::COND_E)
-      .addReg(LHS.getReg()).addReg(RHS.getReg())
-      .addMBB(copy1MBB);
-  }
-
-  DCPU16CC::CondCodes simpleCC = GetSimpleCC(nonEqualCC, LHS, RHS);
-  BuildMI(BB, dl, TII.get(DCPU16::BR_CC))
-    .addImm(simpleCC)
-    .addReg(LHS.getReg()).addReg(RHS.getReg())
-    .addMBB(copy1MBB);
-
-  //  copy0MBB:
-  //   %FalseValue = ...
-  //   # fallthrough to copy1MBB
-  BB = copy0MBB;
-
-  // Update machine-CFG edges
-  BB->addSuccessor(copy1MBB);
-
-  //  copy1MBB:
-  //   %Result = phi [ %FalseValue, copy0MBB ], [ %TrueValue, thisMBB ]
-  //  ...
-  BB = copy1MBB;
-  BuildMI(*BB, BB->begin(), dl, TII.get(DCPU16::PHI),
-          MI->getOperand(0).getReg())
-    .addReg(MI->getOperand(5).getReg()).addMBB(copy0MBB)
-    .addReg(MI->getOperand(4).getReg()).addMBB(thisMBB);
-
-  MI->eraseFromParent();   // The pseudo instruction is gone now.
-  return BB;
-}
-
-MachineBasicBlock*
 DCPU16TargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
                                                   MachineBasicBlock *BB) const {
   unsigned Opc = MI->getOpcode();
@@ -1020,7 +970,5 @@ DCPU16TargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
   case DCPU16::Sra16:
   case DCPU16::Srl16:
     return EmitShiftInstr(MI, BB);
-  case DCPU16::Select16:
-    return EmitSelectCCInstr(MI, BB);
   }
 }
