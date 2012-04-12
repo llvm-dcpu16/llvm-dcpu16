@@ -36,7 +36,7 @@ void DCPU16InstPrinter::printPCRelImmOperand(const MCInst *MI, unsigned OpNo,
   const MCOperand &Op = MI->getOperand(OpNo);
   if (Op.isImm())  {
         if (Op.getImm() % 2 == 0) {
-            O << Op.getImm() / 2;
+            printImmHex(Op.getImm() / 2, O);
         } else {
             llvm_unreachable("immediate is not word sized");
         }
@@ -53,7 +53,7 @@ void DCPU16InstPrinter::printOperand(const MCInst *MI, unsigned OpNo,
   if (Op.isReg()) {
     O << getRegisterName(Op.getReg());
   } else if (Op.isImm()) {
-    O << Op.getImm();
+    printImmHex(Op.getImm(), O);
   } else {
     assert(Op.isExpr() && "unknown operand kind in printOperand");
     O << *Op.getExpr();
@@ -80,23 +80,22 @@ void DCPU16InstPrinter::printSrcMemOperand(const MCInst *MI, unsigned OpNo,
     O << *Disp.getExpr();
   else {
     assert(Disp.isImm() && "Expected immediate in displacement field");
-    if(Disp.getImm() != 0) {
-	if (Disp.getImm() % 2 == 0) {
-            O << Disp.getImm() / 2;
-        } else {
-            llvm_unreachable("immediate is not word sized");
-        }
-    }
   }
-
-  // Print register base field
-  if (Base.getReg()) {
-    if(Disp.isImm() && Disp.getImm() != 0) {
-      O << '+';
-    }
+  if (!Base.getReg() && Disp.isImm()) {
+	  if(Disp.getImm() != 0) {
+		  printImmHex(Disp.getImm(), O);
+	  }
+  } else if (Base.getReg()) {
+	  // Print register base field
+	  if(Disp.isImm() && Disp.getImm() != 0) {
+		  if (Disp.getImm() % 2 == 0) {
+			  O << (Disp.getImm() / 2) << '+';
+		  } else {
+			  llvm_unreachable("immediate is not word sized");
+		  }
+	  }
     O << getRegisterName(Base.getReg());
   }
-
   O << ']';
 }
 
@@ -126,4 +125,19 @@ void DCPU16InstPrinter::printCCOperand(const MCInst *MI, unsigned OpNo,
    O << "IFE\tO, 65535 ; The Notch order\n\tSET\tPC,";
    break;
   }
+}
+
+void DCPU16InstPrinter::printImmHex(int64_t Imm, raw_ostream &O) {
+	 O << "0x";
+	 int16_t  value = Imm;
+	 uint16_t *value2 = reinterpret_cast<uint16_t*>(&value);
+	 char diget;
+	 bool first = true;
+     for (int i = 3; i >= 0; i--) {
+    	 diget = (*value2 & (0xF << (i*4))) >> (i*4);
+     	 if (diget != 0 || first == false || i == 0) {
+     		 O.write_hex(diget);
+     		 first = false;
+     	 }
+    }
 }

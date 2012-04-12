@@ -10,10 +10,10 @@ entry:
   ret i16 %and
 }
 ; CHECK: :bic
-; CHECK: XOR B, -1
+; CHECK: XOR B, 0xff
 ; CHECK: AND A, B
 
 ; CHECK-O0: :bic
-; CHECK-O0: XOR C, -1
+; CHECK-O0: XOR C, 0xff
 ; CHECK-O0: AND C, A
 ; CHECK-O0: SET A, C

@@ -15,6 +15,7 @@
 #define DCPU16INSTPRINTER_H
 
 #include "llvm/MC/MCInstPrinter.h"
+#include "llvm/Support/DataTypes.h"
 
 namespace llvm {
   class MCOperand;
@@ -38,6 +39,7 @@ namespace llvm {
                             const char *Modifier = 0);
     void printCCOperand(const MCInst *MI, unsigned OpNo, raw_ostream &O);
 
+    void printImmHex(int64_t Imm, raw_ostream &O);
   };
 }
 
