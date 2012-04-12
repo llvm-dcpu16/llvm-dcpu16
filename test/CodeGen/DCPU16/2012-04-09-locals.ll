@@ -12,10 +12,10 @@ entry:
   ret i16 %add
 }
 ; CHECK: :f
-; CHECK: ADD A, 3
+; CHECK: ADD A, 0x3
 
 ; CHECKO0: :f
 ; CHECK-O0: SET B, A
-; CHECK-O0: ADD B, 3
+; CHECK-O0: ADD B, 0x3
 ; CHECK-O0: SET A, B
 

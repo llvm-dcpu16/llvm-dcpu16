@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "asm-printer"
+
 #include "DCPU16.h"
 #include "DCPU16InstPrinter.h"
 #include "llvm/MC/MCInst.h"
@@ -20,7 +21,6 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FormattedStream.h"
 using namespace llvm;
-
 
 // Include the auto-generated portion of the assembly writer.
 #include "DCPU16GenAsmWriter.inc"
@@ -35,11 +35,12 @@ void DCPU16InstPrinter::printPCRelImmOperand(const MCInst *MI, unsigned OpNo,
                                              raw_ostream &O) {
   const MCOperand &Op = MI->getOperand(OpNo);
   if (Op.isImm())  {
-        if (Op.getImm() % 2 == 0) {
-            O << Op.getImm() / 2;
-        } else {
-            llvm_unreachable("immediate is not word sized");
-        }
+	  if (Op.getImm() % 2 == 0) {
+        	O << "0x";
+        	O.write_hex((Op.getImm() / 2) & 0xFFFF);
+	  } else {
+		  llvm_unreachable("immediate is not word sized");
+	  }
   } else {
     assert(Op.isExpr() && "unknown pcrel immediate operand");
     O << *Op.getExpr();
@@ -53,7 +54,8 @@ void DCPU16InstPrinter::printOperand(const MCInst *MI, unsigned OpNo,
   if (Op.isReg()) {
     O << getRegisterName(Op.getReg());
   } else if (Op.isImm()) {
-    O << Op.getImm();
+	  O << "0x";
+	  O.write_hex(Op.getImm() & 0xFFFF);
   } else {
     assert(Op.isExpr() && "unknown operand kind in printOperand");
     O << *Op.getExpr();
@@ -80,23 +82,23 @@ void DCPU16InstPrinter::printSrcMemOperand(const MCInst *MI, unsigned OpNo,
     O << *Disp.getExpr();
   else {
     assert(Disp.isImm() && "Expected immediate in displacement field");
-    if(Disp.getImm() != 0) {
-	if (Disp.getImm() % 2 == 0) {
-            O << Disp.getImm() / 2;
-        } else {
-            llvm_unreachable("immediate is not word sized");
-        }
-    }
   }
-
-  // Print register base field
-  if (Base.getReg()) {
-    if(Disp.isImm() && Disp.getImm() != 0) {
-      O << '+';
-    }
+  if (!Base.getReg() && Disp.isImm()) {
+	  if(Disp.getImm() != 0) {
+		  O << "0x";
+		  O.write_hex((Disp.getImm()) & 0xFFFF);
+	  }
+  } else if (Base.getReg()) {
+	  // Print register base field
+	  if(Disp.isImm() && Disp.getImm() != 0) {
+		  if (Disp.getImm() % 2 == 0) {
+			  O << (Disp.getImm() / 2) << '+';
+		  } else {
+			  llvm_unreachable("immediate is not word sized");
+		  }
+	  }
     O << getRegisterName(Base.getReg());
   }
-
   O << ']';
 }
 

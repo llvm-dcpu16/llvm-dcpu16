@@ -4,34 +4,34 @@ target triple = "dcpu16"
 
 define i16 @mov() nounwind {
 ; CHECK: :mov
-; CHECK: SET A, 1
+; CHECK: SET A, 0x1
 	ret i16 1
 }
 
 define i16 @add(i16 %a, i16 %b) nounwind {
 ; CHECK: :add
-; CHECK: ADD A, 1
+; CHECK: ADD A, 0x1
 	%1 = add i16 %a, 1
 	ret i16 %1
 }
 
 define i16 @and(i16 %a, i16 %b) nounwind {
 ; CHECK: :and
-; CHECK: AND A, 1
+; CHECK: AND A, 0x1
 	%1 = and i16 %a, 1
 	ret i16 %1
 }
 
 define i16 @bor(i16 %a, i16 %b) nounwind {
 ; CHECK: :bor
-; CHECK: BOR A, 1
+; CHECK: BOR A, 0x1
 	%1 = or i16 %a, 1
 	ret i16 %1
 }
 
 define i16 @xor(i16 %a, i16 %b) nounwind {
 ; CHECK: :xor
-; CHECK: XOR A, 1
+; CHECK: XOR A, 0x1
 	%1 = xor i16 %a, 1
 	ret i16 %1
 }

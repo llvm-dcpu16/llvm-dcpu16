@@ -6,14 +6,14 @@ target triple = "dcpu16"
 
 define void @mov() nounwind {
 ; CHECK: :mov
-; CHECK: SET [foo], 2
+; CHECK: SET [foo], 0x2
 	store i16 2, i16 * @foo
 	ret void
 }
 
 define void @add() nounwind {
 ; CHECK: :add
-; CHECK: ADD [foo], 2
+; CHECK: ADD [foo], 0x2
 	%1 = load i16* @foo
 	%2 = add i16 %1, 2
 	store i16 %2, i16 * @foo
@@ -22,7 +22,7 @@ define void @add() nounwind {
 
 define void @and() nounwind {
 ; CHECK: :and
-; CHECK: AND [foo], 2
+; CHECK: AND [foo], 0x2
 	%1 = load i16* @foo
 	%2 = and i16 %1, 2
 	store i16 %2, i16 * @foo
@@ -31,7 +31,7 @@ define void @and() nounwind {
 
 define void @bor() nounwind {
 ; CHECK: :bor
-; CHECK: BOR [foo], 2
+; CHECK: BOR [foo], 0x2
 	%1 = load i16* @foo
 	%2 = or i16 %1, 2
 	store i16 %2, i16 * @foo
@@ -40,7 +40,7 @@ define void @bor() nounwind {
 
 define void @xor() nounwind {
 ; CHECK: :xor
-; CHECK: XOR [foo], 2
+; CHECK: XOR [foo], 0x2
 	%1 = load i16* @foo
 	%2 = xor i16 %1, 2
 	store i16 %2, i16 * @foo

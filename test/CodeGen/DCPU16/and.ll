@@ -18,7 +18,7 @@ entry:
 ; CHECK: SET [I], B
 ; CHECK: AND B, [1+I]
 ; CHECK: SET A, B
-; CHECK: ADD I, 4
+; CHECK: ADD I, 0x4
 
 
 define i16 @f2(i16 %x) nounwind {
@@ -30,4 +30,4 @@ entry:
   ret i16 %and
 }
 ; CHECK: :f2
-; CHECK: AND A, 16
+; CHECK: AND A, 0x10
