@@ -38,8 +38,6 @@ namespace llvm {
   FunctionPass *createDCPU16ISelDag(DCPU16TargetMachine &TM,
                                     CodeGenOpt::Level OptLevel);
 
-  FunctionPass *createDCPU16BranchSelectionPass();
-
 } // end namespace llvm;
 
 #endif
