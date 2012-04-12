@@ -12,6 +12,8 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "asm-printer"
+
+#include <sstream>
 #include "DCPU16.h"
 #include "DCPU16InstPrinter.h"
 #include "llvm/MC/MCInst.h"
@@ -20,7 +22,6 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FormattedStream.h"
 using namespace llvm;
-
 
 // Include the auto-generated portion of the assembly writer.
 #include "DCPU16GenAsmWriter.inc"
@@ -128,16 +129,9 @@ void DCPU16InstPrinter::printCCOperand(const MCInst *MI, unsigned OpNo,
 }
 
 void DCPU16InstPrinter::printImmHex(int64_t Imm, raw_ostream &O) {
-	 O << "0x";
+	 std::stringstream diget;
 	 int16_t  value = Imm;
 	 uint16_t *value2 = reinterpret_cast<uint16_t*>(&value);
-	 char diget;
-	 bool first = true;
-     for (int i = 3; i >= 0; i--) {
-    	 diget = (*value2 & (0xF << (i*4))) >> (i*4);
-     	 if (diget != 0 || first == false || i == 0) {
-     		 O.write_hex(diget);
-     		 first = false;
-     	 }
-    }
+	 diget << std::hex << *value2;
+	 O << "0x" << diget.str();
 }
