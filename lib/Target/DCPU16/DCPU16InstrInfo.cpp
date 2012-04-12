@@ -116,9 +116,13 @@ unsigned DCPU16InstrInfo::RemoveBranch(MachineBasicBlock &MBB) const {
 
 bool DCPU16InstrInfo::
 ReverseBranchCondition(SmallVectorImpl<MachineOperand> &Cond) const {
-  assert(Cond.size() == 1 && "Invalid Xbranch condition!");
+  assert(Cond.size() == 3 && "Invalid BR_CC condition!");
 
   DCPU16CC::CondCodes CC = static_cast<DCPU16CC::CondCodes>(Cond[0].getImm());
+
+  if ((CC != DCPU16CC::COND_E) && (CC & DCPU16CC::COND_E)) {
+    return true;
+  }
 
   switch (CC) {
   default: llvm_unreachable("Invalid branch condition!");
