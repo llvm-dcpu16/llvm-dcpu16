@@ -21,10 +21,10 @@
 namespace DCPU16CC {
   // DCPU16 specific condition code.
   enum CondCodes {
-    COND_E = 0,
-    COND_NE = 1,
-    COND_G = 2,
-    COND_B = 3,
+    COND_E =  0x1,
+    COND_NE = 0x2,
+    COND_G =  0x4,
+    COND_B =  0x8,
 
     COND_INVALID = -1
   };

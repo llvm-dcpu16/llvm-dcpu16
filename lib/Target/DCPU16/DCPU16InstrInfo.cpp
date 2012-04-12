@@ -153,8 +153,6 @@ bool DCPU16InstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,
                                     MachineBasicBlock *&FBB,
                                     SmallVectorImpl<MachineOperand> &Cond,
                                     bool AllowModify) const {
-  return true;
-  /*
   // Start from the bottom of the block and work up, examining the
   // terminator instructions.
   MachineBasicBlock::iterator I = MBB.end();
@@ -205,40 +203,38 @@ bool DCPU16InstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,
     }
 
     // Handle conditional branches.
-    assert(I->getOpcode() == DCPU16::JCC && "Invalid conditional branch");
+    assert(I->getOpcode() == DCPU16::BR_CC && "Invalid conditional branch");
     DCPU16CC::CondCodes BranchCode =
-      static_cast<DCPU16CC::CondCodes>(I->getOperand(1).getImm());
+      static_cast<DCPU16CC::CondCodes>(I->getOperand(0).getImm());
     if (BranchCode == DCPU16CC::COND_INVALID)
       return true;  // Can't handle weird stuff.
 
     // Working from the bottom, handle the first conditional branch.
     if (Cond.empty()) {
       FBB = TBB;
-      TBB = I->getOperand(0).getMBB();
+      TBB = I->getOperand(3).getMBB();
       Cond.push_back(MachineOperand::CreateImm(BranchCode));
+      Cond.push_back(I->getOperand(1)); // LHS
+      Cond.push_back(I->getOperand(2)); // RHS
       continue;
-    }
-
-    // Handle subsequent conditional branches. Only handle the case where all
-    // conditional branches branch to the same destination.
-    assert(Cond.size() == 1);
-    assert(TBB);
-
-    // Only handle the case where all conditional branches branch to
-    // the same destination.
-    if (TBB != I->getOperand(0).getMBB())
+    } else if ((BranchCode != DCPU16CC::COND_E)
+        || (TBB != I->getOperand(3).getMBB())) {
+      // Not a >= or <=
       return true;
+    } else {
+      // It's a <= or >=
+      assert(Cond.size() == 3);
+      assert(TBB);
 
-    DCPU16CC::CondCodes OldBranchCode = (DCPU16CC::CondCodes)Cond[0].getImm();
-    // If the conditions are the same, we can leave them alone.
-    if (OldBranchCode == BranchCode)
-      continue;
-
-    return true;
+      // Mark the CC by ORing with the equality CC
+      DCPU16CC::CondCodes CC = (DCPU16CC::CondCodes) Cond[0].getImm();
+      assert((CC != DCPU16CC::COND_E) && "Double COND_E CC");
+      Cond[0] = MachineOperand::CreateImm(CC | DCPU16CC::COND_E);
+      return true;
+    }
   }
 
   return false;
-  */
 }
 
 unsigned
@@ -246,12 +242,10 @@ DCPU16InstrInfo::InsertBranch(MachineBasicBlock &MBB, MachineBasicBlock *TBB,
                               MachineBasicBlock *FBB,
                               const SmallVectorImpl<MachineOperand> &Cond,
                               DebugLoc DL) const {
-  return 0;
-  /*
   // Shouldn't be a fall through.
   assert(TBB && "InsertBranch must not be told to insert a fallthrough");
-  assert((Cond.size() == 1 || Cond.size() == 0) &&
-         "DCPU16 branch conditions have one component!");
+  assert((Cond.size() == 3 || Cond.size() == 0) &&
+         "DCPU16 branch conditions have three components!");
 
   if (Cond.empty()) {
     // Unconditional branch?
@@ -262,7 +256,19 @@ DCPU16InstrInfo::InsertBranch(MachineBasicBlock &MBB, MachineBasicBlock *TBB,
 
   // Conditional branch.
   unsigned Count = 0;
-  BuildMI(&MBB, DL, get(DCPU16::JCC)).addMBB(TBB).addImm(Cond[0].getImm());
+  DCPU16CC::CondCodes CC = (DCPU16CC::CondCodes) Cond[0].getImm();
+  if ((CC & DCPU16CC::COND_E) && (CC != DCPU16CC::COND_E)) {
+    BuildMI(&MBB, DL, get(DCPU16::BR_CC))
+      .addImm(DCPU16CC::COND_E)
+      .addOperand(Cond[1]).addOperand(Cond[2])
+      .addMBB(TBB);
+    CC = (DCPU16CC::CondCodes) (CC & (~DCPU16CC::COND_E));
+    ++Count;
+  }
+  BuildMI(&MBB, DL, get(DCPU16::BR_CC))
+    .addImm(CC)
+    .addOperand(Cond[1]).addOperand(Cond[2])
+    .addMBB(TBB);
   ++Count;
 
   if (FBB) {
@@ -271,7 +277,6 @@ DCPU16InstrInfo::InsertBranch(MachineBasicBlock &MBB, MachineBasicBlock *TBB,
     ++Count;
   }
   return Count;
-  */
 }
 
 /// GetInstSize - Return the number of bytes of code the specified
