@@ -108,22 +108,16 @@ void DCPU16InstPrinter::printCCOperand(const MCInst *MI, unsigned OpNo,
   default:
    llvm_unreachable("Unsupported CC code");
   case DCPU16CC::COND_E:
-   O << "IFE\tO, 0 ; The Notch order\n\tSET\tPC,";
+   O << "IFE";
    break;
   case DCPU16CC::COND_NE:
-   O << "IFN\tO, 0 ; The Notch order\n\tSET\tPC,";
+   O << "IFN";
    break;
-  case DCPU16CC::COND_HS:
-   O << "IFN\tO, 65535 ; The Notch order\n\tSET\tPC,";
+  case DCPU16CC::COND_G:
+   O << "IFG";
    break;
-  case DCPU16CC::COND_LO:
-   O << "IFE\tO, 65535 ; The Notch order\n\tSET\tPC,";
-   break;
-  case DCPU16CC::COND_GE:
-   O << "IFN\tO, 65535 ; The Notch order\n\tSET\tPC,";
-   break;
-  case DCPU16CC::COND_L:
-   O << "IFE\tO, 65535 ; The Notch order\n\tSET\tPC,";
+  case DCPU16CC::COND_B:
+   O << "IFB";
    break;
   }
 }

@@ -52,6 +52,8 @@ FunctionPass *llvm::createDCPU16BranchSelectionPass() {
 }
 
 bool DCPU16BSel::runOnMachineFunction(MachineFunction &Fn) {
+  return false;
+  /*
   const DCPU16InstrInfo *TII =
              static_cast<const DCPU16InstrInfo*>(Fn.getTarget().getInstrInfo());
   // Give the blocks of the function a dense, in-order, numbering.
@@ -102,7 +104,7 @@ bool DCPU16BSel::runOnMachineFunction(MachineFunction &Fn) {
       unsigned MBBStartOffset = 0;
       for (MachineBasicBlock::iterator I = MBB.begin(), E = MBB.end();
            I != E; ++I) {
-        if ((I->getOpcode() != DCPU16::JCC || I->getOperand(0).isImm()) &&
+        if ((I->getOpcode() != DCPU16::BR_CC || I->getOperand(3).isImm()) &&
             I->getOpcode() != DCPU16::JMP) {
           MBBStartOffset += TII->GetInstSizeInBytes(I);
           continue;
@@ -152,7 +154,7 @@ bool DCPU16BSel::runOnMachineFunction(MachineFunction &Fn) {
 
           // Jump over the uncond branch inst (i.e. $+6) on opposite condition.
           TII->ReverseBranchCondition(Cond);
-          BuildMI(MBB, I, dl, TII->get(DCPU16::JCC))
+          BuildMI(MBB, I, dl, TII->get(DCPU16::BR_CC))
             .addImm(4).addOperand(Cond[0]);
 
           NewSize = 6;
@@ -177,4 +179,5 @@ bool DCPU16BSel::runOnMachineFunction(MachineFunction &Fn) {
 
   BlockSizes.clear();
   return true;
+  */
 }

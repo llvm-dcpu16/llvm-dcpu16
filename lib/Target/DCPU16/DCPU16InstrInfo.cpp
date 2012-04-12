@@ -101,7 +101,7 @@ unsigned DCPU16InstrInfo::RemoveBranch(MachineBasicBlock &MBB) const {
     if (I->isDebugValue())
       continue;
     if (I->getOpcode() != DCPU16::JMP &&
-        I->getOpcode() != DCPU16::JCC &&
+        I->getOpcode() != DCPU16::BR_CC &&
         I->getOpcode() != DCPU16::Br &&
         I->getOpcode() != DCPU16::Bm)
       break;
@@ -128,18 +128,9 @@ ReverseBranchCondition(SmallVectorImpl<MachineOperand> &Cond) const {
   case DCPU16CC::COND_NE:
     CC = DCPU16CC::COND_E;
     break;
-  case DCPU16CC::COND_L:
-    CC = DCPU16CC::COND_GE;
-    break;
-  case DCPU16CC::COND_GE:
-    CC = DCPU16CC::COND_L;
-    break;
-  case DCPU16CC::COND_HS:
-    CC = DCPU16CC::COND_LO;
-    break;
-  case DCPU16CC::COND_LO:
-    CC = DCPU16CC::COND_HS;
-    break;
+  case DCPU16CC::COND_G:
+  case DCPU16CC::COND_B:
+    return true;
   }
 
   Cond[0].setImm(CC);
@@ -162,6 +153,8 @@ bool DCPU16InstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,
                                     MachineBasicBlock *&FBB,
                                     SmallVectorImpl<MachineOperand> &Cond,
                                     bool AllowModify) const {
+  return true;
+  /*
   // Start from the bottom of the block and work up, examining the
   // terminator instructions.
   MachineBasicBlock::iterator I = MBB.end();
@@ -245,6 +238,7 @@ bool DCPU16InstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,
   }
 
   return false;
+  */
 }
 
 unsigned
@@ -252,6 +246,8 @@ DCPU16InstrInfo::InsertBranch(MachineBasicBlock &MBB, MachineBasicBlock *TBB,
                               MachineBasicBlock *FBB,
                               const SmallVectorImpl<MachineOperand> &Cond,
                               DebugLoc DL) const {
+  return 0;
+  /*
   // Shouldn't be a fall through.
   assert(TBB && "InsertBranch must not be told to insert a fallthrough");
   assert((Cond.size() == 1 || Cond.size() == 0) &&
@@ -275,6 +271,7 @@ DCPU16InstrInfo::InsertBranch(MachineBasicBlock &MBB, MachineBasicBlock *TBB,
     ++Count;
   }
   return Count;
+  */
 }
 
 /// GetInstSize - Return the number of bytes of code the specified

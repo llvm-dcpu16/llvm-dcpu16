@@ -27,11 +27,16 @@ def SDT_DCPU16CallSeqEnd   : SDCallSeqEnd<[SDTCisVT<0, i16>, SDTCisVT<1, i16>]>;
 def SDT_DCPU16Wrapper      : SDTypeProfile<1, 1, [SDTCisSameAs<0, 1>,
                                                   SDTCisPtrTy<0>]>;
 def SDT_DCPU16Cmp          : SDTypeProfile<0, 2, [SDTCisSameAs<0, 1>]>;
-def SDT_DCPU16BrCC         : SDTypeProfile<0, 2, [SDTCisVT<0, OtherVT>,
-                                                  SDTCisVT<1, i16>]>;
-def SDT_DCPU16SelectCC     : SDTypeProfile<1, 3, [SDTCisSameAs<0, 1>,
+def SDT_DCPU16BrCC         : SDTypeProfile<0, 4, [SDTCisVT<0, i16>,
+                                                  SDTCisSameAs<1, 0>,
+                                                  SDTCisSameAs<2, 1>,
+                                                  SDTCisVT<3, OtherVT>]>;
+def SDT_DCPU16SelectCC     : SDTypeProfile<1, 5, [SDTCisSameAs<0, 1>,
                                                   SDTCisSameAs<1, 2>,
-                                                  SDTCisVT<3, i16>]>;
+                                                  SDTCisSameAs<2, 3>,
+                                                  SDTCisSameAs<3, 4>,
+                                                  SDTCisSameAs<4, 5>,
+                                                  SDTCisVT<5, i16>]>;
 def SDT_DCPU16Shift        : SDTypeProfile<1, 2, [SDTCisSameAs<0, 1>,
                                                   SDTCisI16<2>]>;
 
@@ -56,9 +61,8 @@ def DCPU16callseq_end :
 def DCPU16Wrapper : SDNode<"DCPU16ISD::Wrapper", SDT_DCPU16Wrapper>;
 def DCPU16cmp     : SDNode<"DCPU16ISD::CMP", SDT_DCPU16Cmp, [SDNPOutGlue]>;
 def DCPU16brcc    : SDNode<"DCPU16ISD::BR_CC", SDT_DCPU16BrCC,
-                            [SDNPHasChain, SDNPInGlue]>;
-def DCPU16selectcc: SDNode<"DCPU16ISD::SELECT_CC", SDT_DCPU16SelectCC,
-                            [SDNPInGlue]>;
+                            [SDNPHasChain]>;
+def DCPU16selectcc: SDNode<"DCPU16ISD::SELECT_CC", SDT_DCPU16SelectCC, []>;
 def DCPU16shl     : SDNode<"DCPU16ISD::SHL", SDT_DCPU16Shift, []>;
 def DCPU16sra     : SDNode<"DCPU16ISD::SRA", SDT_DCPU16Shift, []>;
 def DCPU16srl     : SDNode<"DCPU16ISD::SRL", SDT_DCPU16Shift, []>;
@@ -117,10 +121,10 @@ def ADJCALLSTACKUP   : Pseudo<(outs), (ins i16imm:$amt1, i16imm:$amt2),
 }
 
 let usesCustomInserter = 1 in {
-  def Select16 : Pseudo<(outs GR16:$dst), (ins GR16:$src, GR16:$src2, i16imm:$cc),
+  def Select16 : Pseudo<(outs GR16:$dst), (ins i16imm:$cc, GR16:$lhs, GR16:$rhs, GR16:$trueV, GR16:$falseV),
                         "# Select16 PSEUDO",
                         [(set GR16:$dst,
-                          (DCPU16selectcc GR16:$src, GR16:$src2, imm:$cc))]>;
+                          (DCPU16selectcc imm:$cc, GR16:$lhs, GR16:$rhs, GR16:$trueV, GR16:$falseV))]>;
   let Defs = [RO] in {
   def Shl16    : Pseudo<(outs GR16:$dst), (ins GR16:$src, GR16:$cnt),
                         "# Shl16 PSEUDO",
@@ -172,11 +176,11 @@ let isBarrier = 1 in {
 }
 
 // Conditional branches
-let Uses = [RO] in
-  def JCC : CJForm<0, 0,
-                   (outs), (ins jmptarget:$dst, cc:$cc),
-                   "$cc $dst ; The Notch order",
-                   [(DCPU16brcc bb:$dst, imm:$cc)]>;
+def BR_CC : CJForm<0, 0,
+   (outs), (ins cc:$cc, GR16:$lhs, GR16:$rhs, jmptarget:$dst),
+   "$cc\t{$lhs, $rhs} ; The Notch order\n"
+   "\tSET\t{PC, $dst} ; The Notch order",
+   [(DCPU16brcc imm:$cc, GR16:$lhs, GR16:$rhs, bb:$dst)]>;
 } // isBranch, isTerminator
 
 //===----------------------------------------------------------------------===//

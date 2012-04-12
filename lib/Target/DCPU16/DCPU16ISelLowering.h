@@ -52,10 +52,14 @@ namespace llvm {
       /// is the block to branch if condition is true, operand 2 is the
       /// condition code, and operand 3 is the flag operand produced by a CMP
       /// instruction.
+      //
+      /// CC, LHS, RHS, DEST
       BR_CC,
 
       /// SELECT_CC - Operand 0 and operand 1 are selection variable, operand 3
       /// is condition code and operand 4 is flag operand.
+      //
+      /// CC, LHS, RHS, TrueV, FalseV
       SELECT_CC,
 
       /// SHL, SRA, SRL - Non-constant shifts.
@@ -100,6 +104,8 @@ namespace llvm {
                                                    MachineBasicBlock *BB) const;
     MachineBasicBlock* EmitShiftInstr(MachineInstr *MI,
                                       MachineBasicBlock *BB) const;
+    MachineBasicBlock* EmitSelectCCInstr(MachineInstr *MI,
+                                         MachineBasicBlock *BB) const;
 
   private:
     SDValue LowerCCCCallTo(SDValue Chain, SDValue Callee,

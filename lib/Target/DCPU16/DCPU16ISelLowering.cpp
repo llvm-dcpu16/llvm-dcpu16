@@ -92,7 +92,7 @@ DCPU16TargetLowering::DCPU16TargetLowering(DCPU16TargetMachine &tm) :
   setOperationAction(ISD::BR_CC,            MVT::i16,   Custom);
   setOperationAction(ISD::BRCOND,           MVT::Other, Expand);
   setOperationAction(ISD::SETCC,            MVT::i8,    Promote);
-  setOperationAction(ISD::SETCC,            MVT::i16,   Custom);
+  setOperationAction(ISD::SETCC,            MVT::i16,   Expand);
   setOperationAction(ISD::SELECT,           MVT::i8,    Promote);
   setOperationAction(ISD::SELECT,           MVT::i16,   Expand);
   setOperationAction(ISD::SELECT_CC,        MVT::i8,    Promote);
@@ -158,7 +158,6 @@ SDValue DCPU16TargetLowering::LowerOperation(SDValue Op,
   case ISD::GlobalAddress:    return LowerGlobalAddress(Op, DAG);
   case ISD::BlockAddress:     return LowerBlockAddress(Op, DAG);
   case ISD::ExternalSymbol:   return LowerExternalSymbol(Op, DAG);
-  case ISD::SETCC:            return LowerSETCC(Op, DAG);
   case ISD::BR_CC:            return LowerBR_CC(Op, DAG);
   case ISD::SELECT_CC:        return LowerSELECT_CC(Op, DAG);
   case ISD::SIGN_EXTEND:      return LowerSIGN_EXTEND(Op, DAG);
@@ -463,7 +462,7 @@ DCPU16TargetLowering::LowerCCCCallTo(SDValue Chain, SDValue Callee,
                         &MemOpChains[0], MemOpChains.size());
 
   // Build a sequence of copy-to-reg nodes chained together with token chain and
-  // flag operands which copy the outgoing args into registers.  The InFlag in
+  // flag operands which copy the outgoing args into registers.  The InFlag is
   // necessary since all emitted instructions must be stuck together.
   SDValue InFlag;
   for (unsigned i = 0, e = RegsToPass.size(); i != e; ++i) {
@@ -612,88 +611,66 @@ SDValue DCPU16TargetLowering::LowerBlockAddress(SDValue Op,
   return DAG.getNode(DCPU16ISD::Wrapper, dl, getPointerTy(), Result);
 }
 
-static SDValue EmitCMP(SDValue &LHS, SDValue &RHS, SDValue &TargetCC,
-                       ISD::CondCode CC,
-                       DebugLoc dl, SelectionDAG &DAG) {
-  // FIXME: Handle bittests someday
-  assert(!LHS.getValueType().isFloatingPoint() && "We don't handle FP yet");
-
-  // FIXME: Handle jump negative someday
-  DCPU16CC::CondCodes TCC = DCPU16CC::COND_INVALID;
+static bool NeedsAdditionalEqualityCC(ISD::CondCode CC,
+                                      ISD::CondCode *simpleCC) {
+  *simpleCC = CC;
   switch (CC) {
   default: llvm_unreachable("Invalid integer condition!");
   case ISD::SETEQ:
-    TCC = DCPU16CC::COND_E;     // aka COND_Z
-    // Minor optimization: if LHS is a constant, swap operands, then the
-    // constant can be folded into comparison.
-    if (LHS.getOpcode() == ISD::Constant)
-      std::swap(LHS, RHS);
-    break;
   case ISD::SETNE:
-    TCC = DCPU16CC::COND_NE;    // aka COND_NZ
-    // Minor optimization: if LHS is a constant, swap operands, then the
-    // constant can be folded into comparison.
-    if (LHS.getOpcode() == ISD::Constant)
-      std::swap(LHS, RHS);
-    break;
-  case ISD::SETULE:
-    std::swap(LHS, RHS);        // FALLTHROUGH
-  case ISD::SETUGE:
-    // Turn lhs u>= rhs with lhs constant into rhs u< lhs+1, this allows us to
-    // fold constant into instruction.
-    if (const ConstantSDNode * C = dyn_cast<ConstantSDNode>(LHS)) {
-      LHS = RHS;
-      RHS = DAG.getConstant(C->getSExtValue() + 1, C->getValueType(0));
-      TCC = DCPU16CC::COND_LO;
-      break;
-    }
-    TCC = DCPU16CC::COND_HS;    // aka COND_C
-    break;
-  case ISD::SETUGT:
-    std::swap(LHS, RHS);        // FALLTHROUGH
-  case ISD::SETULT:
-    // Turn lhs u< rhs with lhs constant into rhs u>= lhs+1, this allows us to
-    // fold constant into instruction.
-    if (const ConstantSDNode * C = dyn_cast<ConstantSDNode>(LHS)) {
-      LHS = RHS;
-      RHS = DAG.getConstant(C->getSExtValue() + 1, C->getValueType(0));
-      TCC = DCPU16CC::COND_HS;
-      break;
-    }
-    TCC = DCPU16CC::COND_LO;    // aka COND_NC
-    break;
-  case ISD::SETLE:
-    std::swap(LHS, RHS);        // FALLTHROUGH
-  case ISD::SETGE:
-    // Turn lhs >= rhs with lhs constant into rhs < lhs+1, this allows us to
-    // fold constant into instruction.
-    if (const ConstantSDNode * C = dyn_cast<ConstantSDNode>(LHS)) {
-      LHS = RHS;
-      RHS = DAG.getConstant(C->getSExtValue() + 1, C->getValueType(0));
-      TCC = DCPU16CC::COND_L;
-      break;
-    }
-    TCC = DCPU16CC::COND_GE;
-    break;
-  case ISD::SETGT:
-    std::swap(LHS, RHS);        // FALLTHROUGH
   case ISD::SETLT:
-    // Turn lhs < rhs with lhs constant into rhs >= lhs+1, this allows us to
-    // fold constant into instruction.
-    if (const ConstantSDNode * C = dyn_cast<ConstantSDNode>(LHS)) {
-      LHS = RHS;
-      RHS = DAG.getConstant(C->getSExtValue() + 1, C->getValueType(0));
-      TCC = DCPU16CC::COND_GE;
-      break;
-    }
-    TCC = DCPU16CC::COND_L;
-    break;
+  case ISD::SETULT:
+  case ISD::SETUGT:
+  case ISD::SETGT:
+    return false;
+  case ISD::SETUGE:
+    *simpleCC = ISD::SETUGT;
+    return true;
+  case ISD::SETULE:
+    *simpleCC = ISD::SETULT;
+    return true;
+  case ISD::SETGE:
+    *simpleCC = ISD::SETGT;
+    return true;
+  case ISD::SETLE:
+    *simpleCC = ISD::SETLT;
+    return true;
   }
-
-  TargetCC = DAG.getConstant(TCC, MVT::i16);
-  return DAG.getNode(DCPU16ISD::CMP, dl, MVT::Glue, LHS, RHS);
+  // Not reached
+  return false;
 }
 
+static DCPU16CC::CondCodes GetSimpleCC(ISD::CondCode CC,
+                                      SDValue &LHS, SDValue &RHS) {
+  DCPU16CC::CondCodes TCC = DCPU16CC::COND_INVALID;
+  switch (CC) {
+  default: llvm_unreachable("Invalid integer condition!");
+  case ISD::SETGE:
+  case ISD::SETLE:
+  case ISD::SETUGE:
+  case ISD::SETULE:
+    llvm_unreachable("CC requires additional equality test - not simple!");
+  case ISD::SETEQ:
+    TCC = DCPU16CC::COND_E;
+    break;
+  case ISD::SETNE:
+    TCC = DCPU16CC::COND_NE;
+    break;
+  case ISD::SETULT:
+    std::swap(LHS, RHS); // FALLTHROUGH
+  case ISD::SETUGT:
+    TCC = DCPU16CC::COND_G;
+    break;
+  // FIXME: signed comparison doesn't really work like that when only unsigned
+  // comparison is available
+  case ISD::SETLT:
+    std::swap(LHS, RHS); // FALLTHROUGH
+  case ISD::SETGT:
+    TCC = DCPU16CC::COND_G;
+    break;
+  }
+  return TCC;
+}
 
 SDValue DCPU16TargetLowering::LowerBR_CC(SDValue Op, SelectionDAG &DAG) const {
   SDValue Chain = Op.getOperand(0);
@@ -703,93 +680,16 @@ SDValue DCPU16TargetLowering::LowerBR_CC(SDValue Op, SelectionDAG &DAG) const {
   SDValue Dest  = Op.getOperand(4);
   DebugLoc dl   = Op.getDebugLoc();
 
-  SDValue TargetCC;
-  SDValue Flag = EmitCMP(LHS, RHS, TargetCC, CC, dl, DAG);
+  ISD::CondCode nonEqualCC;
+  if (NeedsAdditionalEqualityCC(CC, &nonEqualCC)) {
+    SDValue eqCC = DAG.getConstant(DCPU16CC::COND_E, MVT::i16);
+    Chain = DAG.getNode(DCPU16ISD::BR_CC, dl, Op.getValueType(),
+                        Chain, eqCC, LHS, RHS, Dest);
+  }
 
+  DCPU16CC::CondCodes simpleCC = GetSimpleCC(nonEqualCC, LHS, RHS);
   return DAG.getNode(DCPU16ISD::BR_CC, dl, Op.getValueType(),
-                     Chain, Dest, TargetCC, Flag);
-}
-
-// TODO: I'm pretty sure that won't work in this form, since RO is not
-//       doing the same stuff SRW was (Flags for conditional branches?).
-SDValue DCPU16TargetLowering::LowerSETCC(SDValue Op, SelectionDAG &DAG) const {
-  SDValue LHS   = Op.getOperand(0);
-  SDValue RHS   = Op.getOperand(1);
-  DebugLoc dl   = Op.getDebugLoc();
-
-  // If we are doing an AND and testing against zero, then the CMP
-  // will not be generated.  The AND (or BIT) will generate the condition codes,
-  // but they are different from CMP.
-  // FIXME: since we're doing a post-processing, use a pseudoinstr here, so
-  // lowering & isel wouldn't diverge.
-  bool andCC = false;
-  if (ConstantSDNode *RHSC = dyn_cast<ConstantSDNode>(RHS)) {
-    if (RHSC->isNullValue() && LHS.hasOneUse() &&
-        (LHS.getOpcode() == ISD::AND ||
-         (LHS.getOpcode() == ISD::TRUNCATE &&
-          LHS.getOperand(0).getOpcode() == ISD::AND))) {
-      andCC = true;
-    }
-  }
-  ISD::CondCode CC = cast<CondCodeSDNode>(Op.getOperand(2))->get();
-  SDValue TargetCC;
-  SDValue Flag = EmitCMP(LHS, RHS, TargetCC, CC, dl, DAG);
-
-  // Get the condition codes directly from the status register, if its easy.
-  // Otherwise a branch will be generated.  Note that the AND and BIT
-  // instructions generate different flags than CMP, the carry bit can be used
-  // for NE/EQ.
-  bool Invert = false;
-  bool Shift = false;
-  bool Convert = true;
-  switch (cast<ConstantSDNode>(TargetCC)->getZExtValue()) {
-   default:
-    Convert = false;
-    break;
-   case DCPU16CC::COND_HS:
-     // Res = RO & 1, no processing is required
-     break;
-   case DCPU16CC::COND_LO:
-     // Res = ~(RO & 1)
-     Invert = true;
-     break;
-   case DCPU16CC::COND_NE:
-     if (andCC) {
-       // C = ~Z, thus Res = RO & 1, no processing is required
-     } else {
-       // Res = ~((RO >> 1) & 1)
-       Shift = true;
-       Invert = true;
-     }
-     break;
-   case DCPU16CC::COND_E:
-     Shift = true;
-     // C = ~Z for AND instruction, thus we can put Res = ~(RO & 1), however,
-     // Res = (RO >> 1) & 1 is 1 word shorter.
-     break;
-  }
-  EVT VT = Op.getValueType();
-  SDValue One  = DAG.getConstant(1, VT);
-  if (Convert) {
-    SDValue SR = DAG.getCopyFromReg(DAG.getEntryNode(), dl, DCPU16::RO,
-                                    MVT::i16, Flag);
-    if (Shift)
-      // FIXME: somewhere this is turned into a SRL, lower it MSP specific?
-      SR = DAG.getNode(ISD::SRA, dl, MVT::i16, SR, One);
-    SR = DAG.getNode(ISD::AND, dl, MVT::i16, SR, One);
-    if (Invert)
-      SR = DAG.getNode(ISD::XOR, dl, MVT::i16, SR, One);
-    return SR;
-  } else {
-    SDValue Zero = DAG.getConstant(0, VT);
-    SDVTList VTs = DAG.getVTList(Op.getValueType(), MVT::Glue);
-    SmallVector<SDValue, 4> Ops;
-    Ops.push_back(One);
-    Ops.push_back(Zero);
-    Ops.push_back(TargetCC);
-    Ops.push_back(Flag);
-    return DAG.getNode(DCPU16ISD::SELECT_CC, dl, VTs, &Ops[0], Ops.size());
-  }
+                     Chain, DAG.getConstant(simpleCC, MVT::i16), LHS, RHS, Dest);
 }
 
 SDValue DCPU16TargetLowering::LowerSELECT_CC(SDValue Op,
@@ -801,15 +701,13 @@ SDValue DCPU16TargetLowering::LowerSELECT_CC(SDValue Op,
   ISD::CondCode CC = cast<CondCodeSDNode>(Op.getOperand(4))->get();
   DebugLoc dl    = Op.getDebugLoc();
 
-  SDValue TargetCC;
-  SDValue Flag = EmitCMP(LHS, RHS, TargetCC, CC, dl, DAG);
-
-  SDVTList VTs = DAG.getVTList(Op.getValueType(), MVT::Glue);
-  SmallVector<SDValue, 4> Ops;
+  SDVTList VTs = DAG.getVTList(Op.getValueType());
+  SmallVector<SDValue, 5> Ops;
+  Ops.push_back(DAG.getConstant(CC, MVT::i16));
+  Ops.push_back(LHS);
+  Ops.push_back(RHS);
   Ops.push_back(TrueV);
   Ops.push_back(FalseV);
-  Ops.push_back(TargetCC);
-  Ops.push_back(Flag);
 
   return DAG.getNode(DCPU16ISD::SELECT_CC, dl, VTs, &Ops[0], Ops.size());
 }
@@ -1001,11 +899,10 @@ DCPU16TargetLowering::EmitShiftInstr(MachineInstr *MI,
   // BB:
   // cmp 0, N
   // je RemBB
-  BuildMI(BB, dl, TII.get(DCPU16::CMP16ri))
-    .addReg(ShiftAmtSrcReg).addImm(0);
-  BuildMI(BB, dl, TII.get(DCPU16::JCC))
-    .addMBB(RemBB)
-    .addImm(DCPU16CC::COND_E);
+  BuildMI(BB, dl, TII.get(DCPU16::BR_CC))
+    .addImm(DCPU16CC::COND_E) // CC
+    .addReg(ShiftAmtSrcReg).addImm(0) // LHS, RHS
+    .addMBB(RemBB); // Dest
 
   // LoopBB:
   // ShiftReg = phi [%SrcReg, BB], [%ShiftReg2, LoopBB]
@@ -1022,9 +919,10 @@ DCPU16TargetLowering::EmitShiftInstr(MachineInstr *MI,
     .addReg(ShiftReg);
   BuildMI(LoopBB, dl, TII.get(DCPU16::SUB16ri), ShiftAmtReg2)
     .addReg(ShiftAmtReg).addImm(1);
-  BuildMI(LoopBB, dl, TII.get(DCPU16::JCC))
-    .addMBB(LoopBB)
-    .addImm(DCPU16CC::COND_NE);
+  BuildMI(LoopBB, dl, TII.get(DCPU16::BR_CC))
+    .addImm(DCPU16CC::COND_NE) // CC
+    .addReg(DCPU16::RO).addImm(0) // LHS, RHS
+    .addMBB(LoopBB); // Dest
 
   // RemBB:
   // DestReg = phi [%SrcReg, BB], [%ShiftReg, LoopBB]
@@ -1037,20 +935,10 @@ DCPU16TargetLowering::EmitShiftInstr(MachineInstr *MI,
 }
 
 MachineBasicBlock*
-DCPU16TargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
-                                                  MachineBasicBlock *BB) const {
-  unsigned Opc = MI->getOpcode();
-
-  if (Opc == DCPU16::Shl16 ||
-      Opc == DCPU16::Sra16 ||
-      Opc == DCPU16::Srl16)
-    return EmitShiftInstr(MI, BB);
-
+DCPU16TargetLowering::EmitSelectCCInstr(MachineInstr *MI,
+                                        MachineBasicBlock *BB) const {
   const TargetInstrInfo &TII = *getTargetMachine().getInstrInfo();
   DebugLoc dl = MI->getDebugLoc();
-
-  assert((Opc == DCPU16::Select16) &&
-         "Unexpected instr type to insert");
 
   // To "insert" a SELECT instruction, we actually have to insert the diamond
   // control-flow pattern.  The incoming instruction knows the destination vreg
@@ -1082,9 +970,14 @@ DCPU16TargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
   BB->addSuccessor(copy0MBB);
   BB->addSuccessor(copy1MBB);
 
-  BuildMI(BB, dl, TII.get(DCPU16::JCC))
-    .addMBB(copy1MBB)
-    .addImm(MI->getOperand(3).getImm());
+  DCPU16CC::CondCodes CC = (DCPU16CC::CondCodes) MI->getOperand(0).getImm();
+  MachineOperand &LHS = MI->getOperand(1);
+  MachineOperand &RHS = MI->getOperand(2);
+
+  BuildMI(BB, dl, TII.get(DCPU16::BR_CC))
+    .addImm(CC)
+    .addOperand(LHS).addOperand(RHS)
+    .addMBB(copy1MBB);
 
   //  copy0MBB:
   //   %FalseValue = ...
@@ -1105,4 +998,20 @@ DCPU16TargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
 
   MI->eraseFromParent();   // The pseudo instruction is gone now.
   return BB;
+}
+
+MachineBasicBlock*
+DCPU16TargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
+                                                  MachineBasicBlock *BB) const {
+  unsigned Opc = MI->getOpcode();
+  switch (Opc) {
+  default:
+    llvm_unreachable("Unexpected instr type to insert");
+  case DCPU16::Shl16:
+  case DCPU16::Sra16:
+  case DCPU16::Srl16:
+    return EmitShiftInstr(MI, BB);
+  case DCPU16::Select16:
+    return EmitSelectCCInstr(MI, BB);
+  }
 }
