@@ -120,10 +120,6 @@ ReverseBranchCondition(SmallVectorImpl<MachineOperand> &Cond) const {
 
   DCPU16CC::CondCodes CC = static_cast<DCPU16CC::CondCodes>(Cond[0].getImm());
 
-  if ((CC != DCPU16CC::COND_E) && (CC & DCPU16CC::COND_E)) {
-    return true;
-  }
-
   switch (CC) {
   default: llvm_unreachable("Invalid branch condition!");
   case DCPU16CC::COND_E:
@@ -133,6 +129,14 @@ ReverseBranchCondition(SmallVectorImpl<MachineOperand> &Cond) const {
     CC = DCPU16CC::COND_E;
     break;
   case DCPU16CC::COND_G:
+    std::swap(Cond[1], Cond[2]);
+    CC = DCPU16CC::COND_G;
+    break;
+  case (DCPU16CC::COND_G | DCPU16CC::COND_E):
+    // This encodes a >= sequence
+    std::swap(Cond[1], Cond[2]);
+    CC = DCPU16CC::COND_G;
+    break;
   case DCPU16CC::COND_B:
     return true;
   }
