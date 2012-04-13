@@ -121,7 +121,10 @@ fib.s:
   SET PC, POP ; The Notch order
 ```
 
-You may want to try it in one of the [online DCPU assembler and debugger by Mappum](http://mappum.github.com/DCPU-16/)
+You may want to try it the [online deNULL DCPU-16 Assembler, Emulator & Disassembler](http://dcpu.ru/)
+Other assemblers may or may not be able to compile the output from DCPU16 LLVM backend.
+Hopefully, the situation with the compatibility will improve soon.
+
 After you compile and run the program, the final state would be something like:
 
     ==== REGISTERS: ====
