@@ -121,7 +121,7 @@ fib.s:
   SET PC, POP ; The Notch order
 ```
 
-You may want to try it the [online deNULL DCPU-16 Assembler, Emulator & Disassembler](http://dcpu.ru/)
+You may want to try it the [online deNULL DCPU-16 Assembler, Emulator & Disassembler](http://dcpu.ru/).
 Other assemblers may or may not be able to compile the output from DCPU16 LLVM backend.
 Hopefully, the situation with the compatibility will improve soon.
 
