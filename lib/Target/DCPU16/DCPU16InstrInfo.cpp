@@ -130,10 +130,10 @@ ReverseBranchCondition(SmallVectorImpl<MachineOperand> &Cond) const {
     break;
   case DCPU16CC::COND_G:
     std::swap(Cond[1], Cond[2]);
-    CC = DCPU16CC::COND_G;
+    CC = (DCPU16CC::CondCodes) (DCPU16CC::COND_G | DCPU16CC::COND_E);
     break;
   case (DCPU16CC::COND_G | DCPU16CC::COND_E):
-    // This encodes a >= sequence
+    // This encodes a >= sequence.
     std::swap(Cond[1], Cond[2]);
     CC = DCPU16CC::COND_G;
     break;
@@ -217,29 +217,33 @@ bool DCPU16InstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,
     if (BranchCode == DCPU16CC::COND_INVALID)
       return true;  // Can't handle weird stuff.
 
+    MachineOperand LHS = I->getOperand(1);
+    MachineOperand RHS = I->getOperand(2);
+
     // Working from the bottom, handle the first conditional branch.
     if (Cond.empty()) {
       FBB = TBB;
       TBB = I->getOperand(3).getMBB();
       Cond.push_back(MachineOperand::CreateImm(BranchCode));
-      Cond.push_back(I->getOperand(1)); // LHS
-      Cond.push_back(I->getOperand(2)); // RHS
+      Cond.push_back(LHS);
+      Cond.push_back(RHS);
       continue;
-    } else if ((BranchCode != DCPU16CC::COND_E)
-        || (TBB != I->getOperand(3).getMBB())) {
-      // Not a >= or <=
-      return true;
-    } else {
-      // It's a <= or >=
-      assert(Cond.size() == 3);
-      assert(TBB);
+    }
+
+    assert(Cond.size() == 3);
+    assert(TBB);
+
+    // Is it a >= ?
+    if ((BranchCode == DCPU16CC::COND_E)
+        && (((DCPU16CC::CondCodes) Cond[0].getImm()) == DCPU16CC::COND_G)
+        && (TBB == I->getOperand(3).getMBB())
+        && (((Cond[1].getReg() == LHS.getReg()) && (Cond[2].getReg() == RHS.getReg()))
+          || ((Cond[1].getReg() == RHS.getReg()) && (Cond[2].getReg() == LHS.getReg())))) {
 
       // Mark the CC by ORing with the equality CC
-      DCPU16CC::CondCodes CC = (DCPU16CC::CondCodes) Cond[0].getImm();
-      assert((CC != DCPU16CC::COND_E) && "Double COND_E CC");
-      Cond[0] = MachineOperand::CreateImm(CC | DCPU16CC::COND_E);
-      return true;
+      Cond[0] = MachineOperand::CreateImm(DCPU16CC::COND_G | DCPU16CC::COND_E);
     }
+    break;
   }
 
   return false;
@@ -265,17 +269,26 @@ DCPU16InstrInfo::InsertBranch(MachineBasicBlock &MBB, MachineBasicBlock *TBB,
   // Conditional branch.
   unsigned Count = 0;
   DCPU16CC::CondCodes CC = (DCPU16CC::CondCodes) Cond[0].getImm();
-  if ((CC & DCPU16CC::COND_E) && (CC != DCPU16CC::COND_E)) {
-    BuildMI(&MBB, DL, get(DCPU16::BR_CC))
-      .addImm(DCPU16CC::COND_E)
-      .addOperand(Cond[1]).addOperand(Cond[2])
-      .addMBB(TBB);
-    CC = (DCPU16CC::CondCodes) (CC & (~DCPU16CC::COND_E));
-    ++Count;
+  MachineOperand LHS = Cond[1];
+  MachineOperand RHS = Cond[2];
+  // Is it a >= ?
+  if (CC == (DCPU16CC::COND_E | DCPU16CC::COND_G)) {
+    if (FBB) {
+      // Switch targets around to produce shorter code
+      std::swap(TBB, FBB);
+      std::swap(LHS, RHS);
+    } else {
+      BuildMI(&MBB, DL, get(DCPU16::BR_CC))
+        .addImm(DCPU16CC::COND_E)
+        .addOperand(LHS).addOperand(RHS)
+        .addMBB(TBB);
+      ++Count;
+    }
+    CC = DCPU16CC::COND_G;
   }
   BuildMI(&MBB, DL, get(DCPU16::BR_CC))
     .addImm(CC)
-    .addOperand(Cond[1]).addOperand(Cond[2])
+    .addOperand(LHS).addOperand(RHS)
     .addMBB(TBB);
   ++Count;
 
