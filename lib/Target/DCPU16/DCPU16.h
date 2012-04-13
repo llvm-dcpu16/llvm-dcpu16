@@ -21,12 +21,10 @@
 namespace DCPU16CC {
   // DCPU16 specific condition code.
   enum CondCodes {
-    COND_E  = 0,  // aka COND_Z
-    COND_NE = 1,  // aka COND_NZ
-    COND_HS = 2,  // aka COND_C
-    COND_LO = 3,  // aka COND_NC
-    COND_GE = 4,
-    COND_L  = 5,
+    COND_E =  0x1,
+    COND_NE = 0x2,
+    COND_G =  0x4,
+    COND_B =  0x8,
 
     COND_INVALID = -1
   };
@@ -39,8 +37,6 @@ namespace llvm {
 
   FunctionPass *createDCPU16ISelDag(DCPU16TargetMachine &TM,
                                     CodeGenOpt::Level OptLevel);
-
-  FunctionPass *createDCPU16BranchSelectionPass();
 
 } // end namespace llvm;
 

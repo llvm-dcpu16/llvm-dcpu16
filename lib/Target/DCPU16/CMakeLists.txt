@@ -9,7 +9,6 @@ tablegen(LLVM DCPU16GenSubtargetInfo.inc -gen-subtarget)
 add_public_tablegen_target(DCPU16CommonTableGen)
 
 add_llvm_target(DCPU16CodeGen
-  DCPU16BranchSelector.cpp
   DCPU16ISelDAGToDAG.cpp
   DCPU16ISelLowering.cpp
   DCPU16InstrInfo.cpp

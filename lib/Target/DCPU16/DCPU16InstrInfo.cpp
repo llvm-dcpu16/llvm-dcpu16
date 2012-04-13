@@ -101,7 +101,7 @@ unsigned DCPU16InstrInfo::RemoveBranch(MachineBasicBlock &MBB) const {
     if (I->isDebugValue())
       continue;
     if (I->getOpcode() != DCPU16::JMP &&
-        I->getOpcode() != DCPU16::JCC &&
+        I->getOpcode() != DCPU16::BR_CC &&
         I->getOpcode() != DCPU16::Br &&
         I->getOpcode() != DCPU16::Bm)
       break;
@@ -116,7 +116,7 @@ unsigned DCPU16InstrInfo::RemoveBranch(MachineBasicBlock &MBB) const {
 
 bool DCPU16InstrInfo::
 ReverseBranchCondition(SmallVectorImpl<MachineOperand> &Cond) const {
-  assert(Cond.size() == 1 && "Invalid Xbranch condition!");
+  assert(Cond.size() == 3 && "Invalid BR_CC condition!");
 
   DCPU16CC::CondCodes CC = static_cast<DCPU16CC::CondCodes>(Cond[0].getImm());
 
@@ -128,18 +128,17 @@ ReverseBranchCondition(SmallVectorImpl<MachineOperand> &Cond) const {
   case DCPU16CC::COND_NE:
     CC = DCPU16CC::COND_E;
     break;
-  case DCPU16CC::COND_L:
-    CC = DCPU16CC::COND_GE;
+  case DCPU16CC::COND_G:
+    std::swap(Cond[1], Cond[2]);
+    CC = (DCPU16CC::CondCodes) (DCPU16CC::COND_G | DCPU16CC::COND_E);
     break;
-  case DCPU16CC::COND_GE:
-    CC = DCPU16CC::COND_L;
+  case (DCPU16CC::COND_G | DCPU16CC::COND_E):
+    // This encodes a >= sequence.
+    std::swap(Cond[1], Cond[2]);
+    CC = DCPU16CC::COND_G;
     break;
-  case DCPU16CC::COND_HS:
-    CC = DCPU16CC::COND_LO;
-    break;
-  case DCPU16CC::COND_LO:
-    CC = DCPU16CC::COND_HS;
-    break;
+  case DCPU16CC::COND_B:
+    return true;
   }
 
   Cond[0].setImm(CC);
@@ -212,36 +211,39 @@ bool DCPU16InstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,
     }
 
     // Handle conditional branches.
-    assert(I->getOpcode() == DCPU16::JCC && "Invalid conditional branch");
+    assert(I->getOpcode() == DCPU16::BR_CC && "Invalid conditional branch");
     DCPU16CC::CondCodes BranchCode =
-      static_cast<DCPU16CC::CondCodes>(I->getOperand(1).getImm());
+      static_cast<DCPU16CC::CondCodes>(I->getOperand(0).getImm());
     if (BranchCode == DCPU16CC::COND_INVALID)
       return true;  // Can't handle weird stuff.
+
+    MachineOperand LHS = I->getOperand(1);
+    MachineOperand RHS = I->getOperand(2);
 
     // Working from the bottom, handle the first conditional branch.
     if (Cond.empty()) {
       FBB = TBB;
-      TBB = I->getOperand(0).getMBB();
+      TBB = I->getOperand(3).getMBB();
       Cond.push_back(MachineOperand::CreateImm(BranchCode));
+      Cond.push_back(LHS);
+      Cond.push_back(RHS);
       continue;
     }
 
-    // Handle subsequent conditional branches. Only handle the case where all
-    // conditional branches branch to the same destination.
-    assert(Cond.size() == 1);
+    assert(Cond.size() == 3);
     assert(TBB);
 
-    // Only handle the case where all conditional branches branch to
-    // the same destination.
-    if (TBB != I->getOperand(0).getMBB())
-      return true;
+    // Is it a >= ?
+    if ((BranchCode == DCPU16CC::COND_E)
+        && (((DCPU16CC::CondCodes) Cond[0].getImm()) == DCPU16CC::COND_G)
+        && (TBB == I->getOperand(3).getMBB())
+        && (((Cond[1].getReg() == LHS.getReg()) && (Cond[2].getReg() == RHS.getReg()))
+          || ((Cond[1].getReg() == RHS.getReg()) && (Cond[2].getReg() == LHS.getReg())))) {
 
-    DCPU16CC::CondCodes OldBranchCode = (DCPU16CC::CondCodes)Cond[0].getImm();
-    // If the conditions are the same, we can leave them alone.
-    if (OldBranchCode == BranchCode)
-      continue;
-
-    return true;
+      // Mark the CC by ORing with the equality CC
+      Cond[0] = MachineOperand::CreateImm(DCPU16CC::COND_G | DCPU16CC::COND_E);
+    }
+    break;
   }
 
   return false;
@@ -254,8 +256,8 @@ DCPU16InstrInfo::InsertBranch(MachineBasicBlock &MBB, MachineBasicBlock *TBB,
                               DebugLoc DL) const {
   // Shouldn't be a fall through.
   assert(TBB && "InsertBranch must not be told to insert a fallthrough");
-  assert((Cond.size() == 1 || Cond.size() == 0) &&
-         "DCPU16 branch conditions have one component!");
+  assert((Cond.size() == 3 || Cond.size() == 0) &&
+         "DCPU16 branch conditions have three components!");
 
   if (Cond.empty()) {
     // Unconditional branch?
@@ -266,7 +268,28 @@ DCPU16InstrInfo::InsertBranch(MachineBasicBlock &MBB, MachineBasicBlock *TBB,
 
   // Conditional branch.
   unsigned Count = 0;
-  BuildMI(&MBB, DL, get(DCPU16::JCC)).addMBB(TBB).addImm(Cond[0].getImm());
+  DCPU16CC::CondCodes CC = (DCPU16CC::CondCodes) Cond[0].getImm();
+  MachineOperand LHS = Cond[1];
+  MachineOperand RHS = Cond[2];
+  // Is it a >= ?
+  if (CC == (DCPU16CC::COND_E | DCPU16CC::COND_G)) {
+    if (FBB) {
+      // Switch targets around to produce shorter code
+      std::swap(TBB, FBB);
+      std::swap(LHS, RHS);
+    } else {
+      BuildMI(&MBB, DL, get(DCPU16::BR_CC))
+        .addImm(DCPU16CC::COND_E)
+        .addOperand(LHS).addOperand(RHS)
+        .addMBB(TBB);
+      ++Count;
+    }
+    CC = DCPU16CC::COND_G;
+  }
+  BuildMI(&MBB, DL, get(DCPU16::BR_CC))
+    .addImm(CC)
+    .addOperand(LHS).addOperand(RHS)
+    .addMBB(TBB);
   ++Count;
 
   if (FBB) {
