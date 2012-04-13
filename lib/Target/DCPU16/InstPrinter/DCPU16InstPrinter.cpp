@@ -36,8 +36,8 @@ void DCPU16InstPrinter::printPCRelImmOperand(const MCInst *MI, unsigned OpNo,
   const MCOperand &Op = MI->getOperand(OpNo);
   if (Op.isImm())  {
 	  if (Op.getImm() % 2 == 0) {
-        	O << "0x";
-        	O.write_hex((Op.getImm() / 2) & 0xFFFF);
+		  O << "0x";
+		  O.write_hex((Op.getImm() / 2) & 0xFFFF);
 	  } else {
 		  llvm_unreachable("immediate is not word sized");
 	  }
@@ -92,7 +92,9 @@ void DCPU16InstPrinter::printSrcMemOperand(const MCInst *MI, unsigned OpNo,
 	  // Print register base field
 	  if(Disp.isImm() && Disp.getImm() != 0) {
 		  if (Disp.getImm() % 2 == 0) {
-			  O << (Disp.getImm() / 2) << '+';
+			  O << "0x";
+			  O.write_hex((Disp.getImm()/2) & 0xFFFF);
+			  O << "+";
 		  } else {
 			  llvm_unreachable("immediate is not word sized");
 		  }
