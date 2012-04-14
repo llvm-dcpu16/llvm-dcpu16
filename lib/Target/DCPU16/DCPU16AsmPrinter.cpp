@@ -57,8 +57,6 @@ namespace {
                                unsigned OpNo, unsigned AsmVariant,
                                const char *ExtraCode, raw_ostream &O);
     void EmitInstruction(const MachineInstr *MI);
-
-    virtual void EmitStartOfAsmFile(Module &M);
   };
 } // end of anonymous namespace
 
@@ -161,16 +159,6 @@ void DCPU16AsmPrinter::EmitInstruction(const MachineInstr *MI) {
   MCInst TmpInst;
   MCInstLowering.Lower(MI, TmpInst);
   OutStreamer.EmitInstruction(TmpInst);
-}
-
-void DCPU16AsmPrinter::EmitStartOfAsmFile(Module &M) {
-  OutStreamer.EmitRawText(Twine(
-    ":autoinit\t\t;;Init data stack register C\n"
-    "\tSET I, SP\n"
-    "\tSUB I, 256\n\n"
-    ":autostart\n"
-    "\tJSR main\n"
-    ":autohalt SET PC, autohalt\n"));
 }
 
 // Force static initialization.
