@@ -49,10 +49,7 @@ namespace llvm {
       /// SELECT_CC - Operand 0 is the condition code, operand 1 is the LHS,
       /// operand 2 is the RHS, operand 3 is the value if the condition is true
       /// and operand 4 is the value when the condition is false.
-      SELECT_CC,
-
-      /// SHL, SRA, SRL - Non-constant shifts.
-      SHL, SRA, SRL
+      SELECT_CC
     };
   }
 
@@ -72,7 +69,6 @@ namespace llvm {
     /// DAG node.
     virtual const char *getTargetNodeName(unsigned Opcode) const;
 
-    SDValue LowerShifts(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerGlobalAddress(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerBlockAddress(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerExternalSymbol(SDValue Op, SelectionDAG &DAG) const;
@@ -88,13 +84,6 @@ namespace llvm {
     getConstraintType(const std::string &Constraint) const;
     std::pair<unsigned, const TargetRegisterClass*>
     getRegForInlineAsmConstraint(const std::string &Constraint, EVT VT) const;
-
-    MachineBasicBlock* EmitInstrWithCustomInserter(MachineInstr *MI,
-                                                   MachineBasicBlock *BB) const;
-    MachineBasicBlock* EmitShiftInstr(MachineInstr *MI,
-                                      MachineBasicBlock *BB) const;
-    MachineBasicBlock* EmitSelectCCInstr(MachineInstr *MI,
-                                         MachineBasicBlock *BB) const;
 
   private:
     SDValue LowerCCCCallTo(SDValue Chain, SDValue Callee,
