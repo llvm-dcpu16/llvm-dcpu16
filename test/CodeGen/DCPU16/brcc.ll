@@ -1,4 +1,3 @@
-; XFAIL: *
 ; RUN: llc < %s -march=dcpu16 | FileCheck %s
 target datalayout = "e-p:16:16:16-i8:8:8-i16:16:16-i32:16:32-i64:64:64-n8:16"
 target triple = "dcpu16"
