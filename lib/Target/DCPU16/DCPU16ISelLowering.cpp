@@ -75,9 +75,6 @@ DCPU16TargetLowering::DCPU16TargetLowering(DCPU16TargetMachine &tm) :
   setOperationAction(ISD::SRA,              MVT::i8,    Promote);
   setOperationAction(ISD::SHL,              MVT::i8,    Promote);
   setOperationAction(ISD::SRL,              MVT::i8,    Promote);
-  setOperationAction(ISD::SRA,              MVT::i16,   Custom);
-  setOperationAction(ISD::SHL,              MVT::i16,   Custom);
-  setOperationAction(ISD::SRL,              MVT::i16,   Custom);
   setOperationAction(ISD::ROTL,             MVT::i8,    Promote);
   setOperationAction(ISD::ROTR,             MVT::i8,    Promote);
   setOperationAction(ISD::ROTL,             MVT::i16,   Expand);
@@ -152,9 +149,6 @@ DCPU16TargetLowering::DCPU16TargetLowering(DCPU16TargetMachine &tm) :
 SDValue DCPU16TargetLowering::LowerOperation(SDValue Op,
                                              SelectionDAG &DAG) const {
   switch (Op.getOpcode()) {
-  case ISD::SHL: // FALLTHROUGH
-  case ISD::SRL:
-  case ISD::SRA:              return LowerShifts(Op, DAG);
   case ISD::GlobalAddress:    return LowerGlobalAddress(Op, DAG);
   case ISD::BlockAddress:     return LowerBlockAddress(Op, DAG);
   case ISD::ExternalSymbol:   return LowerExternalSymbol(Op, DAG);
@@ -538,49 +532,6 @@ DCPU16TargetLowering::LowerCallResult(SDValue Chain, SDValue InFlag,
   return Chain;
 }
 
-SDValue DCPU16TargetLowering::LowerShifts(SDValue Op,
-                                          SelectionDAG &DAG) const {
-  unsigned Opc = Op.getOpcode();
-  SDNode* N = Op.getNode();
-  EVT VT = Op.getValueType();
-  DebugLoc dl = N->getDebugLoc();
-
-  // Expand non-constant shifts to loops:
-  if (!isa<ConstantSDNode>(N->getOperand(1)))
-    switch (Opc) {
-    default: llvm_unreachable("Invalid shift opcode!");
-    case ISD::SHL:
-      return DAG.getNode(DCPU16ISD::SHL, dl,
-                         VT, N->getOperand(0), N->getOperand(1));
-    case ISD::SRA:
-      return DAG.getNode(DCPU16ISD::SRA, dl,
-                         VT, N->getOperand(0), N->getOperand(1));
-    case ISD::SRL:
-      return DAG.getNode(DCPU16ISD::SRL, dl,
-                         VT, N->getOperand(0), N->getOperand(1));
-    }
-
-  uint64_t ShiftAmount = cast<ConstantSDNode>(N->getOperand(1))->getZExtValue();
-
-  // Expand the stuff into sequence of shifts.
-  // FIXME: for some shift amounts this might be done better!
-  // E.g.: foo >> (8 + N) => sxt(swpb(foo)) >> N
-  SDValue Victim = N->getOperand(0);
-
-  if (Opc == ISD::SRL && ShiftAmount) {
-    // Emit a special goodness here:
-    // srl A, 1 => clrc; rrc A
-    Victim = DAG.getNode(DCPU16ISD::RRC, dl, VT, Victim);
-    ShiftAmount -= 1;
-  }
-
-  while (ShiftAmount--)
-    Victim = DAG.getNode((Opc == ISD::SHL ? DCPU16ISD::RLA : DCPU16ISD::RRA),
-                         dl, VT, Victim);
-
-  return Victim;
-}
-
 SDValue DCPU16TargetLowering::LowerGlobalAddress(SDValue Op,
                                                  SelectionDAG &DAG) const {
   const GlobalValue *GV = cast<GlobalAddressSDNode>(Op)->getGlobal();
@@ -854,121 +805,5 @@ const char *DCPU16TargetLowering::getTargetNodeName(unsigned Opcode) const {
   case DCPU16ISD::Wrapper:            return "DCPU16ISD::Wrapper";
   case DCPU16ISD::BR_CC:              return "DCPU16ISD::BR_CC";
   case DCPU16ISD::SELECT_CC:          return "DCPU16ISD::SELECT_CC";
-  case DCPU16ISD::SHL:                return "DCPU16ISD::SHL";
-  case DCPU16ISD::SRA:                return "DCPU16ISD::SRA";
-  }
-}
-
-//===----------------------------------------------------------------------===//
-//  Other Lowering Code
-//===----------------------------------------------------------------------===//
-
-MachineBasicBlock*
-DCPU16TargetLowering::EmitShiftInstr(MachineInstr *MI,
-                                     MachineBasicBlock *BB) const {
-  MachineFunction *F = BB->getParent();
-  MachineRegisterInfo &RI = F->getRegInfo();
-  DebugLoc dl = MI->getDebugLoc();
-  const TargetInstrInfo &TII = *getTargetMachine().getInstrInfo();
-
-  unsigned Opc;
-  const TargetRegisterClass * RC;
-  switch (MI->getOpcode()) {
-  default: llvm_unreachable("Invalid shift opcode!");
-  case DCPU16::Shl16:
-   Opc = DCPU16::SHL16r1;
-   RC = DCPU16::GR16RegisterClass;
-   break;
-  case DCPU16::Sra16:
-   Opc = DCPU16::SAR16r1;
-   RC = DCPU16::GR16RegisterClass;
-   break;
-  case DCPU16::Srl16:
-   Opc = DCPU16::SAR16r1c;
-   RC = DCPU16::GR16RegisterClass;
-   break;
-  }
-
-  const BasicBlock *LLVM_BB = BB->getBasicBlock();
-  MachineFunction::iterator I = BB;
-  ++I;
-
-  // Create loop block
-  MachineBasicBlock *LoopBB = F->CreateMachineBasicBlock(LLVM_BB);
-  MachineBasicBlock *RemBB  = F->CreateMachineBasicBlock(LLVM_BB);
-
-  F->insert(I, LoopBB);
-  F->insert(I, RemBB);
-
-  // Update machine-CFG edges by transferring all successors of the current
-  // block to the block containing instructions after shift.
-  RemBB->splice(RemBB->begin(), BB,
-                llvm::next(MachineBasicBlock::iterator(MI)),
-                BB->end());
-  RemBB->transferSuccessorsAndUpdatePHIs(BB);
-
-  // Add adges BB => LoopBB => RemBB, BB => RemBB, LoopBB => LoopBB
-  BB->addSuccessor(LoopBB);
-  BB->addSuccessor(RemBB);
-  LoopBB->addSuccessor(RemBB);
-  LoopBB->addSuccessor(LoopBB);
-
-  unsigned ShiftAmtReg = RI.createVirtualRegister(DCPU16::GR16RegisterClass);
-  unsigned ShiftAmtReg2 = RI.createVirtualRegister(DCPU16::GR16RegisterClass);
-  unsigned ShiftReg = RI.createVirtualRegister(RC);
-  unsigned ShiftReg2 = RI.createVirtualRegister(RC);
-  unsigned ShiftAmtSrcReg = MI->getOperand(2).getReg();
-  unsigned SrcReg = MI->getOperand(1).getReg();
-  unsigned DstReg = MI->getOperand(0).getReg();
-
-  // BB:
-  // cmp 0, N
-  // je RemBB
-  BuildMI(BB, dl, TII.get(DCPU16::BR_CC))
-    .addImm(DCPU16CC::COND_E) // CC
-    .addReg(ShiftAmtSrcReg).addImm(0) // LHS, RHS
-    .addMBB(RemBB); // Dest
-
-  // LoopBB:
-  // ShiftReg = phi [%SrcReg, BB], [%ShiftReg2, LoopBB]
-  // ShiftAmt = phi [%N, BB],      [%ShiftAmt2, LoopBB]
-  // ShiftReg2 = shift ShiftReg
-  // ShiftAmt2 = ShiftAmt - 1;
-  BuildMI(LoopBB, dl, TII.get(DCPU16::PHI), ShiftReg)
-    .addReg(SrcReg).addMBB(BB)
-    .addReg(ShiftReg2).addMBB(LoopBB);
-  BuildMI(LoopBB, dl, TII.get(DCPU16::PHI), ShiftAmtReg)
-    .addReg(ShiftAmtSrcReg).addMBB(BB)
-    .addReg(ShiftAmtReg2).addMBB(LoopBB);
-  BuildMI(LoopBB, dl, TII.get(Opc), ShiftReg2)
-    .addReg(ShiftReg);
-  BuildMI(LoopBB, dl, TII.get(DCPU16::SUB16ri), ShiftAmtReg2)
-    .addReg(ShiftAmtReg).addImm(1);
-  BuildMI(LoopBB, dl, TII.get(DCPU16::BR_CC))
-    .addImm(DCPU16CC::COND_NE) // CC
-    .addReg(DCPU16::RO).addImm(0) // LHS, RHS
-    .addMBB(LoopBB); // Dest
-
-  // RemBB:
-  // DestReg = phi [%SrcReg, BB], [%ShiftReg, LoopBB]
-  BuildMI(*RemBB, RemBB->begin(), dl, TII.get(DCPU16::PHI), DstReg)
-    .addReg(SrcReg).addMBB(BB)
-    .addReg(ShiftReg2).addMBB(LoopBB);
-
-  MI->eraseFromParent();   // The pseudo instruction is gone now.
-  return RemBB;
-}
-
-MachineBasicBlock*
-DCPU16TargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
-                                                  MachineBasicBlock *BB) const {
-  unsigned Opc = MI->getOpcode();
-  switch (Opc) {
-  default:
-    llvm_unreachable("Unexpected instr type to insert");
-  case DCPU16::Shl16:
-  case DCPU16::Sra16:
-  case DCPU16::Srl16:
-    return EmitShiftInstr(MI, BB);
   }
 }

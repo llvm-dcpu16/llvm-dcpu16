@@ -45,10 +45,6 @@ def SDT_DCPU16Shift        : SDTypeProfile<1, 2, [SDTCisSameAs<0, 1>,
 def DCPU16retflag  : SDNode<"DCPU16ISD::RET_FLAG", SDTNone,
                        [SDNPHasChain, SDNPOptInGlue]>;
 
-def DCPU16rra     : SDNode<"DCPU16ISD::RRA", SDTIntUnaryOp, []>;
-def DCPU16rla     : SDNode<"DCPU16ISD::RLA", SDTIntUnaryOp, []>;
-def DCPU16rrc     : SDNode<"DCPU16ISD::RRC", SDTIntUnaryOp, []>;
-
 def DCPU16call    : SDNode<"DCPU16ISD::CALL", SDT_DCPU16Call,
                      [SDNPHasChain, SDNPOutGlue, SDNPOptInGlue, SDNPVariadic]>;
 def DCPU16callseq_start :
@@ -61,9 +57,6 @@ def DCPU16Wrapper : SDNode<"DCPU16ISD::Wrapper", SDT_DCPU16Wrapper>;
 def DCPU16brcc    : SDNode<"DCPU16ISD::BR_CC", SDT_DCPU16BrCC,
                             [SDNPHasChain]>;
 def DCPU16selectcc: SDNode<"DCPU16ISD::SELECT_CC", SDT_DCPU16SelectCC, []>;
-def DCPU16shl     : SDNode<"DCPU16ISD::SHL", SDT_DCPU16Shift, []>;
-def DCPU16sra     : SDNode<"DCPU16ISD::SRA", SDT_DCPU16Shift, []>;
-def DCPU16srl     : SDNode<"DCPU16ISD::SRL", SDT_DCPU16Shift, []>;
 
 //===----------------------------------------------------------------------===//
 // DCPU16 Operand Definitions.
@@ -116,20 +109,6 @@ def ADJCALLSTACKDOWN : Pseudo<(outs), (ins i16imm:$amt),
 def ADJCALLSTACKUP   : Pseudo<(outs), (ins i16imm:$amt1, i16imm:$amt2),
                               "#ADJCALLSTACKUP",
                               [(DCPU16callseq_end timm:$amt1, timm:$amt2)]>;
-}
-
-let usesCustomInserter = 1 in {
-  let Defs = [RO] in {
-  def Shl16    : Pseudo<(outs GR16:$dst), (ins GR16:$src, GR16:$cnt),
-                        "# Shl16 PSEUDO",
-                        [(set GR16:$dst, (DCPU16shl GR16:$src, GR16:$cnt))]>;
-  def Sra16    : Pseudo<(outs GR16:$dst), (ins GR16:$src, GR16:$cnt),
-                        "# Sra16 PSEUDO",
-                        [(set GR16:$dst, (DCPU16sra GR16:$src, GR16:$cnt))]>;
-  def Srl16    : Pseudo<(outs GR16:$dst), (ins GR16:$src, GR16:$cnt),
-                        "# Srl16 PSEUDO",
-                        [(set GR16:$dst, (DCPU16srl GR16:$src, GR16:$cnt))]>;
-  }
 }
 
 // $dst _can_ be $falseV
@@ -720,24 +699,41 @@ def SBC16mm : I16mm<0x0,
 
 } // Uses = [RO]
 
-// FIXME: memory variant!
-def SAR16r1 : II16r<0x0,
-                    (outs GR16:$dst), (ins GR16:$src),
-                    "rra.w\t$dst",
-                    [(set GR16:$dst, (DCPU16rra GR16:$src)),
+// TODO: add memory variants
+def SRL16rr : I16rr<0x0,
+                    (outs GR16:$dst), (ins GR16:$src, GR16:$src2),
+                    "SHR\t{$src, $src2}",
+                    [(set GR16:$dst, (srl GR16:$src, GR16:$src2)),
+                     (implicit RO)]>;
+def SRL16ri : I16ri<0x0,
+                    (outs GR16:$dst), (ins GR16:$src, i16imm:$src2),
+                    "SHR\t{$src, $src2}",
+                    [(set GR16:$dst, (srl GR16:$src, imm:$src2)),
                      (implicit RO)]>;
 
-def SHL16r1 : I16rr<0x0,
-                    (outs GR16:$dst), (ins GR16:$src),
-                    "rla.w\t$dst",
-                    [(set GR16:$dst, (DCPU16rla GR16:$src)),
+// FIXME: replace this instruction with the correct arrithmetic shift once
+// Notch updates the spec
+def SRA16rr : I16rr<0x0,
+                    (outs GR16:$dst), (ins GR16:$src, GR16:$src2),
+                    "SHR\t{$src, $src2}",
+                    [(set GR16:$dst, (sra GR16:$src, GR16:$src2)),
+                     (implicit RO)]>;
+def SRA16ri : I16ri<0x0,
+                    (outs GR16:$dst), (ins GR16:$src, i16imm:$src2),
+                    "SHR\t{$src, $src2}",
+                    [(set GR16:$dst, (sra GR16:$src, imm:$src2)),
                      (implicit RO)]>;
 
-def SAR16r1c : Pseudo<(outs GR16:$dst), (ins GR16:$src),
-                      "clrc\n\t"
-                      "rrc.w\t$dst",
-                      [(set GR16:$dst, (DCPU16rrc GR16:$src)),
-                       (implicit RO)]>;
+def SHL16rr : I16rr<0x0,
+                    (outs GR16:$dst), (ins GR16:$src, GR16:$src2),
+                    "SHL\t{$src, $src2}",
+                    [(set GR16:$dst, (shl GR16:$src, GR16:$src2)),
+                     (implicit RO)]>;
+def SHL16ri : I16ri<0x0,
+                    (outs GR16:$dst), (ins GR16:$src, i16imm:$src2),
+                    "SHL\t{$src, $src2}",
+                    [(set GR16:$dst, (shl GR16:$src, imm:$src2)),
+                     (implicit RO)]>;
 
 } // Defs = [RO]
 
