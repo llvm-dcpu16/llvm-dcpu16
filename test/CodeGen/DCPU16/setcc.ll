@@ -11,9 +11,9 @@ define i16 @sccweqand(i16 %a, i16 %b) nounwind {
 }
 ; CHECK: sccweqand
 ; CHECK:	AND A, B
-; CHECK:	SET B, 0
-; CHECK:	IFE A, 0
-; CHECK:	SET B, 1
+; CHECK:	SET B, 0x0
+; CHECK:	IFE A, 0x0
+; CHECK:	SET B, 0x1
 ; CHECK:	SET A, B
 
 define i16 @sccwneand(i16 %a, i16 %b) nounwind {
@@ -24,9 +24,9 @@ define i16 @sccwneand(i16 %a, i16 %b) nounwind {
 }
 ; CHECK: sccwneand
 ; CHECK:        AND     A, B
-; CHECK:        SET     B, 0
-; CHECK:        IFN     A, 0
-; CHECK:        SET     B, 1
+; CHECK:        SET     B, 0x0
+; CHECK:        IFN     A, 0x0
+; CHECK:        SET     B, 0x1
 ; CHECK:        SET     A, B
 
 define i16 @sccwne(i16 %a, i16 %b) nounwind {
@@ -36,9 +36,9 @@ define i16 @sccwne(i16 %a, i16 %b) nounwind {
 }
 ; CHECK:sccwne
 ; CHECK:        SET     C, A ; The Notch order
-; CHECK:        SET     A, 0
+; CHECK:        SET     A, 0x0
 ; CHECK:        IFN     C, B
-; CHECK:        SET     A, 1
+; CHECK:        SET     A, 0x1
 
 define i16 @sccweq(i16 %a, i16 %b) nounwind {
 	%t1 = icmp eq i16 %a, %b
@@ -47,9 +47,9 @@ define i16 @sccweq(i16 %a, i16 %b) nounwind {
 }
 ; CHECK:sccweq
 ; CHECK:        SET     C, A
-; CHECK:        SET     A, 0
+; CHECK:        SET     A, 0x0
 ; CHECK:        IFE     C, B
-; CHECK:        SET     A, 1
+; CHECK:        SET     A, 0x1
 
 define i16 @sccwugt(i16 %a, i16 %b) nounwind {
 	%t1 = icmp ugt i16 %a, %b
@@ -58,9 +58,9 @@ define i16 @sccwugt(i16 %a, i16 %b) nounwind {
 }
 ; CHECK:sccwugt
 ; CHECK:        SET     C, A
-; CHECK:        SET     A, 0
+; CHECK:        SET     A, 0x0
 ; CHECK:        IFG     C, B
-; CHECK:        SET     A, 1
+; CHECK:        SET     A, 0x1
 
 define i16 @sccwuge(i16 %a, i16 %b) nounwind {
 	%t1 = icmp uge i16 %a, %b
@@ -69,9 +69,9 @@ define i16 @sccwuge(i16 %a, i16 %b) nounwind {
 }
 ; CHECK:sccwuge
 ; CHECK:        SET     C, A
-; CHECK:        SET     A, 1
+; CHECK:        SET     A, 0x1
 ; CHECK:        IFG     B, C
-; CHECK:        SET     A, 0
+; CHECK:        SET     A, 0x0
 
 define i16 @sccwult(i16 %a, i16 %b) nounwind {
 	%t1 = icmp ult i16 %a, %b
@@ -80,9 +80,9 @@ define i16 @sccwult(i16 %a, i16 %b) nounwind {
 }
 ; CHECK:sccwult
 ; CHECK:        SET     C, A
-; CHECK:        SET     A, 0
+; CHECK:        SET     A, 0x0
 ; CHECK:        IFG     B, C
-; CHECK:        SET     A, 1
+; CHECK:        SET     A, 0x1
 
 define i16 @sccwule(i16 %a, i16 %b) nounwind {
 	%t1 = icmp ule i16 %a, %b
@@ -91,9 +91,9 @@ define i16 @sccwule(i16 %a, i16 %b) nounwind {
 }
 ; CHECK:sccwule
 ; CHECK:        SET     C, A
-; CHECK:        SET     A, 1
+; CHECK:        SET     A, 0x1
 ; CHECK:        IFG     C, B
-; CHECK:        SET     A, 0
+; CHECK:        SET     A, 0x0
 
 define i16 @sccwsgt(i16 %a, i16 %b) nounwind {
 	%t1 = icmp sgt i16 %a, %b
@@ -102,9 +102,9 @@ define i16 @sccwsgt(i16 %a, i16 %b) nounwind {
 }
 ; CHECK:sccwsgt
 ; CHECK:        SET     C, A
-; CHECK:        SET     A, 0
+; CHECK:        SET     A, 0x0
 ; CHECK:        IFG     C, B
-; CHECK:        SET     A, 1
+; CHECK:        SET     A, 0x1
 
 define i16 @sccwsge(i16 %a, i16 %b) nounwind {
 	%t1 = icmp sge i16 %a, %b
@@ -113,9 +113,9 @@ define i16 @sccwsge(i16 %a, i16 %b) nounwind {
 }
 ; CHECK:sccwsge
 ; CHECK:        SET     C, A
-; CHECK:        SET     A, 1
+; CHECK:        SET     A, 0x1
 ; CHECK:        IFG     B, C
-; CHECK:        SET     A, 0
+; CHECK:        SET     A, 0x0
 
 define i16 @sccwslt(i16 %a, i16 %b) nounwind {
 	%t1 = icmp slt i16 %a, %b
@@ -124,9 +124,9 @@ define i16 @sccwslt(i16 %a, i16 %b) nounwind {
 }
 ; CHECK:sccwslt
 ; CHECK:        SET     C, A
-; CHECK:        SET     A, 0
+; CHECK:        SET     A, 0x0
 ; CHECK:        IFG     B, C
-; CHECK:        SET     A, 1
+; CHECK:        SET     A, 0x1
 
 define i16 @sccwsle(i16 %a, i16 %b) nounwind {
 	%t1 = icmp sle i16 %a, %b
@@ -135,6 +135,6 @@ define i16 @sccwsle(i16 %a, i16 %b) nounwind {
 }
 ; CHECK:sccwsle
 ; CHECK:        SET     C, A
-; CHECK:        SET     A, 1
+; CHECK:        SET     A, 0x1
 ; CHECK:        IFG     C, B
-; CHECK:        SET     A, 0
+; CHECK:        SET     A, 0x0
