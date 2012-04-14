@@ -1,6 +1,6 @@
 ; XFAIL: *
 ; RUN: llc < %s -march=dcpu16 | FileCheck %s
-target datalayout = "e-p:16:16:16-i1:8:8-i8:8:8-i16:16:16-i32:16:16"
+target datalayout = "e-p:16:16:16-i8:16:16-i16:16:16-i32:16:32-s0:16:16-n16"
 target triple = "dcpu16"
 
 define void @am1(i16* %a, i16 %b) nounwind {
