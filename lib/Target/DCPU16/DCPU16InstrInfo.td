@@ -26,12 +26,16 @@ def SDT_DCPU16CallSeqStart : SDCallSeqStart<[SDTCisVT<0, i16>]>;
 def SDT_DCPU16CallSeqEnd   : SDCallSeqEnd<[SDTCisVT<0, i16>, SDTCisVT<1, i16>]>;
 def SDT_DCPU16Wrapper      : SDTypeProfile<1, 1, [SDTCisSameAs<0, 1>,
                                                   SDTCisPtrTy<0>]>;
-def SDT_DCPU16Cmp          : SDTypeProfile<0, 2, [SDTCisSameAs<0, 1>]>;
-def SDT_DCPU16BrCC         : SDTypeProfile<0, 2, [SDTCisVT<0, OtherVT>,
-                                                  SDTCisVT<1, i16>]>;
-def SDT_DCPU16SelectCC     : SDTypeProfile<1, 3, [SDTCisSameAs<0, 1>,
+def SDT_DCPU16BrCC         : SDTypeProfile<0, 4, [SDTCisVT<0, i16>,
+                                                  SDTCisSameAs<1, 0>,
+                                                  SDTCisSameAs<2, 1>,
+                                                  SDTCisVT<3, OtherVT>]>;
+def SDT_DCPU16SelectCC     : SDTypeProfile<1, 5, [SDTCisSameAs<0, 1>,
                                                   SDTCisSameAs<1, 2>,
-                                                  SDTCisVT<3, i16>]>;
+                                                  SDTCisSameAs<2, 3>,
+                                                  SDTCisSameAs<3, 4>,
+                                                  SDTCisSameAs<4, 5>,
+                                                  SDTCisVT<5, i16>]>;
 def SDT_DCPU16Shift        : SDTypeProfile<1, 2, [SDTCisSameAs<0, 1>,
                                                   SDTCisI16<2>]>;
 
@@ -54,11 +58,9 @@ def DCPU16callseq_end :
                  SDNode<"ISD::CALLSEQ_END",   SDT_DCPU16CallSeqEnd,
                         [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue]>;
 def DCPU16Wrapper : SDNode<"DCPU16ISD::Wrapper", SDT_DCPU16Wrapper>;
-def DCPU16cmp     : SDNode<"DCPU16ISD::CMP", SDT_DCPU16Cmp, [SDNPOutGlue]>;
 def DCPU16brcc    : SDNode<"DCPU16ISD::BR_CC", SDT_DCPU16BrCC,
-                            [SDNPHasChain, SDNPInGlue]>;
-def DCPU16selectcc: SDNode<"DCPU16ISD::SELECT_CC", SDT_DCPU16SelectCC,
-                            [SDNPInGlue]>;
+                            [SDNPHasChain]>;
+def DCPU16selectcc: SDNode<"DCPU16ISD::SELECT_CC", SDT_DCPU16SelectCC, []>;
 def DCPU16shl     : SDNode<"DCPU16ISD::SHL", SDT_DCPU16Shift, []>;
 def DCPU16sra     : SDNode<"DCPU16ISD::SRA", SDT_DCPU16Shift, []>;
 def DCPU16srl     : SDNode<"DCPU16ISD::SRL", SDT_DCPU16Shift, []>;
@@ -117,10 +119,6 @@ def ADJCALLSTACKUP   : Pseudo<(outs), (ins i16imm:$amt1, i16imm:$amt2),
 }
 
 let usesCustomInserter = 1 in {
-  def Select16 : Pseudo<(outs GR16:$dst), (ins GR16:$src, GR16:$src2, i16imm:$cc),
-                        "# Select16 PSEUDO",
-                        [(set GR16:$dst,
-                          (DCPU16selectcc GR16:$src, GR16:$src2, imm:$cc))]>;
   let Defs = [RO] in {
   def Shl16    : Pseudo<(outs GR16:$dst), (ins GR16:$src, GR16:$cnt),
                         "# Shl16 PSEUDO",
@@ -132,6 +130,54 @@ let usesCustomInserter = 1 in {
                         "# Srl16 PSEUDO",
                         [(set GR16:$dst, (DCPU16srl GR16:$src, GR16:$cnt))]>;
   }
+}
+
+// $dst _can_ be $falseV
+let Constraints = "@earlyclobber $dst" in {
+  // TODO: add more combinations, in particular memory access
+  def Select16rrrr : Pseudo<(outs GR16:$dst),
+                  (ins cc:$cc, GR16:$lhs, GR16:$rhs, GR16:$trueV, GR16:$falseV),
+                  "SET\t{$dst, $falseV}\n"
+                  "\t$cc\t{$lhs, $rhs}\n"
+                  "\tSET\t{$dst, $trueV}",
+                  [(set GR16:$dst,
+                    (DCPU16selectcc imm:$cc, GR16:$lhs, GR16:$rhs, GR16:$trueV, GR16:$falseV))]>;
+  def Select16rirr : Pseudo<(outs GR16:$dst),
+                  (ins cc:$cc, GR16:$lhs, i16imm:$rhs, GR16:$trueV, GR16:$falseV),
+                  "SET\t{$dst, $falseV}\n"
+                  "\t$cc\t{$lhs, $rhs}\n"
+                  "\tSET\t{$dst, $trueV}",
+                  [(set GR16:$dst,
+                    (DCPU16selectcc imm:$cc, GR16:$lhs, imm:$rhs, GR16:$trueV, GR16:$falseV))]>;
+  def Select16irrr : Pseudo<(outs GR16:$dst),
+                  (ins cc:$cc, i16imm:$lhs, GR16:$rhs, GR16:$trueV, GR16:$falseV),
+                  "SET\t{$dst, $falseV}\n"
+                  "\t$cc\t{$lhs, $rhs}\n"
+                  "\tSET\t{$dst, $trueV}",
+                  [(set GR16:$dst,
+                    (DCPU16selectcc imm:$cc, imm:$lhs, GR16:$rhs, GR16:$trueV, GR16:$falseV))]>;
+
+  def Select16rrii : Pseudo<(outs GR16:$dst),
+                  (ins cc:$cc, GR16:$lhs, GR16:$rhs, i16imm:$trueV, i16imm:$falseV),
+                  "SET\t{$dst, $falseV}\n"
+                  "\t$cc\t{$lhs, $rhs}\n"
+                  "\tSET\t{$dst, $trueV}",
+                  [(set GR16:$dst,
+                    (DCPU16selectcc imm:$cc, GR16:$lhs, GR16:$rhs, imm:$trueV, imm:$falseV))]>;
+  def Select16riii : Pseudo<(outs GR16:$dst),
+                  (ins cc:$cc, GR16:$lhs, i16imm:$rhs, i16imm:$trueV, i16imm:$falseV),
+                  "SET\t{$dst, $falseV}\n"
+                  "\t$cc\t{$lhs, $rhs}\n"
+                  "\tSET\t{$dst, $trueV}",
+                  [(set GR16:$dst,
+                    (DCPU16selectcc imm:$cc, GR16:$lhs, imm:$rhs, imm:$trueV, imm:$falseV))]>;
+  def Select16irii : Pseudo<(outs GR16:$dst),
+                  (ins cc:$cc, i16imm:$lhs, GR16:$rhs, i16imm:$trueV, i16imm:$falseV),
+                  "SET\t{$dst, $falseV}\n"
+                  "\t$cc\t{$lhs, $rhs}\n"
+                  "\tSET\t{$dst, $trueV}",
+                  [(set GR16:$dst,
+                    (DCPU16selectcc imm:$cc, imm:$lhs, GR16:$rhs, imm:$trueV, imm:$falseV))]>;
 }
 
 let neverHasSideEffects = 1 in
@@ -172,11 +218,12 @@ let isBarrier = 1 in {
 }
 
 // Conditional branches
-let Uses = [RO] in
-  def JCC : CJForm<0, 0,
-                   (outs), (ins jmptarget:$dst, cc:$cc),
-                   "$cc $dst ; The Notch order",
-                   [(DCPU16brcc bb:$dst, imm:$cc)]>;
+// TODO: add immediate and memory versions
+def BR_CC : CJForm<0, 0,
+   (outs), (ins cc:$cc, GR16:$lhs, GR16:$rhs, jmptarget:$dst),
+   "$cc\t{$lhs, $rhs} ; The Notch order\n"
+   "\tSET\t{PC, $dst} ; The Notch order",
+   [(DCPU16brcc imm:$cc, GR16:$lhs, GR16:$rhs, bb:$dst)]>;
 } // isBranch, isTerminator
 
 //===----------------------------------------------------------------------===//
@@ -695,58 +742,6 @@ def SAR16r1c : Pseudo<(outs GR16:$dst), (ins GR16:$src),
 } // Defs = [RO]
 
 } // Constraints = "$src = $dst"
-
-// Integer comparisons
-let Defs = [RO] in {
-def CMP16rr : I16rr<0x0,
-                    (outs), (ins GR16:$src, GR16:$src2),
-                    "SET\tO, 65535 ; The Notch order\n"
-                    "\tIFE\t{$src, $src2} ; The Notch order\n"
-                    "\tSET\tO, 0 ; The Notch order\n"
-                    "\tIFG\t{$src, $src2} ; The Notch order\n"
-                    "\tSET\tO, 1 ; The Notch order",
-                    [(DCPU16cmp GR16:$src, GR16:$src2)]>;
-
-def CMP16ri : I16ri<0x0,
-                    (outs), (ins GR16:$src, i16imm:$src2),
-                    "SET\tO, 65535 ; The Notch order\n"
-                    "\tIFE\t{$src, $src2} ; The Notch order\n"
-                    "\tSET\tO, 0 ; The Notch order\n"
-                    "\tIFG\t{$src, $src2} ; The Notch order\n"
-                    "\tSET\tO, 1 ; The Notch order",
-                    [(DCPU16cmp GR16:$src, imm:$src2)]>;
-
-def CMP16mi : I16mi<0x0,
-                    (outs), (ins memsrc:$src, i16imm:$src2),
-                    "SET\tO, 65535 ; The Notch order\n"
-                    "\tIFE\t{$src, $src2} ; The Notch order\n"
-                    "\tSET\tO, 0 ; The Notch order\n"
-                    "\tIFG\t{$src, $src2} ; The Notch order\n"
-                    "\tSET\tO, 1 ; The Notch order",
-                     [(DCPU16cmp (load addr:$src),
-                                 (i16 imm:$src2)), (implicit RO)]>;
-
-def CMP16rm : I16rm<0x0,
-                    (outs), (ins GR16:$src, memsrc:$src2),
-                    "SET\tO, 65535 ; The Notch order\n"
-                    "\tIFE\t{$src, $src2} ; The Notch order\n"
-                    "\tSET\tO, 0 ; The Notch order\n"
-                    "\tIFG\t{$src, $src2} ; The Notch order\n"
-                    "\tSET\tO, 1 ; The Notch order",
-                    [(DCPU16cmp GR16:$src, (load addr:$src2)),
-                     (implicit RO)]>;
-
-def CMP16mr : I16mr<0x0,
-                    (outs), (ins memsrc:$src, GR16:$src2),
-                    "SET\tO, 65535 ; The Notch order\n"
-                    "\tIFE\t{$src, $src2} ; The Notch order\n"
-                    "\tSET\tO, 0 ; The Notch order\n"
-                    "\tIFG\t{$src, $src2} ; The Notch order\n"
-                    "\tSET\tO, 1 ; The Notch order",
-                    [(DCPU16cmp (load addr:$src), GR16:$src2),
-                     (implicit RO)]>;
-
-} // Defs = [RO]
 
 //===----------------------------------------------------------------------===//
 // Non-Instruction Patterns

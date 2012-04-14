@@ -51,7 +51,6 @@ public:
   }
 
   virtual bool addInstSelector();
-  virtual bool addPreEmitPass();
 };
 } // namespace
 
@@ -62,11 +61,5 @@ TargetPassConfig *DCPU16TargetMachine::createPassConfig(PassManagerBase &PM) {
 bool DCPU16PassConfig::addInstSelector() {
   // Install an instruction selector.
   PM.add(createDCPU16ISelDag(getDCPU16TargetMachine(), getOptLevel()));
-  return false;
-}
-
-bool DCPU16PassConfig::addPreEmitPass() {
-  // Must run branch selection immediately preceding the asm printer.
-  PM.add(createDCPU16BranchSelectionPass());
   return false;
 }
