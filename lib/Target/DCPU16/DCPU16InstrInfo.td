@@ -169,7 +169,7 @@ def NOP : Pseudo<(outs), (ins), "nop", []>;
 // FIXME: Provide proper encoding!
 let isReturn = 1, isTerminator = 1, isBarrier = 1 in {
   def RET  : IForm16<0x0, DstReg, SrcPostInc, Size2Bytes,
-                     (outs), (ins), "SET PC, POP ; The Notch order",  [(DCPU16retflag)]>;
+                     (outs), (ins), "SET PC, POP",  [(DCPU16retflag)]>;
 }
 
 let isBranch = 1, isTerminator = 1 in {
@@ -180,7 +180,7 @@ let isBranch = 1, isTerminator = 1 in {
 let isBarrier = 1 in {
   // Short branch
   def JMP : CJForm<0, 0, (outs), (ins jmptarget:$dst),
-                   "SET\t{PC, $dst} ; The Notch order",
+                   "SET\t{PC, $dst}",
                    [(br bb:$dst)]>;
   let isIndirectBranch = 1 in {
     // Long branches
@@ -188,10 +188,10 @@ let isBarrier = 1 in {
                     "br\t$brdst",
                     [(brind tblockaddress:$brdst)]>;
     def Br  : I16rr<0, (outs), (ins GR16:$brdst),
-                    "SET\t{pc, $brdst} ; The Notch order",
+                    "SET\t{pc, $brdst}",
                     [(brind GR16:$brdst)]>;
     def Bm  : I16rm<0, (outs), (ins memsrc:$brdst),
-                    "SET\t{pc, $brdst} ; The Notch order",
+                    "SET\t{pc, $brdst}",
                     [(brind (load addr:$brdst))]>;
   }
 }
@@ -200,8 +200,8 @@ let isBarrier = 1 in {
 // TODO: add immediate and memory versions
 def BR_CC : CJForm<0, 0,
    (outs), (ins cc:$cc, GR16:$lhs, GR16:$rhs, jmptarget:$dst),
-   "$cc\t{$lhs, $rhs} ; The Notch order\n"
-   "\tSET\t{PC, $dst} ; The Notch order",
+   "$cc\t{$lhs, $rhs}\n"
+   "\tSET\t{PC, $dst}",
    [(DCPU16brcc imm:$cc, GR16:$lhs, GR16:$rhs, bb:$dst)]>;
 } // isBranch, isTerminator
 
@@ -217,13 +217,13 @@ let isCall = 1 in
       Uses = [RI] in {
     def CALLi     : II16i<0x0,
                           (outs), (ins i16imm:$dst, variable_ops),
-                          "JSR\t$dst ; The Notch order", [(DCPU16call imm:$dst)]>;
+                          "JSR\t$dst", [(DCPU16call imm:$dst)]>;
     def CALLr     : II16r<0x0,
                           (outs), (ins GR16:$dst, variable_ops),
-                          "JSR\t$dst ; The Notch order", [(DCPU16call GR16:$dst)]>;
+                          "JSR\t$dst", [(DCPU16call GR16:$dst)]>;
     def CALLm     : II16m<0x0,
                           (outs), (ins memsrc:$dst, variable_ops),
-                          "JSR\t${dst:mem} ; The Notch order", [(DCPU16call (load addr:$dst))]>;
+                          "JSR\t${dst:mem}", [(DCPU16call (load addr:$dst))]>;
   }
 
 
@@ -247,7 +247,7 @@ def PUSH16r  : II16r<0x0,
 let neverHasSideEffects = 1 in {
 def MOV16rr : I16rr<0x0,
                     (outs GR16:$dst), (ins GR16:$src),
-                    "SET\t{$dst, $src} ; The Notch order",
+                    "SET\t{$dst, $src}",
                     []>;
 }
 
@@ -255,43 +255,43 @@ def MOV16rr : I16rr<0x0,
 let isReMaterializable = 1, isAsCheapAsAMove = 1 in {
 def MOV16ri : I16ri<0x0,
                     (outs GR16:$dst), (ins i16imm:$src),
-                    "SET\t{$dst, $src} ; The Notch order",
+                    "SET\t{$dst, $src}",
                     [(set GR16:$dst, imm:$src)]>;
 }
 
 let canFoldAsLoad = 1, isReMaterializable = 1 in {
 def MOV16rm : I16rm<0x0,
                     (outs GR16:$dst), (ins memsrc:$src),
-                    "SET\t{$dst, $src} ; The Notch order",
+                    "SET\t{$dst, $src}",
                     [(set GR16:$dst, (load addr:$src))]>;
 }
 
 let canFoldAsLoad = 1, isReMaterializable = 1 in {
 def MOV16rmi8 : I16rm<0x0,
                     (outs GR16:$dst), (ins memsrc:$src),
-                    "SET\t{$dst, $src} ; The Notch order",
+                    "SET\t{$dst, $src}",
                     [(set GR16:$dst, (zextloadi8 addr:$src))]>;
 }
 
 let mayLoad = 1, hasExtraDefRegAllocReq = 1, Constraints = "$base = $base_wb" in {
 def MOV16rm_POST : IForm16<0x0, DstReg, SrcPostInc, Size2Bytes,
                            (outs GR16:$dst, GR16:$base_wb), (ins GR16:$base),
-                           "SET\t{$dst, @$base+} ; The Notch order", []>;
+                           "SET\t{$dst, @$base+}", []>;
 }
 
 def MOV16mi : I16mi<0x0,
                     (outs), (ins memdst:$dst, i16imm:$src),
-                    "SET\t{$dst, $src} ; The Notch order",
+                    "SET\t{$dst, $src}",
                     [(store (i16 imm:$src), addr:$dst)]>;
 
 def MOV16mr : I16mr<0x0,
                     (outs), (ins memdst:$dst, GR16:$src),
-                    "SET\t{$dst, $src} ; The Notch order",
+                    "SET\t{$dst, $src}",
                     [(store GR16:$src, addr:$dst)]>;
 
 def MOV16mm : I16mm<0x0,
                     (outs), (ins memdst:$dst, memsrc:$src),
-                    "SET\t{$dst, $src} ; The Notch order",
+                    "SET\t{$dst, $src}",
                     [(store (i16 (load addr:$src)), addr:$dst)]>;
 
 //===----------------------------------------------------------------------===//
