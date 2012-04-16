@@ -4,12 +4,12 @@ target triple = "dcpu16"
 
 define i16 @f1(i16 %x, i16 %y) nounwind {
 entry:
-  %x.addr = alloca i16, align 2
-  %y.addr = alloca i16, align 2
-  store i16 %x, i16* %x.addr, align 2
-  store i16 %y, i16* %y.addr, align 2
-  %0 = load i16* %x.addr, align 2
-  %1 = load i16* %y.addr, align 2
+  %x.addr = alloca i16, align 1
+  %y.addr = alloca i16, align 1
+  store i16 %x, i16* %x.addr, align 1
+  store i16 %y, i16* %y.addr, align 1
+  %0 = load i16* %x.addr, align 1
+  %1 = load i16* %y.addr, align 1
   %and = and i16 %0, %1
   ret i16 %and
 }
@@ -18,14 +18,14 @@ entry:
 ; CHECK: SET [I], B
 ; CHECK: AND B, [0x1+I]
 ; CHECK: SET A, B
-; CHECK: ADD I, 0x4
+; CHECK: ADD I, 0x2
 
 
 define i16 @f2(i16 %x) nounwind {
 entry:
-  %x.addr = alloca i16, align 2
-  store i16 %x, i16* %x.addr, align 2
-  %0 = load i16* %x.addr, align 2
+  %x.addr = alloca i16, align 1
+  store i16 %x, i16* %x.addr, align 1
+  %0 = load i16* %x.addr, align 1
   %and = and i16 %0, 16
   ret i16 %and
 }
