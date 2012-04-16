@@ -273,12 +273,6 @@ def MOV16rmi8 : I16rm<0x0,
                     [(set GR16:$dst, (zextloadi8 addr:$src))]>;
 }
 
-let mayLoad = 1, hasExtraDefRegAllocReq = 1, Constraints = "$base = $base_wb" in {
-def MOV16rm_POST : IForm16<0x0, DstReg, SrcPostInc, Size2Bytes,
-                           (outs GR16:$dst, GR16:$base_wb), (ins GR16:$base),
-                           "SET\t{$dst, @$base+}", []>;
-}
-
 def MOV16mi : I16mi<0x0,
                     (outs), (ins memdst:$dst, i16imm:$src),
                     "SET\t{$dst, $src}",
@@ -359,34 +353,22 @@ multiclass BASIC_NORMAL<bits<4> OpVal, string OpcStr, SDNode OpNode> {
   }  
 }
 
-multiclass BASIC_RM_POST<bits<4> OpVal, string OpcStr> {
-  let mayLoad = 1, hasExtraDefRegAllocReq = 1, 
-    Constraints = "$base = $base_wb, $src = $dst" in {
-  
-  def rm_POST: IForm16<OpVal, DstReg, SrcPostInc, Size2Bytes,
-                           (outs GR16:$dst, GR16:$base_wb),
-                           (ins GR16:$src, GR16:$base),
-                           OpcStr#"\t{$dst, @$base+}", []>;
-
-  }
-}
-
 //===----------------------------------------------------------------------===//
 // Arithmetic Instructions
 
 let Defs = [RO] in {
-  defm ADD16   : BASIC_RR_IS_COM <0x0,"ADD", add>,  BASIC_NORMAL<0x0, "ADD", add>, BASIC_RM_POST<0x0, "ADD">;
-  defm AND16   : BASIC_RR_IS_COM <0x0,"AND", and>,  BASIC_NORMAL<0x0, "AND", and>, BASIC_RM_POST<0x0, "AND">;
-  defm OR16    : BASIC_RR_IS_COM <0x0,"BOR", or>,   BASIC_NORMAL<0x0, "BOR", or>,  BASIC_RM_POST<0x0, "BOR">;
-  defm XOR16   : BASIC_RR_IS_COM <0x0,"XOR", xor>,  BASIC_NORMAL<0x0, "XOR", xor>, BASIC_RM_POST<0x0, "XOR">;
-  defm SUB16   : BASIC_RR_NON_COM<0x0,"SUB", sub>,  BASIC_NORMAL<0x0, "SUB", sub>, BASIC_RM_POST<0x0, "SUB">;
-  defm MUL16   : BASIC_RR_NON_COM<0x0,"MUL", mul>,  BASIC_NORMAL<0x0, "MUL", mul>, BASIC_RM_POST<0x0, "MUL">;
-  defm SRL16   : BASIC_RR_NON_COM<0x0,"SHR", srl>,  BASIC_NORMAL<0x0, "SHR", srl>, BASIC_RM_POST<0x0, "SHR">;
+  defm ADD16   : BASIC_RR_IS_COM <0x0,"ADD", add>,  BASIC_NORMAL<0x0, "ADD", add>;
+  defm AND16   : BASIC_RR_IS_COM <0x0,"AND", and>,  BASIC_NORMAL<0x0, "AND", and>;
+  defm OR16    : BASIC_RR_IS_COM <0x0,"BOR", or>,   BASIC_NORMAL<0x0, "BOR", or>;
+  defm XOR16   : BASIC_RR_IS_COM <0x0,"XOR", xor>,  BASIC_NORMAL<0x0, "XOR", xor>;
+  defm SUB16   : BASIC_RR_NON_COM<0x0,"SUB", sub>,  BASIC_NORMAL<0x0, "SUB", sub>;
+  defm MUL16   : BASIC_RR_IS_COM <0x0,"MUL", mul>,  BASIC_NORMAL<0x0, "MUL", mul>;
+  defm SRL16   : BASIC_RR_NON_COM<0x0,"SHR", srl>,  BASIC_NORMAL<0x0, "SHR", srl>;
 
-  // FIXME: replace this instruction with the correct arrithmetic shift once
+  // FIXME: replace this instruction with the correct arithmetic shift once
   // Notch updates the spec
-  defm SRA16   : BASIC_RR_NON_COM<0x0, "SHR", sra>, BASIC_NORMAL<0x0, "SHR", sra>, BASIC_RM_POST<0x0, "SHR">;
-  defm SHL16   : BASIC_RR_NON_COM<0x0, "SHL", shl>, BASIC_NORMAL<0x0, "SHL", shl>, BASIC_RM_POST<0x0, "SHL">;
+  defm SRA16   : BASIC_RR_NON_COM<0x0, "SHR", sra>, BASIC_NORMAL<0x0, "SHR", sra>;
+  defm SHL16   : BASIC_RR_NON_COM<0x0, "SHL", shl>, BASIC_NORMAL<0x0, "SHL", shl>;
 
   let Uses = [RO] in {
     defm ADC16   : BASIC_RR_IS_COM <0x0, "addc.w", adde>, BASIC_NORMAL<0x0, "addc.w", adde>;

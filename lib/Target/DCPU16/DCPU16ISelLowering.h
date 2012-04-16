@@ -131,12 +131,6 @@ namespace llvm {
                   const SmallVectorImpl<SDValue> &OutVals,
                   DebugLoc dl, SelectionDAG &DAG) const;
 
-    virtual bool getPostIndexedAddressParts(SDNode *N, SDNode *Op,
-                                            SDValue &Base,
-                                            SDValue &Offset,
-                                            ISD::MemIndexedMode &AM,
-                                            SelectionDAG &DAG) const;
-
     const DCPU16Subtarget &Subtarget;
     const DCPU16TargetMachine &TM;
     const TargetData *TD;
