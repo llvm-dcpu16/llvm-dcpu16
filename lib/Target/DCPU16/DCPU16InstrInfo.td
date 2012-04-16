@@ -391,17 +391,6 @@ def SBC16mm : I16mm<0x0,
 
 } // Uses = [RO]
 
-def SHL16rr : I16rr<0x0,
-                    (outs GR16:$dst), (ins GR16:$src, GR16:$src2),
-                    "SHL\t{$src, $src2}",
-                    [(set GR16:$dst, (shl GR16:$src, GR16:$src2)),
-                     (implicit RO)]>;
-def SHL16ri : I16ri<0x0,
-                    (outs GR16:$dst), (ins GR16:$src, i16imm:$src2),
-                    "SHL\t{$src, $src2}",
-                    [(set GR16:$dst, (shl GR16:$src, imm:$src2)),
-                     (implicit RO)]>;
-
 } // Defs = [RO]
 
 } // Constraints = "$src = $dst"
@@ -498,6 +487,7 @@ let Defs = [RO] in {
   // FIXME: replace this instruction with the correct arrithmetic shift once
   // Notch updates the spec
   defm SRA16   : BASIC_RR_NON_COM<0x0, "SHR", sra>, BASIC_NORMAL<0x0, "SHR", sra>, BASIC_RM_POST<0x0, "SHR">;
+  defm SHL16   : BASIC_RR_NON_COM<0x0, "SHL", shl>, BASIC_NORMAL<0x0, "SHL", shl>, BASIC_RM_POST<0x0, "SHL">;
 
 } // Defs = [RO]
 
