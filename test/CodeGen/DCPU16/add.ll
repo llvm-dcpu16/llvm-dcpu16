@@ -14,4 +14,4 @@ entry:
   ret i16 %add
 }
 ; CHECK: :sum2
-; CHECK: {{ ADD ., \[0x[0-9a-f]\+.\] }}
+; CHECK: {{ADD ., \[0x[0-9a-f]\+.\]}}
