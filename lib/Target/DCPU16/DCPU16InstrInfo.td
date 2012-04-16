@@ -301,61 +301,6 @@ let Constraints = "$src = $dst" in {
 
 let Defs = [RO] in {
 
-let isCommutable = 1 in { // X = ADD Y, Z  == X = ADD Z, Y
-def ADD16rr : I16rr<0x0,
-                    (outs GR16:$dst), (ins GR16:$src, GR16:$src2),
-                    "ADD\t{$dst, $src2} ; The Notch order",
-                    [(set GR16:$dst, (add GR16:$src, GR16:$src2)),
-                     (implicit RO)]>;
-}
-
-def ADD16rm : I16rm<0x0,
-                    (outs GR16:$dst), (ins GR16:$src, memsrc:$src2),
-                    "ADD\t{$dst, $src2} ; The Notch order",
-                    [(set GR16:$dst, (add GR16:$src, (load addr:$src2))),
-                     (implicit RO)]>;
-
-def ADD16rmi8 : I16rm<0x0,
-                    (outs GR16:$dst), (ins GR16:$src, memsrc:$src2),
-                    "ADD\t{$dst, $src2} ; The Notch order",
-                    [(set GR16:$dst, (add GR16:$src, (zextloadi8 addr:$src2))),
-                     (implicit RO)]>;
-
-let mayLoad = 1, hasExtraDefRegAllocReq = 1,
-Constraints = "$base = $base_wb, $src = $dst" in {
-def ADD16rm_POST : IForm16<0x0, DstReg, SrcPostInc, Size2Bytes,
-                           (outs GR16:$dst, GR16:$base_wb),
-                           (ins GR16:$src, GR16:$base),
-                          "ADD\t{$dst, @$base+} ; The Notch order", []>;
-}
-
-
-def ADD16ri : I16ri<0x0,
-                    (outs GR16:$dst), (ins GR16:$src, i16imm:$src2),
-                    "ADD\t{$dst, $src2} ; The Notch order",
-                    [(set GR16:$dst, (add GR16:$src, imm:$src2)),
-                     (implicit RO)]>;
-
-let Constraints = "" in {
-def ADD16mr : I16mr<0x0,
-                    (outs), (ins memdst:$dst, GR16:$src),
-                    "ADD\t{$dst, $src} ; The Notch order",
-                    [(store (add (load addr:$dst), GR16:$src), addr:$dst),
-                     (implicit RO)]>;
-
-def ADD16mi : I16mi<0x0,
-                    (outs), (ins memdst:$dst, i16imm:$src),
-                    "ADD\t{$dst, $src} ; The Notch order",
-                    [(store (add (load addr:$dst), (i16 imm:$src)), addr:$dst),
-                     (implicit RO)]>;
-
-def ADD16mm : I16mm<0x0,
-                    (outs), (ins memdst:$dst, memsrc:$src),
-                    "ADD\t{$dst, $src} ; The Notch order",
-                    [(store (add (load addr:$dst),
-                                  (i16 (load addr:$src))), addr:$dst),
-                     (implicit RO)]>;
-}
 
 let Uses = [RO] in {
 
@@ -738,6 +683,82 @@ def SHL16ri : I16ri<0x0,
 } // Defs = [RO]
 
 } // Constraints = "$src = $dst"
+
+//===----------------------------------------------------------------------===//
+// Multiclasses for instructions
+
+multiclass BASIC_RR_IS_COM<bits<4> OpVal, string OpcStr, SDNode OpNode> {
+  let Constraints = "$src = $dst", isCommutable = 1 in {
+  def rr: I16rr<OpVal,
+                    (outs GR16:$dst), (ins GR16:$src, GR16:$src2),
+                    OpcStr#"\t{$dst, $src2}",
+                    [(set GR16:$dst, (OpNode GR16:$src, GR16:$src2)),
+                     (implicit RO)]>;
+  }
+}
+
+multiclass BASIC_NORMAL<bits<4> OpVal, string OpcStr, SDNode OpNode> {
+  let Constraints = "$src = $dst" in {
+  def rm: I16rm<OpVal,
+                    (outs GR16:$dst), (ins GR16:$src, memsrc:$src2),
+                    OpcStr#"\t{$dst, $src2}",
+                    [(set GR16:$dst, (OpNode GR16:$src, (load addr:$src2))),
+                     (implicit RO)]>;
+  def ri: I16ri<OpVal,
+                    (outs GR16:$dst), (ins GR16:$src, i16imm:$src2),
+                    OpcStr#"\t{$dst, $src2}",
+                    [(set GR16:$dst, (OpNode GR16:$src, imm:$src2)),
+                     (implicit RO)]>;
+  }
+  let Constraints = "" in {
+  def mr: I16mr<OpVal,
+                    (outs), (ins memdst:$dst, GR16:$src),
+                    OpcStr#"\t{$dst, $src}",
+                    [(store (OpNode (load addr:$dst), GR16:$src), addr:$dst),
+                     (implicit RO)]>;
+  def mi: I16mi<OpVal,
+                    (outs), (ins memdst:$dst, i16imm:$src),
+                    OpcStr#"\t{$dst, $src}",
+                    [(store (OpNode (load addr:$dst), (i16 imm:$src)), addr:$dst),
+                     (implicit RO)]>;
+  def mm: I16mm<OpVal,
+                    (outs), (ins memdst:$dst, memsrc:$src),
+                    OpcStr#"\t{$dst, $src}",
+                    [(store (OpNode (load addr:$dst),
+                                  (i16 (load addr:$src))), addr:$dst),
+                     (implicit RO)]>;
+  }
+  
+  // FIXME! Wrong zero extend
+  let Constraints = "$src = $dst", canFoldAsLoad = 1, isReMaterializable = 1 in {
+  def rmi8 : I16rm<OpVal,
+                    (outs GR16:$dst), (ins GR16:$src, memsrc:$src2),
+					OpcStr#"\t{$dst, $src}",
+                    [(set GR16:$dst, (OpNode GR16:$src, (zextloadi8 addr:$src2))),
+                     (implicit RO)]>;
+  }  
+}
+
+multiclass BASIC_RM_POST<bits<4> OpVal, string OpcStr> {
+  let mayLoad = 1, hasExtraDefRegAllocReq = 1, 
+    Constraints = "$base = $base_wb, $src = $dst" in {
+  
+  def rm_POST: IForm16<OpVal, DstReg, SrcPostInc, Size2Bytes,
+                           (outs GR16:$dst, GR16:$base_wb),
+                           (ins GR16:$src, GR16:$base),
+                           OpcStr#"\t{$dst, @$base+}", []>;
+
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Instructions
+
+let Defs = [RO] in {
+  defm ADD16   : BASIC_RR_IS_COM <0x0,"ADD", add>,  BASIC_NORMAL<0x0, "ADD", add>, BASIC_RM_POST<0x0, "ADD">;
+
+} // Defs = [RO]
+
 
 //===----------------------------------------------------------------------===//
 // Non-Instruction Patterns
