@@ -391,19 +391,6 @@ def SBC16mm : I16mm<0x0,
 
 } // Uses = [RO]
 
-// FIXME: replace this instruction with the correct arrithmetic shift once
-// Notch updates the spec
-def SRA16rr : I16rr<0x0,
-                    (outs GR16:$dst), (ins GR16:$src, GR16:$src2),
-                    "SHR\t{$src, $src2}",
-                    [(set GR16:$dst, (sra GR16:$src, GR16:$src2)),
-                     (implicit RO)]>;
-def SRA16ri : I16ri<0x0,
-                    (outs GR16:$dst), (ins GR16:$src, i16imm:$src2),
-                    "SHR\t{$src, $src2}",
-                    [(set GR16:$dst, (sra GR16:$src, imm:$src2)),
-                     (implicit RO)]>;
-
 def SHL16rr : I16rr<0x0,
                     (outs GR16:$dst), (ins GR16:$src, GR16:$src2),
                     "SHL\t{$src, $src2}",
@@ -507,6 +494,10 @@ let Defs = [RO] in {
   defm SUB16   : BASIC_RR_NON_COM<0x0,"SUB", sub>,  BASIC_NORMAL<0x0, "SUB", sub>, BASIC_RM_POST<0x0, "SUB">;
   defm MUL16   : BASIC_RR_NON_COM<0x0,"MUL", mul>,  BASIC_NORMAL<0x0, "MUL", mul>, BASIC_RM_POST<0x0, "MUL">;
   defm SRL16   : BASIC_RR_NON_COM<0x0,"SHR", srl>,  BASIC_NORMAL<0x0, "SHR", srl>, BASIC_RM_POST<0x0, "SHR">;
+
+  // FIXME: replace this instruction with the correct arrithmetic shift once
+  // Notch updates the spec
+  defm SRA16   : BASIC_RR_NON_COM<0x0, "SHR", sra>, BASIC_NORMAL<0x0, "SHR", sra>, BASIC_RM_POST<0x0, "SHR">;
 
 } // Defs = [RO]
 
