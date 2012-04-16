@@ -295,61 +295,7 @@ def MOV16mm : I16mm<0x0,
                     [(store (i16 (load addr:$src)), addr:$dst)]>;
 
 //===----------------------------------------------------------------------===//
-// Arithmetic Instructions
-
-let Constraints = "$src = $dst" in {
-
-let Defs = [RO] in {
-
-let Uses = [RO] in {
-def SBC16rr : I16rr<0x0,
-                    (outs GR16:$dst), (ins GR16:$src, GR16:$src2),
-                    "subc.w\t{$src2, $dst}",
-                    [(set GR16:$dst, (sube GR16:$src, GR16:$src2)),
-                     (implicit RO)]>;
-
-def SBC16ri : I16ri<0x0,
-                    (outs GR16:$dst), (ins GR16:$src, i16imm:$src2),
-                    "subc.w\t{$src2, $dst}",
-                    [(set GR16:$dst, (sube GR16:$src, imm:$src2)),
-                     (implicit RO)]>;
-
-def SBC16rm : I16rm<0x0,
-                    (outs GR16:$dst), (ins GR16:$src, memsrc:$src2),
-                    "subc.w\t{$src2, $dst}",
-                    [(set GR16:$dst, (sube GR16:$src, (load addr:$src2))),
-                     (implicit RO)]>;
-
-let Constraints = "" in {
-
-def SBC16mr : I16mr<0x0,
-                    (outs), (ins memdst:$dst, GR16:$src),
-                    "subc.w\t{$src, $dst}",
-                    [(store (sube (load addr:$dst), GR16:$src), addr:$dst),
-                     (implicit RO)]>;
-
-def SBC16mi : I16mi<0x0,
-                    (outs), (ins memdst:$dst, i16imm:$src),
-                    "subc.w\t{$src, $dst}",
-                    [(store (sube (load addr:$dst), (i16 imm:$src)), addr:$dst),
-                     (implicit RO)]>;
-
-def SBC16mm : I16mm<0x0,
-                    (outs), (ins memdst:$dst, memsrc:$src),
-                    "subc.w\t{$src, $dst}",
-                    [(store (sube (load addr:$dst),
-                            (i16 (load addr:$src))), addr:$dst),
-                     (implicit RO)]>;
-}
-
-} // Uses = [RO]
-
-} // Defs = [RO]
-
-} // Constraints = "$src = $dst"
-
-//===----------------------------------------------------------------------===//
-// Multiclasses for instructions
+// Multiclasses for arithmetic instructions
 
 multiclass BASIC_RR_IS_COM<bits<4> OpVal, string OpcStr, SDNode OpNode> {
   let Constraints = "$src = $dst", isCommutable = 1 in {
@@ -426,7 +372,7 @@ multiclass BASIC_RM_POST<bits<4> OpVal, string OpcStr> {
 }
 
 //===----------------------------------------------------------------------===//
-// Instructions
+// Arithmetic Instructions
 
 let Defs = [RO] in {
   defm ADD16   : BASIC_RR_IS_COM <0x0,"ADD", add>,  BASIC_NORMAL<0x0, "ADD", add>, BASIC_RM_POST<0x0, "ADD">;
@@ -444,6 +390,7 @@ let Defs = [RO] in {
 
   let Uses = [RO] in {
     defm ADC16   : BASIC_RR_IS_COM <0x0, "addc.w", adde>, BASIC_NORMAL<0x0, "addc.w", adde>;
+    defm SBC16   : BASIC_RR_NON_COM<0x0, "subc.w", sube>, BASIC_NORMAL<0x0, "subc.w", sube>;
   }
 
 } // Defs = [RO]
