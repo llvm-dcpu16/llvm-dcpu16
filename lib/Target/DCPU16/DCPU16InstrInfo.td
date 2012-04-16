@@ -301,53 +301,6 @@ let Constraints = "$src = $dst" in {
 
 let Defs = [RO] in {
 
-
-let Uses = [RO] in {
-
-let isCommutable = 1 in { // X = ADDC Y, Z  == X = ADDC Z, Y
-def ADC16rr : I16rr<0x0,
-                    (outs GR16:$dst), (ins GR16:$src, GR16:$src2),
-                    "addc.w\t{$src2, $dst}",
-                    [(set GR16:$dst, (adde GR16:$src, GR16:$src2)),
-                     (implicit RO)]>;
-} // isCommutable
-
-def ADC16ri : I16ri<0x0,
-                    (outs GR16:$dst), (ins GR16:$src, i16imm:$src2),
-                    "addc.w\t{$src2, $dst}",
-                    [(set GR16:$dst, (adde GR16:$src, imm:$src2)),
-                     (implicit RO)]>;
-
-def ADC16rm : I16rm<0x0,
-                    (outs GR16:$dst), (ins GR16:$src, memsrc:$src2),
-                    "addc.w\t{$src2, $dst}",
-                    [(set GR16:$dst, (adde GR16:$src, (load addr:$src2))),
-                     (implicit RO)]>;
-
-let Constraints = "" in {
-def ADC16mr : I16mr<0x0,
-                    (outs), (ins memdst:$dst, GR16:$src),
-                    "addc.w\t{$src, $dst}",
-                    [(store (adde (load addr:$dst), GR16:$src), addr:$dst),
-                     (implicit RO)]>;
-
-def ADC16mi : I16mi<0x0,
-                    (outs), (ins memdst:$dst, i16imm:$src),
-                    "addc.w\t{$src, $dst}",
-                    [(store (adde (load addr:$dst), (i16 imm:$src)), addr:$dst),
-                     (implicit RO)]>;
-
-def ADC16mm : I8mm<0x0,
-                   (outs), (ins memdst:$dst, memsrc:$src),
-                   "addc.w\t{$src, $dst}",
-                   [(store (adde (load addr:$dst),
-                                 (i16 (load addr:$src))), addr:$dst),
-                    (implicit RO)]>;
-}
-
-} // Uses = [RO]
-
-
 let Uses = [RO] in {
 def SBC16rr : I16rr<0x0,
                     (outs GR16:$dst), (ins GR16:$src, GR16:$src2),
@@ -488,6 +441,10 @@ let Defs = [RO] in {
   // Notch updates the spec
   defm SRA16   : BASIC_RR_NON_COM<0x0, "SHR", sra>, BASIC_NORMAL<0x0, "SHR", sra>, BASIC_RM_POST<0x0, "SHR">;
   defm SHL16   : BASIC_RR_NON_COM<0x0, "SHL", shl>, BASIC_NORMAL<0x0, "SHL", shl>, BASIC_RM_POST<0x0, "SHL">;
+
+  let Uses = [RO] in {
+    defm ADC16   : BASIC_RR_IS_COM <0x0, "addc.w", adde>, BASIC_NORMAL<0x0, "addc.w", adde>;
+  }
 
 } // Defs = [RO]
 
