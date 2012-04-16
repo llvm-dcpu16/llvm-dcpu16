@@ -34,7 +34,7 @@ define i16 @sccwne(i16 %a, i16 %b) nounwind {
 	ret i16 %t2
 }
 ; CHECK:sccwne
-; CHECK:        SET     C, A ; The Notch order
+; CHECK:        SET     C, A
 ; CHECK:        SET     A, 0x0
 ; CHECK:        IFN     C, B
 ; CHECK:        SET     A, 0x1
