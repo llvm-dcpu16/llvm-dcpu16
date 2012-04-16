@@ -357,13 +357,14 @@ multiclass BASIC_NORMAL<bits<4> OpVal, string OpcStr, SDNode OpNode> {
 // Arithmetic Instructions
 
 let Defs = [RO] in {
-  defm ADD16   : BASIC_RR_IS_COM <0x0,"ADD", add>,  BASIC_NORMAL<0x0, "ADD", add>;
-  defm AND16   : BASIC_RR_IS_COM <0x0,"AND", and>,  BASIC_NORMAL<0x0, "AND", and>;
-  defm OR16    : BASIC_RR_IS_COM <0x0,"BOR", or>,   BASIC_NORMAL<0x0, "BOR", or>;
-  defm XOR16   : BASIC_RR_IS_COM <0x0,"XOR", xor>,  BASIC_NORMAL<0x0, "XOR", xor>;
-  defm SUB16   : BASIC_RR_NON_COM<0x0,"SUB", sub>,  BASIC_NORMAL<0x0, "SUB", sub>;
-  defm MUL16   : BASIC_RR_IS_COM <0x0,"MUL", mul>,  BASIC_NORMAL<0x0, "MUL", mul>;
-  defm SRL16   : BASIC_RR_NON_COM<0x0,"SHR", srl>,  BASIC_NORMAL<0x0, "SHR", srl>;
+  defm ADD16   : BASIC_RR_IS_COM <0x0, "ADD", add>,  BASIC_NORMAL<0x0, "ADD", add>;
+  defm AND16   : BASIC_RR_IS_COM <0x0, "AND", and>,  BASIC_NORMAL<0x0, "AND", and>;
+  defm OR16    : BASIC_RR_IS_COM <0x0, "BOR", or>,   BASIC_NORMAL<0x0, "BOR", or>;
+  defm XOR16   : BASIC_RR_IS_COM <0x0, "XOR", xor>,  BASIC_NORMAL<0x0, "XOR", xor>;
+  defm SUB16   : BASIC_RR_NON_COM<0x0, "SUB", sub>,  BASIC_NORMAL<0x0, "SUB", sub>;
+  defm MUL16   : BASIC_RR_IS_COM <0x0, "MUL", mul>,  BASIC_NORMAL<0x0, "MUL", mul>;
+  defm DIV16   : BASIC_RR_NON_COM<0x0, "DIV", udiv>, BASIC_NORMAL<0x0, "DIV", udiv>;
+  defm SRL16   : BASIC_RR_NON_COM<0x0, "SHR", srl>,  BASIC_NORMAL<0x0, "SHR", srl>;
 
   // FIXME: replace this instruction with the correct arithmetic shift once
   // Notch updates the spec
