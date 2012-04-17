@@ -136,6 +136,7 @@ void TargetData::init() {
 
   LayoutMap = 0;
   LittleEndian = false;
+  WordAddressing = false;
   PointerMemSize = 8;
   PointerABIAlign = 8;
   PointerPrefAlign = PointerABIAlign;
@@ -176,6 +177,10 @@ std::string TargetData::parseSpecifier(StringRef Desc, TargetData *td) {
     assert(!Specifier.empty() && "Can't be empty here");
 
     switch (Specifier[0]) {
+    case 'W': {
+    	td->WordAddressing = true;
+    	break;
+    }
     case 'E':
       if (td)
         td->LittleEndian = false;
