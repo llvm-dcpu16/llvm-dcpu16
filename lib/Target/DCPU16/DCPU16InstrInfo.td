@@ -364,6 +364,7 @@ let Defs = [RO] in {
   defm SUB16   : BASIC_RR_NON_COM<0x0, "SUB", sub>,  BASIC_NORMAL<0x0, "SUB", sub>;
   defm MUL16   : BASIC_RR_IS_COM <0x0, "MUL", mul>,  BASIC_NORMAL<0x0, "MUL", mul>;
   defm DIV16   : BASIC_RR_NON_COM<0x0, "DIV", udiv>, BASIC_NORMAL<0x0, "DIV", udiv>;
+  defm MOD16   : BASIC_RR_NON_COM<0x0, "MOD", urem>, BASIC_NORMAL<0x0, "MOD", urem>;
   defm SRL16   : BASIC_RR_NON_COM<0x0, "SHR", srl>,  BASIC_NORMAL<0x0, "SHR", srl>;
 
   // FIXME: replace this instruction with the correct arithmetic shift once
