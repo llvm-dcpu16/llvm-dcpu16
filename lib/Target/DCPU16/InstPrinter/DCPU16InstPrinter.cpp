@@ -35,12 +35,8 @@ void DCPU16InstPrinter::printPCRelImmOperand(const MCInst *MI, unsigned OpNo,
                                              raw_ostream &O) {
   const MCOperand &Op = MI->getOperand(OpNo);
   if (Op.isImm())  {
-	  if (Op.getImm() % 2 == 0) {
-		  O << "0x";
-		  O.write_hex((Op.getImm() / 2) & 0xFFFF);
-	  } else {
-		  llvm_unreachable("immediate is not word sized");
-	  }
+	  O << "0x";
+	  O.write_hex((Op.getImm()) & 0xFFFF);
   } else {
     assert(Op.isExpr() && "unknown pcrel immediate operand");
     O << *Op.getExpr();
@@ -91,13 +87,9 @@ void DCPU16InstPrinter::printSrcMemOperand(const MCInst *MI, unsigned OpNo,
   } else if (Base.getReg()) {
 	  // Print register base field
 	  if(Disp.isImm() && Disp.getImm() != 0) {
-		  if (Disp.getImm() % 2 == 0) {
-			  O << "0x";
-			  O.write_hex((Disp.getImm()/2) & 0xFFFF);
-			  O << "+";
-		  } else {
-			  llvm_unreachable("immediate is not word sized");
-		  }
+		  O << "0x";
+		  O.write_hex((Disp.getImm()) & 0xFFFF);
+		  O << "+";
 	  }
     O << getRegisterName(Base.getReg());
   }
