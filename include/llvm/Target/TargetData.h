@@ -231,11 +231,10 @@ public:
   /// overwritten by storing the specified type.  For example, returns 5
   /// for i36 and 10 for x86_fp80.
   uint64_t getTypeStoreSize(Type *Ty) const {
-	  if (WordAddressing==true) {
-		  return (getTypeSizeInBits(Ty)+7)/16;
-	  } else {
+	  if (WordAddressing)
+		  return (getTypeSizeInBits(Ty)+15)/16;
+	  else
 		  return (getTypeSizeInBits(Ty)+7)/8;
-	  }
   }
 
   /// getTypeStoreSizeInBits - Return the maximum number of bits that may be
