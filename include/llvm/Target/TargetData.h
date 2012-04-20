@@ -78,7 +78,7 @@ private:
   unsigned      PointerABIAlign;       ///< Pointer ABI alignment
   unsigned      PointerPrefAlign;      ///< Pointer preferred alignment
   unsigned      StackNaturalAlign;     ///< Stack natural alignment
-  bool          WordAddressing;	 	   ///< We use word addressing
+  unsigned      BitsPerByte;           ///< Number of bits in an addressable byte
 
   SmallVector<unsigned char, 8> LegalIntWidths; ///< Legal Integers.
 
@@ -146,7 +146,7 @@ public:
     PointerMemSize(TD.PointerMemSize),
     PointerABIAlign(TD.PointerABIAlign),
     PointerPrefAlign(TD.PointerPrefAlign),
-    WordAddressing(TD.WordAddressing),
+    BitsPerByte(TD.BitsPerByte),
     LegalIntWidths(TD.LegalIntWidths),
     Alignments(TD.Alignments),
     LayoutMap(0)
@@ -201,10 +201,16 @@ public:
   unsigned getPointerABIAlignment() const { return PointerABIAlign; }
   /// Return target's alignment for stack-based pointers
   unsigned getPointerPrefAlignment() const { return PointerPrefAlign; }
+  /// Bits per byte of the target
+  unsigned getBitsPerByte() const { return BitsPerByte; }
   /// Target pointer size
   unsigned getPointerSize()         const { return PointerMemSize; }
   /// Target pointer size, in bits
-  unsigned getPointerSizeInBits()   const { return 8*PointerMemSize; }
+  unsigned getPointerSizeInBits()   const {
+    // XXX: this is a dirty hack. it should be multiplied by BitsPerByte,
+    // but that triggers assertions.
+    return 8*PointerMemSize;
+  }
 
   /// Size examples:
   ///
@@ -231,17 +237,14 @@ public:
   /// overwritten by storing the specified type.  For example, returns 5
   /// for i36 and 10 for x86_fp80.
   uint64_t getTypeStoreSize(Type *Ty) const {
-	  if (WordAddressing)
-		  return (getTypeSizeInBits(Ty)+15)/16;
-	  else
-		  return (getTypeSizeInBits(Ty)+7)/8;
+    return (getTypeSizeInBits(Ty) + BitsPerByte - 1) / BitsPerByte;
   }
 
   /// getTypeStoreSizeInBits - Return the maximum number of bits that may be
   /// overwritten by storing the specified type; always a multiple of 8.  For
   /// example, returns 40 for i36 and 80 for x86_fp80.
   uint64_t getTypeStoreSizeInBits(Type *Ty) const {
-    return 8*getTypeStoreSize(Ty);
+    return BitsPerByte * getTypeStoreSize(Ty);
   }
 
   /// getTypeAllocSize - Return the offset in bytes between successive objects
@@ -258,7 +261,7 @@ public:
   /// multiple of 8.  This is the amount that alloca reserves for this type.
   /// For example, returns 96 or 128 for x86_fp80, depending on alignment.
   uint64_t getTypeAllocSizeInBits(Type* Ty) const {
-    return 8*getTypeAllocSize(Ty);
+    return BitsPerByte * getTypeAllocSize(Ty);
   }
 
   /// getABITypeAlignment - Return the minimum ABI-required alignment for the
@@ -329,6 +332,7 @@ class StructLayout {
   uint64_t StructSize;
   unsigned StructAlignment;
   unsigned NumElements;
+  unsigned BitsPerByte;
   uint64_t MemberOffsets[1];  // variable sized array!
 public:
 
@@ -337,7 +341,7 @@ public:
   }
 
   uint64_t getSizeInBits() const {
-    return 8*StructSize;
+    return BitsPerByte * StructSize;
   }
 
   unsigned getAlignment() const {
@@ -355,7 +359,7 @@ public:
   }
 
   uint64_t getElementOffsetInBits(unsigned Idx) const {
-    return getElementOffset(Idx)*8;
+    return getElementOffset(Idx) * BitsPerByte;
   }
 
 private:

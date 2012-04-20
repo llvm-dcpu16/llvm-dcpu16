@@ -46,6 +46,7 @@ StructLayout::StructLayout(StructType *ST, const TargetData &TD) {
   StructAlignment = 0;
   StructSize = 0;
   NumElements = ST->getNumElements();
+  BitsPerByte = TD.getBitsPerByte();
 
   // Loop over each of the elements, placing them in memory.
   for (unsigned i = 0, e = NumElements; i != e; ++i) {
@@ -136,7 +137,7 @@ void TargetData::init() {
 
   LayoutMap = 0;
   LittleEndian = false;
-  WordAddressing = false;
+  BitsPerByte = 8;
   PointerMemSize = 8;
   PointerABIAlign = 8;
   PointerPrefAlign = PointerABIAlign;
@@ -177,9 +178,14 @@ std::string TargetData::parseSpecifier(StringRef Desc, TargetData *td) {
     assert(!Specifier.empty() && "Can't be empty here");
 
     switch (Specifier[0]) {
-    case 'W': {
-    	td->WordAddressing = true;
-    	break;
+    case 'B': {
+      Specifier = Specifier.substr(1);
+      int BitsPerByte = getInt(Specifier);
+      if (BitsPerByte < 0 || BitsPerByte % 8 != 0)
+        return "invalid number of bits per byte, must be a positive 8-bit multiple";
+      if (td)
+        td->BitsPerByte = BitsPerByte;
+      break;
     }
     case 'E':
       if (td)
