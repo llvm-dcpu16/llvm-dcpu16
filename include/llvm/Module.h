@@ -203,6 +203,7 @@ private:
   std::string ModuleID;           ///< Human readable identifier for the module
   std::string TargetTriple;       ///< Platform target triple Module compiled on
   std::string DataLayout;         ///< Target data description
+  unsigned BitsPerByte;           ///< Number of bits in an addressable byte
   void *NamedMDSymTab;            ///< NamedMDNode names.
 
   friend class Constant;
@@ -229,6 +230,9 @@ public:
   /// the type sizes and alignments expected by this module.
   /// @returns the data layout as a string
   const std::string &getDataLayout() const { return DataLayout; }
+
+  /// Get the number of bits per byte for the module's target platform.
+  const unsigned getBitsPerByte() const { return BitsPerByte; }
 
   /// Get the target triple which is a string describing the target host.
   /// @returns a string containing the target triple.
@@ -259,6 +263,9 @@ public:
 
   /// Set the data layout
   void setDataLayout(StringRef DL) { DataLayout = DL; }
+
+  /// Set the number of bits per byte
+  void setBitsPerByte(unsigned BPB) { BitsPerByte = BPB; }
 
   /// Set the target triple.
   void setTargetTriple(StringRef T) { TargetTriple = T; }

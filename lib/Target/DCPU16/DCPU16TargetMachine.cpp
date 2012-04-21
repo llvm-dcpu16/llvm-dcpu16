@@ -35,7 +35,7 @@ DCPU16TargetMachine::DCPU16TargetMachine(const Target &T,
   : LLVMTargetMachine(T, TT, CPU, FS, Options, RM, CM, OL),
     Subtarget(TT, CPU, FS),
     // FIXME: Check TargetData string.
-    DataLayout("e-p:16:8:8-i8:8:8-i16:8:8-i32:8:8-s0:8:8-n16-W"),
+    DataLayout("e-p:16:16:16-i8:16:16-i16:16:16-i32:16:16-s0:16:16-n16", 16),
     InstrInfo(*this), TLInfo(*this), TSInfo(*this),
     FrameLowering(Subtarget) { }
 

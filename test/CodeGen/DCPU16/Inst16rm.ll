@@ -1,5 +1,5 @@
 ; RUN: llc -march=dcpu16 < %s | FileCheck %s
-target datalayout = "e-p:16:8:8-i8:8:8-i16:8:8-i32:8:8-s0:8:8-n16"
+target datalayout = "e-p:16:16:16-i8:16:16-i16:16:16-i32:16:16-s0:16:16-n16"
 target triple = "dcpu16"
 @foo = common global i16 0, align 2
 

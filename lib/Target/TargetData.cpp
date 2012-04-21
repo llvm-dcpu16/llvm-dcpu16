@@ -46,6 +46,7 @@ StructLayout::StructLayout(StructType *ST, const TargetData &TD) {
   StructAlignment = 0;
   StructSize = 0;
   NumElements = ST->getNumElements();
+  BitsPerByte = TD.getBitsPerByte();
 
   // Loop over each of the elements, placing them in memory.
   for (unsigned i = 0, e = NumElements; i != e; ++i) {
@@ -136,7 +137,7 @@ void TargetData::init() {
 
   LayoutMap = 0;
   LittleEndian = false;
-  WordAddressing = false;
+  BitsPerByte = 8;
   PointerMemSize = 8;
   PointerABIAlign = 8;
   PointerPrefAlign = PointerABIAlign;
@@ -157,10 +158,16 @@ void TargetData::init() {
   setAlignment(AGGREGATE_ALIGN, 0,  8,  0);  // struct
 }
 
-std::string TargetData::parseSpecifier(StringRef Desc, TargetData *td) {
+std::string TargetData::parseSpecifier(StringRef Desc, TargetData *td, unsigned BitsPerByte) {
 
   if (td)
     td->init();
+
+  if (BitsPerByte == 0 || BitsPerByte % 8 != 0)
+    return "invalid number of bits per byte, must be a positive multiple of 8";
+
+  if (td)
+    td->BitsPerByte = BitsPerByte;
 
   while (!Desc.empty()) {
     std::pair<StringRef, StringRef> Split = Desc.split('-');
@@ -177,10 +184,6 @@ std::string TargetData::parseSpecifier(StringRef Desc, TargetData *td) {
     assert(!Specifier.empty() && "Can't be empty here");
 
     switch (Specifier[0]) {
-    case 'W': {
-    	td->WordAddressing = true;
-    	break;
-    }
     case 'E':
       if (td)
         td->LittleEndian = false;
@@ -193,30 +196,30 @@ std::string TargetData::parseSpecifier(StringRef Desc, TargetData *td) {
       // Pointer size.
       Split = Token.split(':');
       int PointerMemSizeBits = getInt(Split.first);
-      if (PointerMemSizeBits < 0 || PointerMemSizeBits % 8 != 0)
-        return "invalid pointer size, must be a positive 8-bit multiple";
+      if (PointerMemSizeBits < 0 || PointerMemSizeBits % BitsPerByte != 0)
+        return "invalid pointer size, must be a positive multiple of the byte width";
       if (td)
-        td->PointerMemSize = PointerMemSizeBits / 8;
+        td->PointerMemSize = PointerMemSizeBits / BitsPerByte;
 
       // Pointer ABI alignment.
       Split = Split.second.split(':');
       int PointerABIAlignBits = getInt(Split.first);
-      if (PointerABIAlignBits < 0 || PointerABIAlignBits % 8 != 0) {
+      if (PointerABIAlignBits < 0 || PointerABIAlignBits % BitsPerByte != 0) {
         return "invalid pointer ABI alignment, "
-               "must be a positive 8-bit multiple";
+               "must be a positive multiple of the byte width";
       }
       if (td)
-        td->PointerABIAlign = PointerABIAlignBits / 8;
+        td->PointerABIAlign = PointerABIAlignBits / BitsPerByte;
 
       // Pointer preferred alignment.
       Split = Split.second.split(':');
       int PointerPrefAlignBits = getInt(Split.first);
-      if (PointerPrefAlignBits < 0 || PointerPrefAlignBits % 8 != 0) {
+      if (PointerPrefAlignBits < 0 || PointerPrefAlignBits % BitsPerByte != 0) {
         return "invalid pointer preferred alignment, "
-               "must be a positive 8-bit multiple";
+               "must be a positive multiple of the byte width";
       }
       if (td) {
-        td->PointerPrefAlign = PointerPrefAlignBits / 8;
+        td->PointerPrefAlign = PointerPrefAlignBits / BitsPerByte;
         if (td->PointerPrefAlign == 0)
           td->PointerPrefAlign = td->PointerABIAlign;
       }
@@ -245,20 +248,20 @@ std::string TargetData::parseSpecifier(StringRef Desc, TargetData *td) {
 
       Split = Token.split(':');
       int ABIAlignBits = getInt(Split.first);
-      if (ABIAlignBits < 0 || ABIAlignBits % 8 != 0) {
+      if (ABIAlignBits < 0 || ABIAlignBits % BitsPerByte != 0) {
         return std::string("invalid ") + field +"-abi-alignment field, "
-               "must be a positive 8-bit multiple";
+               "must be a positive multiple of the byte width";
       }
-      unsigned ABIAlign = ABIAlignBits / 8;
+      unsigned ABIAlign = ABIAlignBits / BitsPerByte;
 
       Split = Split.second.split(':');
 
       int PrefAlignBits = getInt(Split.first);
-      if (PrefAlignBits < 0 || PrefAlignBits % 8 != 0) {
+      if (PrefAlignBits < 0 || PrefAlignBits % BitsPerByte != 0) {
         return std::string("invalid ") + field +"-preferred-alignment field, "
-               "must be a positive 8-bit multiple";
+               "must be a positive multiple of the byte width";
       }
-      unsigned PrefAlign = PrefAlignBits / 8;
+      unsigned PrefAlign = PrefAlignBits / BitsPerByte;
       if (PrefAlign == 0)
         PrefAlign = ABIAlign;
       
@@ -283,12 +286,12 @@ std::string TargetData::parseSpecifier(StringRef Desc, TargetData *td) {
       break;
     case 'S': { // Stack natural alignment.
       int StackNaturalAlignBits = getInt(Specifier.substr(1));
-      if (StackNaturalAlignBits < 0 || StackNaturalAlignBits % 8 != 0) {
+      if (StackNaturalAlignBits < 0 || StackNaturalAlignBits % BitsPerByte != 0) {
         return "invalid natural stack alignment (S-field), "
-               "must be a positive 8-bit multiple";
+               "must be a positive multiple of the byte width";
       }
       if (td)
-        td->StackNaturalAlign = StackNaturalAlignBits / 8;
+        td->StackNaturalAlign = StackNaturalAlignBits / BitsPerByte;
       break;
     }
     default:
@@ -310,7 +313,7 @@ TargetData::TargetData() : ImmutablePass(ID) {
 
 TargetData::TargetData(const Module *M)
   : ImmutablePass(ID) {
-  std::string errMsg = parseSpecifier(M->getDataLayout(), this);
+  std::string errMsg = parseSpecifier(M->getDataLayout(), this, M->getBitsPerByte());
   assert(errMsg == "" && "Module M has malformed target data layout string.");
   (void)errMsg;
 }
@@ -447,14 +450,14 @@ std::string TargetData::getStringRepresentation() const {
   raw_string_ostream OS(Result);
 
   OS << (LittleEndian ? "e" : "E")
-     << "-p:" << PointerMemSize*8 << ':' << PointerABIAlign*8
-     << ':' << PointerPrefAlign*8
-     << "-S" << StackNaturalAlign*8;
+     << "-p:" << PointerMemSize*BitsPerByte << ':' << PointerABIAlign*BitsPerByte
+     << ':' << PointerPrefAlign*BitsPerByte
+     << "-S" << StackNaturalAlign*BitsPerByte;
 
   for (unsigned i = 0, e = Alignments.size(); i != e; ++i) {
     const TargetAlignElem &AI = Alignments[i];
     OS << '-' << (char)AI.AlignType << AI.TypeBitWidth << ':'
-       << AI.ABIAlign*8 << ':' << AI.PrefAlign*8;
+       << AI.ABIAlign*BitsPerByte << ':' << AI.PrefAlign*BitsPerByte;
   }
 
   if (!LegalIntWidths.empty()) {
