@@ -125,9 +125,9 @@ public:
   TargetData();
 
   /// Constructs a TargetData from a specification string. See init().
-  explicit TargetData(StringRef TargetDescription)
+  explicit TargetData(StringRef TargetDescription, unsigned _BitsPerBytes = 8)
     : ImmutablePass(ID) {
-    std::string errMsg = parseSpecifier(TargetDescription, this);
+    std::string errMsg = parseSpecifier(TargetDescription, this, _BitsPerBytes);
     assert(errMsg == "" && "Invalid target data layout string.");
     (void)errMsg;
   }
@@ -135,7 +135,12 @@ public:
   /// Parses a target data specification string. Returns an error message
   /// if the string is malformed, or the empty string on success. Optionally
   /// initialises a TargetData object if passed a non-null pointer.
-  static std::string parseSpecifier(StringRef TargetDescription, TargetData* td = 0);
+  /// It is possible to specify the number of bits that are contained
+  /// in a byte. This will be respected when parsing the TargetDescription
+  /// string. It has a default value of 8.
+  static std::string parseSpecifier(StringRef TargetDescription,
+                                    TargetData* td = 0,
+                                    unsigned BitsPerByte = 8);
 
   /// Initialize target data from properties stored in the module.
   explicit TargetData(const Module *M);
@@ -207,9 +212,7 @@ public:
   unsigned getPointerSize()         const { return PointerMemSize; }
   /// Target pointer size, in bits
   unsigned getPointerSizeInBits()   const {
-    // XXX: this is a dirty hack. it should be multiplied by BitsPerByte,
-    // but that triggers assertions.
-    return 8*PointerMemSize;
+    return BitsPerByte*PointerMemSize;
   }
 
   /// Size examples:

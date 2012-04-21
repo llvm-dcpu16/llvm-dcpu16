@@ -591,7 +591,7 @@ TargetLowering::TargetLowering(const TargetMachine &tm,
   setOperationAction(ISD::TRAP, MVT::Other, Expand);
 
   IsLittleEndian = TD->isLittleEndian();
-  PointerTy = MVT::getIntegerVT(8*TD->getPointerSize());
+  PointerTy = MVT::getIntegerVT(TD->getPointerSizeInBits());
   memset(RegClassForVT, 0,MVT::LAST_VALUETYPE*sizeof(TargetRegisterClass*));
   memset(TargetDAGCombineArray, 0, array_lengthof(TargetDAGCombineArray));
   maxStoresPerMemset = maxStoresPerMemcpy = maxStoresPerMemmove = 8;
@@ -629,7 +629,7 @@ TargetLowering::~TargetLowering() {
 }
 
 MVT TargetLowering::getShiftAmountTy(EVT LHSTy) const {
-  return MVT::getIntegerVT(8*TD->getPointerSize());
+  return MVT::getIntegerVT(TD->getPointerSizeInBits());
 }
 
 /// canOpTrap - Returns true if the operation can trap for the value type.
@@ -2914,7 +2914,7 @@ TargetLowering::AsmOperandInfoVector TargetLowering::ParseConstraints(
           break;
         }
       } else if (dyn_cast<PointerType>(OpTy)) {
-        OpInfo.ConstraintVT = MVT::getIntegerVT(8*TD->getPointerSize());
+        OpInfo.ConstraintVT = MVT::getIntegerVT(TD->getPointerSizeInBits());
       } else {
         OpInfo.ConstraintVT = EVT::getEVT(OpTy, true);
       }

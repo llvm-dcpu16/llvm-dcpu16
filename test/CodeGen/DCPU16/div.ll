@@ -1,5 +1,5 @@
 ; RUN: llc < %s -march=dcpu16 | FileCheck %s
-target datalayout = "e-p:16:16:16-i8:8:8-i16:16:16-i32:16:32-i64:64:64-n8:16"
+target datalayout = "e-p:16:16:16-i8:16:16-i16:16:16-i32:16:16-s0:16:16-n16"
 target triple = "dcpu16"
 
 define i16 @div(i16 %a, i16 %b, i16* nocapture %c) nounwind readonly {
