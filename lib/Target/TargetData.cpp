@@ -313,7 +313,7 @@ TargetData::TargetData() : ImmutablePass(ID) {
 
 TargetData::TargetData(const Module *M)
   : ImmutablePass(ID) {
-  std::string errMsg = parseSpecifier(M->getDataLayout(), this);
+  std::string errMsg = parseSpecifier(M->getDataLayout(), this, M->getBitsPerByte());
   assert(errMsg == "" && "Module M has malformed target data layout string.");
   (void)errMsg;
 }
