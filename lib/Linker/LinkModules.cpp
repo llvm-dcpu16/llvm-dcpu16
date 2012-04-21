@@ -1157,8 +1157,10 @@ bool ModuleLinker::run() {
 
   // Inherit the target data from the source module if the destination module
   // doesn't have one already.
-  if (DstM->getDataLayout().empty() && !SrcM->getDataLayout().empty())
+  if (DstM->getDataLayout().empty() && !SrcM->getDataLayout().empty()) {
     DstM->setDataLayout(SrcM->getDataLayout());
+    DstM->setBitsPerByte(SrcM->getBitsPerByte());
+  }
 
   // Copy the target triple from the source to dest if the dest's is empty.
   if (DstM->getTargetTriple().empty() && !SrcM->getTargetTriple().empty())

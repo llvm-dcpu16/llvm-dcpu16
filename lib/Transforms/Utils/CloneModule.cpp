@@ -35,6 +35,7 @@ Module *llvm::CloneModule(const Module *M, ValueToValueMapTy &VMap) {
   // First off, we need to create the new module.
   Module *New = new Module(M->getModuleIdentifier(), M->getContext());
   New->setDataLayout(M->getDataLayout());
+  New->setBitsPerByte(M->getBitsPerByte());
   New->setTargetTriple(M->getTargetTriple());
   New->setModuleInlineAsm(M->getModuleInlineAsm());
    

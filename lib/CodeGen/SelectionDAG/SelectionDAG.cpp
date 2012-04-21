@@ -1496,11 +1496,11 @@ SDValue SelectionDAG::CreateStackTemporary(EVT VT, unsigned minAlign) {
 /// CreateStackTemporary - Create a stack temporary suitable for holding
 /// either of the specified value types.
 SDValue SelectionDAG::CreateStackTemporary(EVT VT1, EVT VT2) {
+  const TargetData *TD = TLI.getTargetData();
   unsigned Bytes = std::max(VT1.getStoreSizeInBits(),
-                            VT2.getStoreSizeInBits())/8;
+                            VT2.getStoreSizeInBits())/TD->getBitsPerByte();
   Type *Ty1 = VT1.getTypeForEVT(*getContext());
   Type *Ty2 = VT2.getTypeForEVT(*getContext());
-  const TargetData *TD = TLI.getTargetData();
   unsigned Align = std::max(TD->getPrefTypeAlignment(Ty1),
                             TD->getPrefTypeAlignment(Ty2));
 
@@ -3280,16 +3280,17 @@ static SDValue getMemsetStringVal(EVT VT, DebugLoc dl, SelectionDAG &DAG,
   }
 
   assert(!VT.isVector() && "Can't handle vector type here!");
-  unsigned NumVTBytes = VT.getSizeInBits() / 8;
+  unsigned BitsPerByte = TLI.getTargetData()->getBitsPerByte();
+  unsigned NumVTBytes = VT.getSizeInBits() / BitsPerByte;
   unsigned NumBytes = std::min(NumVTBytes, unsigned(Str.size()));
 
   uint64_t Val = 0;
   if (TLI.isLittleEndian()) {
     for (unsigned i = 0; i != NumBytes; ++i)
-      Val |= (uint64_t)(unsigned char)Str[i] << i*8;
+      Val |= (uint64_t)(unsigned char)Str[i] << i*BitsPerByte;
   } else {
     for (unsigned i = 0; i != NumBytes; ++i)
-      Val |= (uint64_t)(unsigned char)Str[i] << (NumVTBytes-i-1)*8;
+      Val |= (uint64_t)(unsigned char)Str[i] << (NumVTBytes-i-1)*BitsPerByte;
   }
 
   return DAG.getConstant(Val, VT);
@@ -3371,14 +3372,14 @@ static bool FindOptimalMemOpLowering(std::vector<EVT> &MemOps,
 
   unsigned NumMemOps = 0;
   while (Size != 0) {
-    unsigned VTSize = VT.getSizeInBits() / 8;
+    unsigned VTSize = VT.getSizeInBits() / TLI.getTargetData()->getBitsPerByte();
     while (VTSize > Size) {
       // For now, only use non-vector load / store's for the left-over pieces.
       if (VT.isVector() || VT.isFloatingPoint()) {
         VT = MVT::i64;
         while (!TLI.isTypeLegal(VT))
           VT = (MVT::SimpleValueType)(VT.getSimpleVT().SimpleTy - 1);
-        VTSize = VT.getSizeInBits() / 8;
+        VTSize = VT.getSizeInBits() / TLI.getTargetData()->getBitsPerByte();
       } else {
         // This can result in a type that is not legal on the target, e.g.
         // 1 or 2 bytes on PPC.
@@ -3450,7 +3451,7 @@ static SDValue getMemcpyLoadsAndStores(SelectionDAG &DAG, DebugLoc dl,
   uint64_t SrcOff = 0, DstOff = 0;
   for (unsigned i = 0; i != NumMemOps; ++i) {
     EVT VT = MemOps[i];
-    unsigned VTSize = VT.getSizeInBits() / 8;
+    unsigned VTSize = VT.getSizeInBits() / TLI.getTargetData()->getBitsPerByte();
     SDValue Value, Store;
 
     if (CopyFromStr &&
@@ -3541,7 +3542,7 @@ static SDValue getMemmoveLoadsAndStores(SelectionDAG &DAG, DebugLoc dl,
   unsigned NumMemOps = MemOps.size();
   for (unsigned i = 0; i < NumMemOps; i++) {
     EVT VT = MemOps[i];
-    unsigned VTSize = VT.getSizeInBits() / 8;
+    unsigned VTSize = VT.getSizeInBits() / TLI.getTargetData()->getBitsPerByte();
     SDValue Value, Store;
 
     Value = DAG.getLoad(VT, dl, Chain,
@@ -3557,7 +3558,7 @@ static SDValue getMemmoveLoadsAndStores(SelectionDAG &DAG, DebugLoc dl,
   OutChains.clear();
   for (unsigned i = 0; i < NumMemOps; i++) {
     EVT VT = MemOps[i];
-    unsigned VTSize = VT.getSizeInBits() / 8;
+    unsigned VTSize = VT.getSizeInBits() / TLI.getTargetData()->getBitsPerByte();
     SDValue Value, Store;
 
     Store = DAG.getStore(Chain, dl, LoadValues[i],
@@ -3639,7 +3640,7 @@ static SDValue getMemsetStores(SelectionDAG &DAG, DebugLoc dl,
                                  DstPtrInfo.getWithOffset(DstOff),
                                  isVol, false, Align);
     OutChains.push_back(Store);
-    DstOff += VT.getSizeInBits() / 8;
+    DstOff += VT.getSizeInBits() / TLI.getTargetData()->getBitsPerByte();
   }
 
   return DAG.getNode(ISD::TokenFactor, dl, MVT::Other,
@@ -5953,7 +5954,7 @@ bool SelectionDAG::isConsecutiveLoad(LoadSDNode *LD, LoadSDNode *Base,
   if (LD->getChain() != Base->getChain())
     return false;
   EVT VT = LD->getValueType(0);
-  if (VT.getSizeInBits() / 8 != Bytes)
+  if (VT.getSizeInBits() / TLI.getTargetData()->getBitsPerByte() != Bytes)
     return false;
 
   SDValue Loc = LD->getOperand(1);

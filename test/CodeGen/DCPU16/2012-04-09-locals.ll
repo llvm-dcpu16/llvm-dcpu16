@@ -1,6 +1,6 @@
 ; RUN: llc < %s -march=dcpu16 | FileCheck %s
 ; RUN: llc < %s -O0 -march=dcpu16 | FileCheck %s -check-prefix=CHECK-O0
-target datalayout = "e-p:16:8:8-i8:8:8-i16:8:8-i32:8:8-s0:8:8-n16"
+target datalayout = "e-p:16:16:16-i8:16:16-i16:16:16-i32:16:16-s0:16:16-n16"
 target triple = "dcpu16"
 
 define i16 @f(i16 %x) nounwind {
