@@ -131,3 +131,35 @@ return:                                           ; preds = %if.else, %if.then
 ; CHECK: :simplebranch_ne
 ; CHECK: IFE A, B
 ; CHECK: SET PC, .LBB5_2
+
+define i16 @imm_branch(i16 %a, i16 %b) nounwind readnone {
+entry:
+  %cmp = icmp slt i16 %a, 10
+  br i1 %cmp, label %if.then, label %if.else
+
+if.then:                                          ; preds = %entry
+  %add = add i16 %b, 10
+  br label %return
+
+if.else:                                          ; preds = %entry
+  %cmp1 = icmp sgt i16 %a, 20
+  br i1 %cmp1, label %if.then2, label %if.else3
+
+if.then2:                                         ; preds = %if.else
+  %mul = mul i16 %b, 17
+  br label %return
+
+if.else3:                                         ; preds = %if.else
+  %div = udiv i16 %b, 5
+  br label %return
+
+return:                                           ; preds = %if.else3, %if.then2, %if.then
+  %retval.0 = phi i16 [ %add, %if.then ], [ %mul, %if.then2 ], [ %div, %if.else3 ]
+  ret i16 %retval.0
+}
+; CHECK: :imm_branch
+; CHECK: IFG A, 0x9
+; CHECK: ADD B, 0xa
+; CHECK: IFG 0x15, A
+; CHECK: MUL B, 0x11
+; CHECK: DIV B, 0x5

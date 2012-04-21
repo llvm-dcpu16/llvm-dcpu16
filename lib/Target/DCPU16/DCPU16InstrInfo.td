@@ -197,12 +197,27 @@ let isBarrier = 1 in {
 }
 
 // Conditional branches
-// TODO: add immediate and memory versions
-def BR_CC : CJForm<0, 0,
+// TODO: add memory versions
+def BR_CCrr : CJForm<0, 0,
    (outs), (ins cc:$cc, GR16:$lhs, GR16:$rhs, jmptarget:$dst),
    "$cc\t{$lhs, $rhs}\n"
    "\tSET\t{PC, $dst}",
    [(DCPU16brcc imm:$cc, GR16:$lhs, GR16:$rhs, bb:$dst)]>;
+def BR_CCri : CJForm<0, 0,
+   (outs), (ins cc:$cc, GR16:$lhs, i16imm:$rhs, jmptarget:$dst),
+   "$cc\t{$lhs, $rhs}\n"
+   "\tSET\t{PC, $dst}",
+   [(DCPU16brcc imm:$cc, GR16:$lhs, imm:$rhs, bb:$dst)]>;
+def BR_CCir : CJForm<0, 0,
+   (outs), (ins cc:$cc, i16imm:$lhs, GR16:$rhs, jmptarget:$dst),
+   "$cc\t{$lhs, $rhs}\n"
+   "\tSET\t{PC, $dst}",
+   [(DCPU16brcc imm:$cc, imm:$lhs, GR16:$rhs, bb:$dst)]>;
+def BR_CCii : CJForm<0, 0,
+   (outs), (ins cc:$cc, i16imm:$lhs, i16imm:$rhs, jmptarget:$dst),
+   "$cc\t{$lhs, $rhs}\n"
+   "\tSET\t{PC, $dst}",
+   [(DCPU16brcc imm:$cc, imm:$lhs, imm:$rhs, bb:$dst)]>;
 } // isBranch, isTerminator
 
 //===----------------------------------------------------------------------===//

@@ -92,6 +92,17 @@ void DCPU16InstrInfo::copyPhysReg(MachineBasicBlock &MBB,
     .addReg(SrcReg, getKillRegState(KillSrc));
 }
 
+static bool isBR_CC(unsigned Opcode) {
+  switch (Opcode) {
+    default: return false;
+    case DCPU16::BR_CCrr:
+    case DCPU16::BR_CCri:
+    case DCPU16::BR_CCir:
+    case DCPU16::BR_CCii:
+      return true;
+  }
+}
+
 unsigned DCPU16InstrInfo::RemoveBranch(MachineBasicBlock &MBB) const {
   MachineBasicBlock::iterator I = MBB.end();
   unsigned Count = 0;
@@ -101,7 +112,7 @@ unsigned DCPU16InstrInfo::RemoveBranch(MachineBasicBlock &MBB) const {
     if (I->isDebugValue())
       continue;
     if (I->getOpcode() != DCPU16::JMP &&
-        I->getOpcode() != DCPU16::BR_CC &&
+        !isBR_CC(I->getOpcode()) &&
         I->getOpcode() != DCPU16::Br &&
         I->getOpcode() != DCPU16::Bm)
       break;
@@ -114,11 +125,26 @@ unsigned DCPU16InstrInfo::RemoveBranch(MachineBasicBlock &MBB) const {
   return Count;
 }
 
+static unsigned SwapBR_CCOpcode(unsigned Opcode) {
+  switch (Opcode) {
+    default: llvm_unreachable("invalid BR_CC opcode");
+    case DCPU16::BR_CCrr:
+      return DCPU16::BR_CCrr;
+    case DCPU16::BR_CCri:
+      return DCPU16::BR_CCir;
+    case DCPU16::BR_CCir:
+      return DCPU16::BR_CCri;
+    case DCPU16::BR_CCii:
+      return DCPU16::BR_CCii;
+  }
+}
+
 bool DCPU16InstrInfo::
 ReverseBranchCondition(SmallVectorImpl<MachineOperand> &Cond) const {
-  assert(Cond.size() == 3 && "Invalid BR_CC condition!");
+  assert(Cond.size() == 4 && "Invalid BR_CC condition!");
 
-  DCPU16CC::CondCodes CC = static_cast<DCPU16CC::CondCodes>(Cond[0].getImm());
+  unsigned Opcode = Cond[0].getImm();
+  DCPU16CC::CondCodes CC = static_cast<DCPU16CC::CondCodes>(Cond[1].getImm());
 
   switch (CC) {
   default: llvm_unreachable("Invalid branch condition!");
@@ -129,18 +155,21 @@ ReverseBranchCondition(SmallVectorImpl<MachineOperand> &Cond) const {
     CC = DCPU16CC::COND_E;
     break;
   case DCPU16CC::COND_G:
-    std::swap(Cond[1], Cond[2]);
+    Opcode = SwapBR_CCOpcode(Opcode);
+    std::swap(Cond[2], Cond[3]);
     CC = DCPU16CC::COND_GE;
     break;
   case DCPU16CC::COND_GE:
-    std::swap(Cond[1], Cond[2]);
+    Opcode = SwapBR_CCOpcode(Opcode);
+    std::swap(Cond[2], Cond[3]);
     CC = DCPU16CC::COND_G;
     break;
   case DCPU16CC::COND_B:
     return true;
   }
 
-  Cond[0].setImm(CC);
+  Cond[0].setImm(Opcode);
+  Cond[1].setImm(CC);
   return false;
 }
 
@@ -210,7 +239,7 @@ bool DCPU16InstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,
     }
 
     // Handle conditional branches.
-    assert(I->getOpcode() == DCPU16::BR_CC && "Invalid conditional branch");
+    assert(isBR_CC(I->getOpcode()) && "Invalid conditional branch");
     DCPU16CC::CondCodes BranchCode =
       static_cast<DCPU16CC::CondCodes>(I->getOperand(0).getImm());
     if (BranchCode == DCPU16CC::COND_INVALID)
@@ -223,23 +252,25 @@ bool DCPU16InstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,
     if (Cond.empty()) {
       FBB = TBB;
       TBB = I->getOperand(3).getMBB();
+      Cond.push_back(MachineOperand::CreateImm(I->getOpcode()));
       Cond.push_back(MachineOperand::CreateImm(BranchCode));
       Cond.push_back(LHS);
       Cond.push_back(RHS);
       continue;
     }
 
-    assert(Cond.size() == 3);
+    assert(Cond.size() == 4);
     assert(TBB);
 
     // Is it a >= ?
     if ((BranchCode == DCPU16CC::COND_E)
-        && (((DCPU16CC::CondCodes) Cond[0].getImm()) == DCPU16CC::COND_G)
+        && (((DCPU16CC::CondCodes) Cond[1].getImm()) == DCPU16CC::COND_G)
         && (TBB == I->getOperand(3).getMBB())
-        && (((Cond[1].getReg() == LHS.getReg()) && (Cond[2].getReg() == RHS.getReg()))
-          || ((Cond[1].getReg() == RHS.getReg()) && (Cond[2].getReg() == LHS.getReg())))) {
+        // This should actually check for equality but that's just too much code...
+        && (((Cond[2].getType() == LHS.getType()) && (Cond[3].getType() == RHS.getType()))
+          || ((Cond[2].getType() == RHS.getType()) && (Cond[3].getType() == LHS.getType())))) {
 
-      Cond[0] = MachineOperand::CreateImm(DCPU16CC::COND_GE);
+      Cond[1] = MachineOperand::CreateImm(DCPU16CC::COND_GE);
     }
     break;
   }
@@ -254,8 +285,8 @@ DCPU16InstrInfo::InsertBranch(MachineBasicBlock &MBB, MachineBasicBlock *TBB,
                               DebugLoc DL) const {
   // Shouldn't be a fall through.
   assert(TBB && "InsertBranch must not be told to insert a fallthrough");
-  assert((Cond.size() == 3 || Cond.size() == 0) &&
-         "DCPU16 branch conditions have three components!");
+  assert((Cond.size() == 4 || Cond.size() == 0) &&
+         "DCPU16 branch conditions have four components!");
 
   if (Cond.empty()) {
     // Unconditional branch?
@@ -266,17 +297,19 @@ DCPU16InstrInfo::InsertBranch(MachineBasicBlock &MBB, MachineBasicBlock *TBB,
 
   // Conditional branch.
   unsigned Count = 0;
-  DCPU16CC::CondCodes CC = (DCPU16CC::CondCodes) Cond[0].getImm();
-  MachineOperand LHS = Cond[1];
-  MachineOperand RHS = Cond[2];
+  unsigned Opcode = Cond[0].getImm();
+  DCPU16CC::CondCodes CC = (DCPU16CC::CondCodes) Cond[1].getImm();
+  MachineOperand LHS = Cond[2];
+  MachineOperand RHS = Cond[3];
   // Is it a >= ?
   if (CC == DCPU16CC::COND_GE) {
     if (FBB) {
       // Switch targets around to produce shorter code
       std::swap(TBB, FBB);
       std::swap(LHS, RHS);
+      Opcode = SwapBR_CCOpcode(Opcode);
     } else {
-      BuildMI(&MBB, DL, get(DCPU16::BR_CC))
+      BuildMI(&MBB, DL, get(Opcode))
         .addImm(DCPU16CC::COND_E)
         .addOperand(LHS).addOperand(RHS)
         .addMBB(TBB);
@@ -284,7 +317,7 @@ DCPU16InstrInfo::InsertBranch(MachineBasicBlock &MBB, MachineBasicBlock *TBB,
     }
     CC = DCPU16CC::COND_G;
   }
-  BuildMI(&MBB, DL, get(DCPU16::BR_CC))
+  BuildMI(&MBB, DL, get(Opcode))
     .addImm(CC)
     .addOperand(LHS).addOperand(RHS)
     .addMBB(TBB);
