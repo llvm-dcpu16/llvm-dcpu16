@@ -528,8 +528,7 @@ static bool NeedsAdditionalEqualityCC(ISD::CondCode CC,
   if (simpleCC)
     *simpleCC = CC;
   if (reverseCC)
-    // FIXME: what would be a good default value? May be SETCC_INVALID?
-    *reverseCC = (ISD::CondCode) -1;
+    *reverseCC = CC;
   switch (CC) {
   default: break;
   case ISD::SETEQ:

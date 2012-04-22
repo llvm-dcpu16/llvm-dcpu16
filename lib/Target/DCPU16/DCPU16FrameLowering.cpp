@@ -186,7 +186,7 @@ DCPU16FrameLowering::spillCalleeSavedRegisters(MachineBasicBlock &MBB,
   MachineFunction &MF = *MBB.getParent();
   const TargetInstrInfo &TII = *MF.getTarget().getInstrInfo();
   DCPU16MachineFunctionInfo *MFI = MF.getInfo<DCPU16MachineFunctionInfo>();
-  MFI->setCalleeSavedFrameSize(CSI.size() * 2);
+  MFI->setCalleeSavedFrameSize(CSI.size());
 
   for (unsigned i = CSI.size(); i != 0; --i) {
     unsigned Reg = CSI[i-1].getReg();

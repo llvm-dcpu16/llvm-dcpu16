@@ -31,7 +31,7 @@ def CC_DCPU16 : CallingConv<[
   // integer registers.
   CCIfNotVarArg<CCIfType<[i16], CCAssignToReg<[RA, RB, RC]>>>,
 
-  // Integer values get stored in stack slots that are 2 bytes in
-  // size and 2-byte aligned.
-  CCIfType<[i16], CCAssignToStack<2, 2>>
+  // Integer values get stored in stack slots that are 1 (16 bit) byte in
+  // size and 1-byte aligned.
+  CCIfType<[i16], CCAssignToStack<1, 1>>
 ]>;
