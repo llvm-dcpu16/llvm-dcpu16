@@ -112,6 +112,15 @@ std::string StringRef::upper() const {
   return Result;
 }
 
+std::string StringRef::removeZero() const {
+  std::string Result(size()-count('\00'), char());
+  for (size_type i = 0, e = 0, s = size(); i != s; ++i) {
+	if (Data[i] != '\00')
+      Result[e++] = Data[i];
+  }
+  return Result;
+}
+
 //===----------------------------------------------------------------------===//
 // String Searching
 //===----------------------------------------------------------------------===//

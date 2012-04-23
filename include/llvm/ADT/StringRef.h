@@ -362,6 +362,9 @@ namespace llvm {
     /// upper - Convert the given ASCII string to uppercase.
     std::string upper() const;
 
+    // removes all \\00 in a string
+    std::string removeZero() const;
+
     /// @}
     /// @name Substring Operations
     /// @{
