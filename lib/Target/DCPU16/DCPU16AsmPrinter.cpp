@@ -113,18 +113,23 @@ void DCPU16AsmPrinter::printSrcMemOperand(const MachineInstr *MI, int OpNum,
   const MachineOperand &Base = MI->getOperand(OpNum);
   const MachineOperand &Disp = MI->getOperand(OpNum+1);
 
-  // Print displacement first
+  if (Base.getReg())
+    O << '[';
 
-  // Imm here is in fact global address - print extra modifier.
-  if (Disp.isImm() && !Base.getReg())
-    O << '&';
-  printOperand(MI, OpNum+1, O, "nohash");
+  if(Disp.isImm()) {
+	  if (Disp.getImm() != 0) {
+        O << "0x";
+        O.write_hex((Disp.getImm()) & 0xFFFF);
+        O << "+";
+	  }
+  } else {
+	  llvm_unreachable("Unsupported src mem operand in inline asm");
+  }
 
   // Print register base field
   if (Base.getReg()) {
-    O << '(';
     printOperand(MI, OpNum, O);
-    O << ')';
+    O << ']';
   }
 }
 
