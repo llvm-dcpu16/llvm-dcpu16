@@ -363,7 +363,7 @@ namespace llvm {
     std::string upper() const;
 
     // removes all \\00 in a string
-    std::string removeZero() const;
+    StringRef removeZero() const;
 
     /// @}
     /// @name Substring Operations

@@ -13,6 +13,7 @@
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/edit_distance.h"
 #include <bitset>
+#include <cstring>
 
 using namespace llvm;
 
@@ -112,13 +113,16 @@ std::string StringRef::upper() const {
   return Result;
 }
 
-std::string StringRef::removeZero() const {
-  std::string Result(size()-count('\00'), char());
-  for (size_type i = 0, e = 0, s = size(); i != s; ++i) {
-	if (Data[i] != '\00')
-      Result[e++] = Data[i];
+StringRef StringRef::removeZero() const {
+  char *cstr, *p;
+  p = cstr = new char [size()-count('\00')];
+  for (size_type i = 0, e = size(); i != e; ++i) {
+	if (Data[i] != '\00') {
+      *p = Data[i];
+      p++;
+	}
   }
-  return Result;
+  return StringRef((const char*)cstr, strlen(cstr));
 }
 
 //===----------------------------------------------------------------------===//
