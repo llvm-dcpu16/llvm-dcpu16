@@ -232,7 +232,7 @@ public:
   const std::string &getDataLayout() const { return DataLayout; }
 
   /// Get the number of bits per byte for the module's target platform.
-  const unsigned getBitsPerByte() const { return BitsPerByte; }
+  unsigned getBitsPerByte() const { return BitsPerByte; }
 
   /// Get the target triple which is a string describing the target host.
   /// @returns a string containing the target triple.
