@@ -115,7 +115,7 @@ std::string StringRef::upper() const {
 
 StringRef StringRef::removeZero() const {
   char *cstr, *p;
-  p = cstr = new char [size()-count('\00')];
+  p = cstr = new char [size()-count('\00')+1];
   for (size_type i = 0, e = size(); i != e; ++i) {
 	if (Data[i] != '\00') {
       *p = Data[i];
