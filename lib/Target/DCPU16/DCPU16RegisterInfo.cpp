@@ -61,7 +61,7 @@ BitVector DCPU16RegisterInfo::getReservedRegs(const MachineFunction &MF) const {
   const TargetFrameLowering *TFI = MF.getTarget().getFrameLowering();
 
   // Mark 3 special registers as reserved.
-  Reserved.set(DCPU16::RO);
+  Reserved.set(DCPU16::REX);
   Reserved.set(DCPU16::RSP);
 
   // Mark frame pointer as reserved if needed.

@@ -101,8 +101,8 @@ def and_su : PatFrag<(ops node:$lhs, node:$rhs), (and node:$lhs, node:$rhs), [{
 // a stack adjustment and the codegen must know that they may modify the stack
 // pointer before prolog-epilog rewriting occurs.
 // Pessimistically assume ADJCALLSTACKDOWN / ADJCALLSTACKUP will become
-// sub / add which can clobber RO.
-let Defs = [RSP, RO], Uses = [RSP] in {
+// sub / add which can clobber REX.
+let Defs = [RSP, REX], Uses = [RSP] in {
 def ADJCALLSTACKDOWN : Pseudo<(outs), (ins i16imm:$amt),
                               "#ADJCALLSTACKDOWN",
                               [(DCPU16callseq_start timm:$amt)]>;
@@ -228,7 +228,7 @@ let isCall = 1 in
   // a use to prevent stack-pointer assignments that appear immediately
   // before calls from potentially appearing dead. Uses for argument
   // registers are added manually.
-  let Defs = [RO],
+  let Defs = [REX],
       Uses = [RSP] in {
     def CALLi     : II16i<0x0,
                           (outs), (ins i16imm:$dst, variable_ops),
@@ -312,7 +312,7 @@ multiclass BASIC_RR_IS_COM<bits<4> OpVal, string OpcStr, SDNode OpNode> {
                     (outs GR16:$dst), (ins GR16:$src, GR16:$src2),
                     OpcStr#"\t{$dst, $src2}",
                     [(set GR16:$dst, (OpNode GR16:$src, GR16:$src2)),
-                     (implicit RO)]>;
+                     (implicit REX)]>;
   }
 }
 
@@ -322,7 +322,7 @@ multiclass BASIC_RR_NON_COM<bits<4> OpVal, string OpcStr, SDNode OpNode> {
                     (outs GR16:$dst), (ins GR16:$src, GR16:$src2),
                     OpcStr#"\t{$dst, $src2}",
                     [(set GR16:$dst, (OpNode GR16:$src, GR16:$src2)),
-                     (implicit RO)]>;
+                     (implicit REX)]>;
   }
 }
 
@@ -332,30 +332,30 @@ multiclass BASIC_NORMAL<bits<4> OpVal, string OpcStr, SDNode OpNode> {
                     (outs GR16:$dst), (ins GR16:$src, memsrc:$src2),
                     OpcStr#"\t{$dst, $src2}",
                     [(set GR16:$dst, (OpNode GR16:$src, (load addr:$src2))),
-                     (implicit RO)]>;
+                     (implicit REX)]>;
   def ri: I16ri<OpVal,
                     (outs GR16:$dst), (ins GR16:$src, i16imm:$src2),
                     OpcStr#"\t{$dst, $src2}",
                     [(set GR16:$dst, (OpNode GR16:$src, imm:$src2)),
-                     (implicit RO)]>;
+                     (implicit REX)]>;
   }
   let Constraints = "" in {
   def mr: I16mr<OpVal,
                     (outs), (ins memdst:$dst, GR16:$src),
                     OpcStr#"\t{$dst, $src}",
                     [(store (OpNode (load addr:$dst), GR16:$src), addr:$dst),
-                     (implicit RO)]>;
+                     (implicit REX)]>;
   def mi: I16mi<OpVal,
                     (outs), (ins memdst:$dst, i16imm:$src),
                     OpcStr#"\t{$dst, $src}",
                     [(store (OpNode (load addr:$dst), (i16 imm:$src)), addr:$dst),
-                     (implicit RO)]>;
+                     (implicit REX)]>;
   def mm: I16mm<OpVal,
                     (outs), (ins memdst:$dst, memsrc:$src),
                     OpcStr#"\t{$dst, $src}",
                     [(store (OpNode (load addr:$dst),
                                   (i16 (load addr:$src))), addr:$dst),
-                     (implicit RO)]>;
+                     (implicit REX)]>;
   }
   
   // FIXME! Wrong zero extend
@@ -364,14 +364,14 @@ multiclass BASIC_NORMAL<bits<4> OpVal, string OpcStr, SDNode OpNode> {
                     (outs GR16:$dst), (ins GR16:$src, memsrc:$src2),
 					OpcStr#"\t{$dst, $src}",
                     [(set GR16:$dst, (OpNode GR16:$src, (zextloadi8 addr:$src2))),
-                     (implicit RO)]>;
+                     (implicit REX)]>;
   }  
 }
 
 //===----------------------------------------------------------------------===//
 // Arithmetic Instructions
 
-let Defs = [RO] in {
+let Defs = [REX] in {
   defm ADD16   : BASIC_RR_IS_COM <0x0, "ADD", add>,  BASIC_NORMAL<0x0, "ADD", add>;
   defm AND16   : BASIC_RR_IS_COM <0x0, "AND", and>,  BASIC_NORMAL<0x0, "AND", and>;
   defm OR16    : BASIC_RR_IS_COM <0x0, "BOR", or>,   BASIC_NORMAL<0x0, "BOR", or>;
@@ -387,12 +387,12 @@ let Defs = [RO] in {
   defm SRA16   : BASIC_RR_NON_COM<0x0, "SHR", sra>, BASIC_NORMAL<0x0, "SHR", sra>;
   defm SHL16   : BASIC_RR_NON_COM<0x0, "SHL", shl>, BASIC_NORMAL<0x0, "SHL", shl>;
 
-  let Uses = [RO] in {
+  let Uses = [REX] in {
     defm ADC16   : BASIC_RR_IS_COM <0x0, "addc.w", adde>, BASIC_NORMAL<0x0, "addc.w", adde>;
     defm SBC16   : BASIC_RR_NON_COM<0x0, "subc.w", sube>, BASIC_NORMAL<0x0, "subc.w", sube>;
   }
 
-} // Defs = [RO]
+} // Defs = [REX]
 
 
 //===----------------------------------------------------------------------===//
