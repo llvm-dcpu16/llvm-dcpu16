@@ -14,11 +14,11 @@ entry:
   ret i16 %and
 }
 ; CHECK: :f1
-; CHECK: SET [0x1+I], A
-; CHECK: SET [I], B
-; CHECK: AND B, [0x1+I]
+; CHECK: SET [0x1+SP], A
+; CHECK: SET [SP], B
+; CHECK: AND B, [0x1+SP]
 ; CHECK: SET A, B
-; CHECK: ADD I, 0x2
+; CHECK: ADD SP, 0x2
 
 
 define i16 @f2(i16 %x) nounwind {

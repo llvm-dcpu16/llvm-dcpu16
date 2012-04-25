@@ -8,7 +8,7 @@ entry:
   ret i16 %shr
 }
 ; CHECK: :shift_ri
-; CHECK: SHR A, 0x8
+; CHECK: ASR A, 0x8
 
 define i16 @shift_li(i16 %a) nounwind readnone {
 entry:
@@ -24,7 +24,7 @@ entry:
   ret i16 %shr
 }
 ; CHECK: :shift_rr
-; CHECK: SHR A, B
+; CHECK: ASR A, B
 
 define i16 @shift_lr(i16 %a, i16 %b) nounwind readnone {
 entry:

@@ -13,5 +13,5 @@ entry:
 }
 
 ; CHECK: :simpleInc
-; CHECK: SET [I], 0x8000
-; CHECK: SET [I], 0x8001
+; CHECK: SET [SP], 0x8000
+; CHECK: SET [SP], 0x8001
