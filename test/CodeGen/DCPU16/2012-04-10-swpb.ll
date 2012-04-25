@@ -11,6 +11,6 @@ entry:
 }
 ; CHECK: :swpb
 ; CHECK: SET B, A
-; CHECK: SHR B, 0x8
+; CHECK: ASR B, 0x8
 ; CHECK: SHL A, 0x8
 ; CHECK: BOR A, B

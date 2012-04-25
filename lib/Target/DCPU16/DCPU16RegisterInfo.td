@@ -26,25 +26,22 @@ def RC  : DCPU16Reg<0x2,  "C">;
 def RX  : DCPU16Reg<0x3,  "X">;
 def RY  : DCPU16Reg<0x4,  "Y">;
 def RZ  : DCPU16Reg<0x5,  "Z">;
-def RI  : DCPU16Reg<0x6,  "I">; // SP for now
+def RI  : DCPU16Reg<0x6,  "I">;
 def RJ  : DCPU16Reg<0x7,  "J">; // FP if needed
 
 def RSP  : DCPU16Reg<0x1b,  "SP">;
-def RO   : DCPU16Reg<0x1d,  "O">;
+def REX  : DCPU16Reg<0x1d,  "EX">;
 
 // Volatile registers
 def GR16 : RegisterClass<"DCPU16", [i16], 16,
-  (add RA, RB,RC,RX,RY,RZ,RI,RJ)>;
+  (add RA,RB,RC,RX,RY,RZ,RI,RJ)>;
 
 // Stack pointer register
 def SPR16 : RegisterClass<"DCPU16", [i16], 16,
   (add RSP)>;
   
 // Overflow register
-def OR16 : RegisterClass<"DCPU16", [i16], 16,
-  (add RO)> {
+def EXR16 : RegisterClass<"DCPU16", [i16], 16,
+  (add REX)> {
    let isAllocatable = 0;
 }
-
-
-
