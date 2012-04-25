@@ -13,5 +13,5 @@ entry:
 }
 
 ; CHECK: :first
-; CHECK: SET [{{.}}], {{.}}
+; CHECK: SET [SP], {{.}}
 ; CHECK: SET {{.}}, [{{.}}]

@@ -42,13 +42,11 @@ const uint16_t*
 DCPU16RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
   const TargetFrameLowering *TFI = MF->getTarget().getFrameLowering();
   static const uint16_t CalleeSavedRegs[] = {
-    // FIXME: Add RI when SP issue is fixed
-    DCPU16::RX, DCPU16::RY, DCPU16::RZ, DCPU16::RJ,
+    DCPU16::RX, DCPU16::RY, DCPU16::RZ, DCPU16::RI, DCPU16::RJ,
     0
   };
   static const uint16_t CalleeSavedRegsFP[] = {
-    // FIXME: Add RI when SP issue is fixed
-    DCPU16::RX, DCPU16::RY, DCPU16::RZ,
+    DCPU16::RX, DCPU16::RY, DCPU16::RZ, DCPU16::RI,
     0
   };
 
@@ -65,8 +63,6 @@ BitVector DCPU16RegisterInfo::getReservedRegs(const MachineFunction &MF) const {
   // Mark 3 special registers as reserved.
   Reserved.set(DCPU16::RO);
   Reserved.set(DCPU16::RSP);
-  // FIXME: Remove RI when SP issue is fixed
-  Reserved.set(DCPU16::RI);
 
   // Mark frame pointer as reserved if needed.
   if (TFI->hasFP(MF))
@@ -87,8 +83,8 @@ eliminateCallFramePseudoInstr(MachineFunction &MF, MachineBasicBlock &MBB,
 
   if (!TFI->hasReservedCallFrame(MF)) {
     // If the stack pointer can be changed after prologue, turn the
-    // adjcallstackup instruction into a 'sub RI, <amt>' and the
-    // adjcallstackdown instruction into 'add RI, <amt>'
+    // adjcallstackup instruction into a 'sub RSP, <amt>' and the
+    // adjcallstackdown instruction into 'add RSP, <amt>'
     // TODO: consider using push / pop instead of sub + store / add
     MachineInstr *Old = I;
     uint64_t Amount = Old->getOperand(0).getImm();
@@ -101,8 +97,8 @@ eliminateCallFramePseudoInstr(MachineFunction &MF, MachineBasicBlock &MBB,
       MachineInstr *New = 0;
       if (Old->getOpcode() == TII.getCallFrameSetupOpcode()) {
         New = BuildMI(MF, Old->getDebugLoc(),
-                      TII.get(DCPU16::SUB16ri), DCPU16::RI)
-          .addReg(DCPU16::RI).addImm(Amount);
+                      TII.get(DCPU16::SUB16ri), DCPU16::RSP)
+          .addReg(DCPU16::RSP).addImm(Amount);
       } else {
         assert(Old->getOpcode() == TII.getCallFrameDestroyOpcode());
         // factor out the amount the callee already popped.
@@ -110,8 +106,8 @@ eliminateCallFramePseudoInstr(MachineFunction &MF, MachineBasicBlock &MBB,
         Amount -= CalleeAmt;
         if (Amount)
           New = BuildMI(MF, Old->getDebugLoc(),
-                        TII.get(DCPU16::ADD16ri), DCPU16::RI)
-            .addReg(DCPU16::RI).addImm(Amount);
+                        TII.get(DCPU16::ADD16ri), DCPU16::RSP)
+            .addReg(DCPU16::RSP).addImm(Amount);
       }
 
       if (New) {
@@ -129,7 +125,7 @@ eliminateCallFramePseudoInstr(MachineFunction &MF, MachineBasicBlock &MBB,
       MachineInstr *Old = I;
       MachineInstr *New =
         BuildMI(MF, Old->getDebugLoc(), TII.get(DCPU16::SUB16ri),
-                DCPU16::RI).addReg(DCPU16::RI).addImm(CalleeAmt);
+                DCPU16::RSP).addReg(DCPU16::RSP).addImm(CalleeAmt);
       // The SRW implicit def is dead.
       New->getOperand(3).setIsDead();
 
@@ -158,7 +154,7 @@ DCPU16RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
 
   int FrameIndex = MI.getOperand(i).getIndex();
 
-  unsigned BasePtr = (TFI->hasFP(MF) ? DCPU16::RJ : DCPU16::RI);
+  unsigned BasePtr = (TFI->hasFP(MF) ? DCPU16::RJ : DCPU16::RSP);
   int Offset = MF.getFrameInfo()->getObjectOffset(FrameIndex);
 
   // Skip the saved PC
@@ -216,5 +212,5 @@ DCPU16RegisterInfo::processFunctionBeforeFrameFinalized(MachineFunction &MF)
 unsigned DCPU16RegisterInfo::getFrameRegister(const MachineFunction &MF) const {
   const TargetFrameLowering *TFI = MF.getTarget().getFrameLowering();
 
-  return TFI->hasFP(MF) ? DCPU16::RJ : DCPU16::RI;
+  return TFI->hasFP(MF) ? DCPU16::RJ : DCPU16::RSP;
 }

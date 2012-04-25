@@ -102,7 +102,7 @@ def and_su : PatFrag<(ops node:$lhs, node:$rhs), (and node:$lhs, node:$rhs), [{
 // pointer before prolog-epilog rewriting occurs.
 // Pessimistically assume ADJCALLSTACKDOWN / ADJCALLSTACKUP will become
 // sub / add which can clobber RO.
-let Defs = [RI, RO], Uses = [RI] in {
+let Defs = [RSP, RO], Uses = [RSP] in {
 def ADJCALLSTACKDOWN : Pseudo<(outs), (ins i16imm:$amt),
                               "#ADJCALLSTACKDOWN",
                               [(DCPU16callseq_start timm:$amt)]>;
@@ -224,12 +224,12 @@ def BR_CCii : CJForm<0, 0,
 //  Call Instructions...
 //
 let isCall = 1 in
-  // All calls clobber the non-callee saved registers. RI is marked as
+  // All calls clobber the non-callee saved registers. RSP is marked as
   // a use to prevent stack-pointer assignments that appear immediately
   // before calls from potentially appearing dead. Uses for argument
   // registers are added manually.
   let Defs = [RO],
-      Uses = [RI] in {
+      Uses = [RSP] in {
     def CALLi     : II16i<0x0,
                           (outs), (ins i16imm:$dst, variable_ops),
                           "JSR\t$dst", [(DCPU16call imm:$dst)]>;
@@ -245,7 +245,7 @@ let isCall = 1 in
 //===----------------------------------------------------------------------===//
 //  Miscellaneous Instructions...
 //
-let Defs = [RI], Uses = [RI], neverHasSideEffects=1 in {
+let Defs = [RSP], Uses = [RSP], neverHasSideEffects=1 in {
 let mayLoad = 1 in
 def POP16r   : IForm16<0x0, DstReg, SrcPostInc, Size2Bytes,
                        (outs GR16:$reg), (ins), "SET\t{$reg, POP}", []>;
