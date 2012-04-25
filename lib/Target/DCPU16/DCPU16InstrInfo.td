@@ -386,8 +386,8 @@ let Defs = [REX] in {
   defm SHL16   : BASIC_RR_NON_COM<0x0, "SHL", shl>,  BASIC_NORMAL<0x0, "SHL", shl>;
 
   let Uses = [REX] in {
-    defm ADC16   : BASIC_RR_IS_COM <0x0, "addc.w", adde>, BASIC_NORMAL<0x0, "addc.w", adde>;
-    defm SBC16   : BASIC_RR_NON_COM<0x0, "subc.w", sube>, BASIC_NORMAL<0x0, "subc.w", sube>;
+    defm ADC16   : BASIC_RR_IS_COM <0x0, "ADX", adde>, BASIC_NORMAL<0x0, "ADX", adde>;
+    defm SBC16   : BASIC_RR_NON_COM<0x0, "SUX", sube>, BASIC_NORMAL<0x0, "SUX", sube>;
   }
 
 } // Defs = [REX]
