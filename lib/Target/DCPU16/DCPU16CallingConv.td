@@ -35,3 +35,5 @@ def CC_DCPU16 : CallingConv<[
   // size and 1-byte aligned.
   CCIfType<[i16], CCAssignToStack<1, 1>>
 ]>;
+
+def CSR_DCPU16 : CalleeSavedRegs<(add RX, RY, RZ, RI, RJ)>;
