@@ -37,6 +37,7 @@ public:
 
   /// Code Generation virtual methods...
   const uint16_t *getCalleeSavedRegs(const MachineFunction *MF = 0) const;
+  const uint32_t *getCallPreservedMask(CallingConv::ID) const;
 
   BitVector getReservedRegs(const MachineFunction &MF) const;
   const TargetRegisterClass* getPointerRegClass(unsigned Kind = 0) const;
