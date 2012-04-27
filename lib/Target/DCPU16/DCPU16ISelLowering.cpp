@@ -572,10 +572,7 @@ static bool NeedsAdditionalEqualityCC(ISD::CondCode CC,
   return false;
 }
 
-template <class T>
-static DCPU16CC::CondCodes GetSimpleCC(ISD::CondCode CC,
-                                      T &LHS, T &RHS) {
-  DCPU16CC::CondCodes TCC = DCPU16CC::COND_INVALID;
+static DCPU16CC::CondCodes GetSimpleCC(ISD::CondCode CC) {
   switch (CC) {
   default: llvm_unreachable("Invalid integer condition!");
   case ISD::SETGE:
@@ -584,25 +581,18 @@ static DCPU16CC::CondCodes GetSimpleCC(ISD::CondCode CC,
   case ISD::SETULE:
     llvm_unreachable("CC requires additional equality test - not simple!");
   case ISD::SETEQ:
-    TCC = DCPU16CC::COND_E;
-    break;
+    return DCPU16CC::COND_E;
   case ISD::SETNE:
-    TCC = DCPU16CC::COND_NE;
-    break;
+    return DCPU16CC::COND_NE;
   case ISD::SETULT:
-    std::swap(LHS, RHS); // FALLTHROUGH
+    return DCPU16CC::COND_L;
   case ISD::SETUGT:
-    TCC = DCPU16CC::COND_G;
-    break;
-  // FIXME: signed comparison doesn't really work like that when only unsigned
-  // comparison is available
+    return DCPU16CC::COND_G;
   case ISD::SETLT:
-    std::swap(LHS, RHS); // FALLTHROUGH
+    return DCPU16CC::COND_U;
   case ISD::SETGT:
-    TCC = DCPU16CC::COND_G;
-    break;
+    return DCPU16CC::COND_A;
   }
-  return TCC;
 }
 
 SDValue DCPU16TargetLowering::LowerBR_CC(SDValue Op, SelectionDAG &DAG) const {
@@ -620,7 +610,7 @@ SDValue DCPU16TargetLowering::LowerBR_CC(SDValue Op, SelectionDAG &DAG) const {
                         Chain, eqCC, LHS, RHS, Dest);
   }
 
-  DCPU16CC::CondCodes simpleCC = GetSimpleCC(nonEqualCC, LHS, RHS);
+  DCPU16CC::CondCodes simpleCC = GetSimpleCC(nonEqualCC);
   return DAG.getNode(DCPU16ISD::BR_CC, dl, Op.getValueType(),
                      Chain, DAG.getConstant(simpleCC, MVT::i16), LHS, RHS, Dest);
 }
@@ -638,9 +628,8 @@ SDValue DCPU16TargetLowering::LowerSELECT_CC(SDValue Op,
   if (NeedsAdditionalEqualityCC(CC, NULL, &reverseCC)) {
     // This makes sure we only need one SELECT_CC node.
     std::swap(TrueV, FalseV);
-    CC = reverseCC;
   }
-  DCPU16CC::CondCodes simpleCC = GetSimpleCC(CC, LHS, RHS);
+  DCPU16CC::CondCodes simpleCC = GetSimpleCC(reverseCC);
 
   SDVTList VTs = DAG.getVTList(Op.getValueType());
   SmallVector<SDValue, 5> Ops;
