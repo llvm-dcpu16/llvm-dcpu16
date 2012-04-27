@@ -102,18 +102,30 @@ void DCPU16InstPrinter::printCCOperand(const MCInst *MI, unsigned OpNo,
 
   switch (CC) {
   default:
-   llvm_unreachable("Unsupported CC code");
-  case DCPU16CC::COND_E:
-   O << "IFE";
-   break;
-  case DCPU16CC::COND_NE:
-   O << "IFN";
-   break;
-  case DCPU16CC::COND_G:
-   O << "IFG";
-   break;
+    llvm_unreachable("Unsupported CC code");
   case DCPU16CC::COND_B:
-   O << "IFB";
-   break;
+    O << "IFB";
+    break;
+  case DCPU16CC::COND_C:
+    O << "IFC";
+    break;
+  case DCPU16CC::COND_E:
+    O << "IFE";
+    break;
+  case DCPU16CC::COND_NE:
+    O << "IFN";
+    break;
+  case DCPU16CC::COND_G:
+    O << "IFG";
+    break;
+  case DCPU16CC::COND_A:
+    O << "IFA";
+    break;
+  case DCPU16CC::COND_L:
+    O << "IFL";
+    break;
+  case DCPU16CC::COND_U:
+    O << "IFU";
+    break;
   }
 }

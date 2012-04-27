@@ -69,7 +69,7 @@ define i16 @sccwuge(i16 %a, i16 %b) nounwind {
 ; CHECK:sccwuge
 ; CHECK:        SET     C, A
 ; CHECK:        SET     A, 0x1
-; CHECK:        IFG     B, C
+; CHECK:        IFL     C, B
 ; CHECK:        SET     A, 0x0
 
 define i16 @sccwult(i16 %a, i16 %b) nounwind {
@@ -80,7 +80,7 @@ define i16 @sccwult(i16 %a, i16 %b) nounwind {
 ; CHECK:sccwult
 ; CHECK:        SET     C, A
 ; CHECK:        SET     A, 0x0
-; CHECK:        IFG     B, C
+; CHECK:        IFL     C, B
 ; CHECK:        SET     A, 0x1
 
 define i16 @sccwule(i16 %a, i16 %b) nounwind {
@@ -102,7 +102,7 @@ define i16 @sccwsgt(i16 %a, i16 %b) nounwind {
 ; CHECK:sccwsgt
 ; CHECK:        SET     C, A
 ; CHECK:        SET     A, 0x0
-; CHECK:        IFG     C, B
+; CHECK:        IFA     C, B
 ; CHECK:        SET     A, 0x1
 
 define i16 @sccwsge(i16 %a, i16 %b) nounwind {
@@ -113,7 +113,7 @@ define i16 @sccwsge(i16 %a, i16 %b) nounwind {
 ; CHECK:sccwsge
 ; CHECK:        SET     C, A
 ; CHECK:        SET     A, 0x1
-; CHECK:        IFG     B, C
+; CHECK:        IFU     C, B
 ; CHECK:        SET     A, 0x0
 
 define i16 @sccwslt(i16 %a, i16 %b) nounwind {
@@ -124,7 +124,7 @@ define i16 @sccwslt(i16 %a, i16 %b) nounwind {
 ; CHECK:sccwslt
 ; CHECK:        SET     C, A
 ; CHECK:        SET     A, 0x0
-; CHECK:        IFG     B, C
+; CHECK:        IFU     C, B
 ; CHECK:        SET     A, 0x1
 
 define i16 @sccwsle(i16 %a, i16 %b) nounwind {
@@ -135,5 +135,5 @@ define i16 @sccwsle(i16 %a, i16 %b) nounwind {
 ; CHECK:sccwsle
 ; CHECK:        SET     C, A
 ; CHECK:        SET     A, 0x1
-; CHECK:        IFG     C, B
+; CHECK:        IFA     C, B
 ; CHECK:        SET     A, 0x0
