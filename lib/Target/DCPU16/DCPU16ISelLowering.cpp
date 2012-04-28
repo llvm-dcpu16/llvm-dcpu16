@@ -179,6 +179,20 @@ DCPU16TargetLowering::LowerFormalArguments(SDValue Chain,
   case CallingConv::C:
   case CallingConv::Fast:
     return LowerCCCArguments(Chain, CallConv, isVarArg, Ins, dl, DAG, InVals);
+  case CallingConv::DCPU16_INTR: {
+    if (Ins.size() != 1 || Ins[0].VT != MVT::i16)
+      report_fatal_error("Interrupt handlers take exactly one integer or unsigned argument");
+
+    // Copy to virtual register from RA
+    MachineRegisterInfo &RegInfo = DAG.getMachineFunction().getRegInfo();
+    unsigned VReg =
+      RegInfo.createVirtualRegister(DCPU16::GR16RegisterClass);
+    RegInfo.addLiveIn(DCPU16::RA, VReg);
+    SDValue ArgValue = DAG.getCopyFromReg(Chain, dl, VReg, MVT::i16);
+    InVals.push_back(ArgValue);
+
+    return Chain;
+  }
   }
 }
 
@@ -201,6 +215,8 @@ DCPU16TargetLowering::LowerCall(SDValue Chain, SDValue Callee,
   case CallingConv::C:
     return LowerCCCCallTo(Chain, Callee, CallConv, isVarArg, isTailCall,
                           Outs, OutVals, Ins, dl, DAG, InVals);
+  case CallingConv::DCPU16_INTR:
+    report_fatal_error("ISRs cannot be called directly");
   }
 }
 
@@ -300,6 +316,10 @@ DCPU16TargetLowering::LowerReturn(SDValue Chain,
   // CCValAssign - represent the assignment of the return value to a location
   SmallVector<CCValAssign, 16> RVLocs;
 
+  // ISRs cannot return any value.
+  if (CallConv == CallingConv::DCPU16_INTR && !Outs.empty())
+    report_fatal_error("Interrupt handlers cannot return any value");
+
   // CCState - Info about the registers and stack slot.
   CCState CCInfo(CallConv, isVarArg, DAG.getMachineFunction(),
      getTargetMachine(), RVLocs, *DAG.getContext());
@@ -330,11 +350,14 @@ DCPU16TargetLowering::LowerReturn(SDValue Chain,
     Flag = Chain.getValue(1);
   }
 
+  unsigned Opc = (CallConv == CallingConv::DCPU16_INTR ?
+                  DCPU16ISD::RETI_FLAG : DCPU16ISD::RET_FLAG);
+
   if (Flag.getNode())
-    return DAG.getNode(DCPU16ISD::RET_FLAG, dl, MVT::Other, Chain, Flag);
+    return DAG.getNode(Opc, dl, MVT::Other, Chain, Flag);
 
   // Return Void
-  return DAG.getNode(DCPU16ISD::RET_FLAG, dl, MVT::Other, Chain);
+  return DAG.getNode(Opc, dl, MVT::Other, Chain);
 }
 
 /// LowerCCCCallTo - functions arguments are copied from virtual regs to
@@ -717,6 +740,7 @@ const char *DCPU16TargetLowering::getTargetNodeName(unsigned Opcode) const {
   switch (Opcode) {
   default: return NULL;
   case DCPU16ISD::RET_FLAG:           return "DCPU16ISD::RET_FLAG";
+  case DCPU16ISD::RETI_FLAG:          return "DCPU16ISD::RETI_FLAG";
   case DCPU16ISD::RRA:                return "DCPU16ISD::RRA";
   case DCPU16ISD::RLA:                return "DCPU16ISD::RLA";
   case DCPU16ISD::RRC:                return "DCPU16ISD::RRC";
