@@ -41,6 +41,7 @@ DCPU16RegisterInfo::DCPU16RegisterInfo(DCPU16TargetMachine &tm,
 const uint16_t*
 DCPU16RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
   const TargetFrameLowering *TFI = MF->getTarget().getFrameLowering();
+  const Function* F = MF->getFunction();
   static const uint16_t CalleeSavedRegs[] = {
     DCPU16::RX, DCPU16::RY, DCPU16::RZ, DCPU16::RI, DCPU16::RJ,
     0
@@ -49,11 +50,28 @@ DCPU16RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
     DCPU16::RX, DCPU16::RY, DCPU16::RZ, DCPU16::RI,
     0
   };
+  // In interrupt handlers, the caller has to save all registers except RA.
+  // This includes EX.
+  static const uint16_t CalleeSavedRegsIntr[] = {
+    DCPU16::REX,
+    DCPU16::RB, DCPU16::RC,
+    DCPU16::RX, DCPU16::RY, DCPU16::RZ, DCPU16::RI, DCPU16::RJ,
+    0
+  };
+  static const uint16_t CalleeSavedRegsIntrFP[] = {
+    DCPU16::REX,
+    DCPU16::RB, DCPU16::RC,
+    DCPU16::RX, DCPU16::RY, DCPU16::RZ, DCPU16::RI,
+    0
+  };
 
   if (TFI->hasFP(*MF))
-    return CalleeSavedRegsFP;
+    return (F->getCallingConv() == CallingConv::DCPU16_INTR ?
+            CalleeSavedRegsIntrFP : CalleeSavedRegsFP);
   else
-    return CalleeSavedRegs;
+    return (F->getCallingConv() == CallingConv::DCPU16_INTR ?
+            CalleeSavedRegsIntr : CalleeSavedRegs);
+
 }
 
 const uint32_t*
