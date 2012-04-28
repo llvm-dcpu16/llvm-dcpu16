@@ -56,7 +56,7 @@ DCPU16TargetLowering::DCPU16TargetLowering(DCPU16TargetMachine &tm) :
   setIntDivIsCheap(true);
   setPow2DivIsCheap(true);
 
-  setStackPointerRegisterToSaveRestore(DCPU16::RSP);
+  setStackPointerRegisterToSaveRestore(DCPU16::SP);
   setBooleanContents(ZeroOrOneBooleanContent);
   setBooleanVectorContents(ZeroOrOneBooleanContent); // FIXME: Is this correct?
 
@@ -183,11 +183,11 @@ DCPU16TargetLowering::LowerFormalArguments(SDValue Chain,
     if (Ins.size() != 1 || Ins[0].VT != MVT::i16)
       report_fatal_error("Interrupt handlers take exactly one integer or unsigned argument");
 
-    // Copy to virtual register from RA
+    // Copy to virtual register from A
     MachineRegisterInfo &RegInfo = DAG.getMachineFunction().getRegInfo();
     unsigned VReg =
       RegInfo.createVirtualRegister(DCPU16::GR16RegisterClass);
-    RegInfo.addLiveIn(DCPU16::RA, VReg);
+    RegInfo.addLiveIn(DCPU16::A, VReg);
     SDValue ArgValue = DAG.getCopyFromReg(Chain, dl, VReg, MVT::i16);
     InVals.push_back(ArgValue);
 
@@ -419,7 +419,7 @@ DCPU16TargetLowering::LowerCCCCallTo(SDValue Chain, SDValue Callee,
       assert(VA.isMemLoc());
 
       if (StackPtr.getNode() == 0)
-        StackPtr = DAG.getCopyFromReg(Chain, dl, DCPU16::RSP, getPointerTy());
+        StackPtr = DAG.getCopyFromReg(Chain, dl, DCPU16::SP, getPointerTy());
 
       SDValue PtrOff = DAG.getNode(ISD::ADD, dl, getPointerTy(),
                                    StackPtr,
@@ -728,7 +728,7 @@ SDValue DCPU16TargetLowering::LowerFRAMEADDR(SDValue Op,
   DebugLoc dl = Op.getDebugLoc();  // FIXME probably not meaningful
   unsigned Depth = cast<ConstantSDNode>(Op.getOperand(0))->getZExtValue();
   SDValue FrameAddr = DAG.getCopyFromReg(DAG.getEntryNode(), dl,
-                                         DCPU16::RJ, VT);
+                                         DCPU16::J, VT);
   while (Depth--)
     FrameAddr = DAG.getLoad(VT, dl, DAG.getEntryNode(), FrameAddr,
                             MachinePointerInfo(),
