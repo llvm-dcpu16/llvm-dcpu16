@@ -20,8 +20,29 @@ return:                                           ; preds = %if.else, %if.then
   ret i16 %retval.0
 }
 ; CHECK: :simplebranch_le
-; CHECK: IFG A, B
+; CHECK: IFA A, B
 ; CHECK: SET PC, .LBB0_2
+
+define i16 @simplebranch_ule(i16 %x, i16 %y, i16 %z) nounwind readnone {
+entry:
+  %cmp = icmp ugt i16 %x, %y
+  br i1 %cmp, label %if.else, label %if.then
+
+if.then:                                          ; preds = %entry
+  %mul = mul nsw i16 %z, 17
+  br label %return
+
+if.else:                                          ; preds = %entry
+  %add = add nsw i16 %z, 2
+  br label %return
+
+return:                                           ; preds = %if.else, %if.then
+  %retval.0 = phi i16 [ %mul, %if.then ], [ %add, %if.else ]
+  ret i16 %retval.0
+}
+; CHECK: :simplebranch_ule
+; CHECK: IFG A, B
+; CHECK: SET PC, .LBB1_2
 
 define i16 @simplebranch_l(i16 %x, i16 %y, i16 %z) nounwind readnone {
 entry:
@@ -42,9 +63,32 @@ return:                                           ; preds = %if.else, %if.then
 }
 ; CHECK: :simplebranch_l
 ; CHECK: IFE A, B
-; CHECK: SET PC, .LBB1_2
+; CHECK: SET PC, .LBB2_2
+; CHECK: IFA A, B
+; CHECK: SET PC, .LBB2_2
+
+define i16 @simplebranch_ul(i16 %x, i16 %y, i16 %z) nounwind readnone {
+entry:
+  %cmp = icmp ult i16 %x, %y
+  br i1 %cmp, label %if.then, label %if.else
+
+if.then:                                          ; preds = %entry
+  %mul = mul nsw i16 %z, 17
+  br label %return
+
+if.else:                                          ; preds = %entry
+  %add = add nsw i16 %z, 2
+  br label %return
+
+return:                                           ; preds = %if.else, %if.then
+  %retval.0 = phi i16 [ %mul, %if.then ], [ %add, %if.else ]
+  ret i16 %retval.0
+}
+; CHECK: :simplebranch_ul
+; CHECK: IFE A, B
+; CHECK: SET PC, .LBB3_2
 ; CHECK: IFG A, B
-; CHECK: SET PC, .LBB1_2
+; CHECK: SET PC, .LBB3_2
 
 define i16 @simplebranch_ge(i16 %x, i16 %y, i16 %z) nounwind readnone {
 entry:
@@ -64,8 +108,29 @@ return:                                           ; preds = %if.else, %if.then
   ret i16 %retval.0
 }
 ; CHECK: :simplebranch_ge
-; CHECK: IFG B, A
-; CHECK: SET PC, .LBB2_2
+; CHECK: IFU A, B
+; CHECK: SET PC, .LBB4_2
+
+define i16 @simplebranch_uge(i16 %x, i16 %y, i16 %z) nounwind readnone {
+entry:
+  %cmp = icmp ult i16 %x, %y
+  br i1 %cmp, label %if.else, label %if.then
+
+if.then:                                          ; preds = %entry
+  %mul = mul nsw i16 %z, 17
+  br label %return
+
+if.else:                                          ; preds = %entry
+  %add = add nsw i16 %z, 2
+  br label %return
+
+return:                                           ; preds = %if.else, %if.then
+  %retval.0 = phi i16 [ %mul, %if.then ], [ %add, %if.else ]
+  ret i16 %retval.0
+}
+; CHECK: :simplebranch_uge
+; CHECK: IFL A, B
+; CHECK: SET PC, .LBB5_2
 
 define i16 @simplebranch_g(i16 %x, i16 %y, i16 %z) nounwind readnone {
 entry:
@@ -86,9 +151,32 @@ return:                                           ; preds = %if.else, %if.then
 }
 ; CHECK: :simplebranch_g
 ; CHECK: IFE A, B
-; CHECK: SET PC, .LBB3_2
-; CHECK: IFG B, A
-; CHECK: SET PC, .LBB3_2
+; CHECK: SET PC, .LBB6_2
+; CHECK: IFU A, B
+; CHECK: SET PC, .LBB6_2
+
+define i16 @simplebranch_ug(i16 %x, i16 %y, i16 %z) nounwind readnone {
+entry:
+  %cmp = icmp ugt i16 %x, %y
+  br i1 %cmp, label %if.then, label %if.else
+
+if.then:                                          ; preds = %entry
+  %mul = mul nsw i16 %z, 17
+  br label %return
+
+if.else:                                          ; preds = %entry
+  %add = add nsw i16 %z, 2
+  br label %return
+
+return:                                           ; preds = %if.else, %if.then
+  %retval.0 = phi i16 [ %mul, %if.then ], [ %add, %if.else ]
+  ret i16 %retval.0
+}
+; CHECK: :simplebranch_ug
+; CHECK: IFE A, B
+; CHECK: SET PC, .LBB7_2
+; CHECK: IFL A, B
+; CHECK: SET PC, .LBB7_2
 
 define i16 @simplebranch_e(i16 %x, i16 %y, i16 %z) nounwind readnone {
 entry:
@@ -109,7 +197,7 @@ return:                                           ; preds = %if.else, %if.then
 }
 ; CHECK: :simplebranch_e
 ; CHECK: IFN A, B
-; CHECK: SET PC, .LBB4_2
+; CHECK: SET PC, .LBB8_2
 
 define i16 @simplebranch_ne(i16 %x, i16 %y, i16 %z) nounwind readnone {
 entry:
@@ -130,7 +218,7 @@ return:                                           ; preds = %if.else, %if.then
 }
 ; CHECK: :simplebranch_ne
 ; CHECK: IFE A, B
-; CHECK: SET PC, .LBB5_2
+; CHECK: SET PC, .LBB9_2
 
 define i16 @imm_branch(i16 %a, i16 %b) nounwind readnone {
 entry:
@@ -158,8 +246,8 @@ return:                                           ; preds = %if.else3, %if.then2
   ret i16 %retval.0
 }
 ; CHECK: :imm_branch
-; CHECK: IFG A, 0x9
+; CHECK: IFA A, 0x9
 ; CHECK: ADD B, 0xa
-; CHECK: IFG 0x15, A
+; CHECK: IFU A, 0x15
 ; CHECK: MUL B, 0x11
 ; CHECK: DIV B, 0x5

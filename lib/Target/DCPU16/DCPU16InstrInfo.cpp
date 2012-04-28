@@ -148,6 +148,12 @@ ReverseBranchCondition(SmallVectorImpl<MachineOperand> &Cond) const {
 
   switch (CC) {
   default: llvm_unreachable("Invalid branch condition!");
+  case DCPU16CC::COND_B:
+    CC = DCPU16CC::COND_C;
+    break;
+  case DCPU16CC::COND_C:
+    CC = DCPU16CC::COND_B;
+    break;
   case DCPU16CC::COND_E:
     CC = DCPU16CC::COND_NE;
     break;
@@ -155,17 +161,29 @@ ReverseBranchCondition(SmallVectorImpl<MachineOperand> &Cond) const {
     CC = DCPU16CC::COND_E;
     break;
   case DCPU16CC::COND_G:
-    Opcode = SwapBR_CCOpcode(Opcode);
-    std::swap(Cond[2], Cond[3]);
+    CC = DCPU16CC::COND_LE;
+    break;
+  case DCPU16CC::COND_A:
+    CC = DCPU16CC::COND_UE;
+    break;
+  case DCPU16CC::COND_L:
     CC = DCPU16CC::COND_GE;
     break;
+  case DCPU16CC::COND_U:
+    CC = DCPU16CC::COND_AE;
+    break;
   case DCPU16CC::COND_GE:
-    Opcode = SwapBR_CCOpcode(Opcode);
-    std::swap(Cond[2], Cond[3]);
+    CC = DCPU16CC::COND_L;
+    break;
+  case DCPU16CC::COND_AE:
+    CC = DCPU16CC::COND_U;
+    break;
+  case DCPU16CC::COND_LE:
     CC = DCPU16CC::COND_G;
     break;
-  case DCPU16CC::COND_B:
-    return true;
+  case DCPU16CC::COND_UE:
+    CC = DCPU16CC::COND_A;
+    break;
   }
 
   Cond[0].setImm(Opcode);
@@ -182,6 +200,36 @@ bool DCPU16InstrInfo::isUnpredicatedTerminator(const MachineInstr *MI) const {
   if (!MI->isPredicable())
     return true;
   return !isPredicated(MI);
+}
+
+static bool AcceptsAdditionalEqualityCheck(DCPU16CC::CondCodes simpleCC,
+                                           DCPU16CC::CondCodes *complexCC) {
+  *complexCC = simpleCC;
+  switch (simpleCC) {
+  default: llvm_unreachable("Invalid comparison code!");
+  case DCPU16CC::COND_GE:
+  case DCPU16CC::COND_LE:
+  case DCPU16CC::COND_AE:
+  case DCPU16CC::COND_UE:
+    llvm_unreachable("Not a simple CC, already contains an equality!");
+  case DCPU16CC::COND_B:
+  case DCPU16CC::COND_C:
+  case DCPU16CC::COND_E:
+  case DCPU16CC::COND_NE:
+    return false;
+  case DCPU16CC::COND_G:
+    *complexCC = DCPU16CC::COND_GE;
+    return true;
+  case DCPU16CC::COND_A:
+    *complexCC = DCPU16CC::COND_AE;
+    return true;
+  case DCPU16CC::COND_L:
+    *complexCC = DCPU16CC::COND_LE;
+    return true;
+  case DCPU16CC::COND_U:
+    *complexCC = DCPU16CC::COND_UE;
+    return true;
+  }
 }
 
 bool DCPU16InstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,
@@ -262,20 +310,56 @@ bool DCPU16InstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,
     assert(Cond.size() == 4);
     assert(TBB);
 
-    // Is it a >= ?
+    // Is it a complex CC?
+    DCPU16CC::CondCodes complexCC;
     if ((BranchCode == DCPU16CC::COND_E)
-        && (((DCPU16CC::CondCodes) Cond[1].getImm()) == DCPU16CC::COND_G)
+        && AcceptsAdditionalEqualityCheck((DCPU16CC::CondCodes) Cond[1].getImm(), &complexCC)
         && (TBB == I->getOperand(3).getMBB())
         // This should actually check for equality but that's just too much code...
         && (((Cond[2].getType() == LHS.getType()) && (Cond[3].getType() == RHS.getType()))
           || ((Cond[2].getType() == RHS.getType()) && (Cond[3].getType() == LHS.getType())))) {
 
-      Cond[1] = MachineOperand::CreateImm(DCPU16CC::COND_GE);
+      Cond[1] = MachineOperand::CreateImm(complexCC);
     }
     break;
   }
 
   return false;
+}
+
+static bool IsComplexCC(DCPU16CC::CondCodes cc,
+                        DCPU16CC::CondCodes *simpleCC,
+                        DCPU16CC::CondCodes *reverseCC) {
+  *simpleCC = cc;
+  *reverseCC = cc;
+  switch (cc) {
+  default: llvm_unreachable("Invalid condition code!");
+  case DCPU16CC::COND_B:
+  case DCPU16CC::COND_C:
+  case DCPU16CC::COND_E:
+  case DCPU16CC::COND_NE:
+  case DCPU16CC::COND_G:
+  case DCPU16CC::COND_L:
+  case DCPU16CC::COND_A:
+  case DCPU16CC::COND_U:
+    return false;
+  case DCPU16CC::COND_GE:
+    *simpleCC = DCPU16CC::COND_G;
+    *reverseCC = DCPU16CC::COND_L;
+    return true;
+  case DCPU16CC::COND_LE:
+    *simpleCC = DCPU16CC::COND_L;
+    *reverseCC = DCPU16CC::COND_G;
+    return true;
+  case DCPU16CC::COND_AE:
+    *simpleCC = DCPU16CC::COND_A;
+    *reverseCC = DCPU16CC::COND_U;
+    return true;
+  case DCPU16CC::COND_UE:
+    *simpleCC = DCPU16CC::COND_U;
+    *reverseCC = DCPU16CC::COND_A;
+    return true;
+  }
 }
 
 unsigned
@@ -301,21 +385,24 @@ DCPU16InstrInfo::InsertBranch(MachineBasicBlock &MBB, MachineBasicBlock *TBB,
   DCPU16CC::CondCodes CC = (DCPU16CC::CondCodes) Cond[1].getImm();
   MachineOperand LHS = Cond[2];
   MachineOperand RHS = Cond[3];
-  // Is it a >= ?
-  if (CC == DCPU16CC::COND_GE) {
+
+  // Is it a complex CC?
+  DCPU16CC::CondCodes simpleCC, reverseCC;
+  if (IsComplexCC(CC, &simpleCC, &reverseCC)) {
     if (FBB) {
       // Switch targets around to produce shorter code
       std::swap(TBB, FBB);
       std::swap(LHS, RHS);
       Opcode = SwapBR_CCOpcode(Opcode);
+      CC = reverseCC;
     } else {
       BuildMI(&MBB, DL, get(Opcode))
         .addImm(DCPU16CC::COND_E)
         .addOperand(LHS).addOperand(RHS)
         .addMBB(TBB);
+      CC = simpleCC;
       ++Count;
     }
-    CC = DCPU16CC::COND_G;
   }
   BuildMI(&MBB, DL, get(Opcode))
     .addImm(CC)
