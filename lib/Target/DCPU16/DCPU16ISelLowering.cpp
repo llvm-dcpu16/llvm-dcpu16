@@ -52,8 +52,9 @@ DCPU16TargetLowering::DCPU16TargetLowering(DCPU16TargetMachine &tm) :
 
   // Provide all sorts of operation actions
 
-  // Division is expensive
-  setIntDivIsCheap(false);
+  // Division is inexpensive
+  setIntDivIsCheap(true);
+  setPow2DivIsCheap(true);
 
   setStackPointerRegisterToSaveRestore(DCPU16::RSP);
   setBooleanContents(ZeroOrOneBooleanContent);
@@ -99,7 +100,6 @@ DCPU16TargetLowering::DCPU16TargetLowering(DCPU16TargetMachine &tm) :
 
   setOperationAction(ISD::UDIVREM,          MVT::i16,   Expand);
   setOperationAction(ISD::SDIVREM,          MVT::i16,   Expand);
-  setOperationAction(ISD::SREM,             MVT::i16,   Expand);
 
   setMinFunctionAlignment(1);
   setPrefFunctionAlignment(1);
