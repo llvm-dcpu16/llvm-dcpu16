@@ -52,8 +52,9 @@ DCPU16TargetLowering::DCPU16TargetLowering(DCPU16TargetMachine &tm) :
 
   // Provide all sorts of operation actions
 
-  // Division is expensive
-  setIntDivIsCheap(false);
+  // Division is inexpensive
+  setIntDivIsCheap(true);
+  setPow2DivIsCheap(true);
 
   setStackPointerRegisterToSaveRestore(DCPU16::RSP);
   setBooleanContents(ZeroOrOneBooleanContent);
