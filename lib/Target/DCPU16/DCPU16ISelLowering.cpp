@@ -99,7 +99,6 @@ DCPU16TargetLowering::DCPU16TargetLowering(DCPU16TargetMachine &tm) :
 
   setOperationAction(ISD::UDIVREM,          MVT::i16,   Expand);
   setOperationAction(ISD::SDIVREM,          MVT::i16,   Expand);
-  setOperationAction(ISD::SREM,             MVT::i16,   Expand);
 
   setMinFunctionAlignment(1);
   setPrefFunctionAlignment(1);

@@ -384,6 +384,8 @@ let Defs = [REX] in {
   defm SRL16   : BASIC_RR_NON_COM<0x0, "SHR", srl>,  BASIC_NORMAL<0x0, "SHR", srl>;
   defm SRA16   : BASIC_RR_NON_COM<0x0, "ASR", sra>,  BASIC_NORMAL<0x0, "ASR", sra>;
   defm SHL16   : BASIC_RR_NON_COM<0x0, "SHL", shl>,  BASIC_NORMAL<0x0, "SHL", shl>;
+  defm UREM16  : BASIC_RR_NON_COM<0x0, "MOD", urem>, BASIC_NORMAL<0x0, "MOD", urem>;
+  defm SREM16  : BASIC_RR_NON_COM<0x0, "MDI", srem>, BASIC_NORMAL<0x0, "MDI", srem>;
 
   let Uses = [REX] in {
     defm ADC16   : BASIC_RR_IS_COM <0x0, "ADX", adde>, BASIC_NORMAL<0x0, "ADX", adde>;
