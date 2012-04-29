@@ -20,28 +20,28 @@ class DCPU16Reg<bits<5> num, string n> : Register<n> {
 //  Registers
 //===----------------------------------------------------------------------===//
 
-def RA  : DCPU16Reg<0x0,  "A">;
-def RB  : DCPU16Reg<0x1,  "B">;
-def RC  : DCPU16Reg<0x2,  "C">;
-def RX  : DCPU16Reg<0x3,  "X">;
-def RY  : DCPU16Reg<0x4,  "Y">;
-def RZ  : DCPU16Reg<0x5,  "Z">;
-def RI  : DCPU16Reg<0x6,  "I">;
-def RJ  : DCPU16Reg<0x7,  "J">; // FP if needed
+def A  : DCPU16Reg<0x0,  "A">;
+def B  : DCPU16Reg<0x1,  "B">;
+def C  : DCPU16Reg<0x2,  "C">;
+def X  : DCPU16Reg<0x3,  "X">;
+def Y  : DCPU16Reg<0x4,  "Y">;
+def Z  : DCPU16Reg<0x5,  "Z">;
+def I  : DCPU16Reg<0x6,  "I">;
+def J  : DCPU16Reg<0x7,  "J">; // FP if needed
 
-def RSP  : DCPU16Reg<0x1b,  "SP">;
-def REX  : DCPU16Reg<0x1d,  "EX">;
+def SP  : DCPU16Reg<0x1b,  "SP">;
+def EX  : DCPU16Reg<0x1d,  "EX">;
 
 // Volatile registers
 def GR16 : RegisterClass<"DCPU16", [i16], 16,
-  (add RA,RB,RC,RX,RY,RZ,RI,RJ)>;
+  (add A,B,C,X,Y,Z,I,J)>;
 
 // Stack pointer register
 def SPR16 : RegisterClass<"DCPU16", [i16], 16,
-  (add RSP)>;
+  (add SP)>;
   
 // Overflow register
 def EXR16 : RegisterClass<"DCPU16", [i16], 16,
-  (add REX)> {
+  (add EX)> {
    let isAllocatable = 0;
 }
