@@ -10,7 +10,7 @@ but simple programs work.
 ### [Binary distribution for Linux x64 is available.](https://s3.amazonaws.com/llvm-dcpu16/llvm-dcpu16.v0.0.2.tar.gz) (v0.0.2, 170MB) ###
 
 Tested on Ubuntu 11.10 x86-64.
-Please, [let me know](https://github.com/krasin/llvm-dcpu16/issues), if it does not work for you.
+Please, [let me know](https://github.com/llvm-dcpu16/llvm-dcpu16/issues), if it does not work for you.
 
 Basic Clang usage is:
 
@@ -28,7 +28,7 @@ you have to replace "cmake .." with "cmake  -DPYTHON_EXECUTABLE=/path/to/python2
 
 Next, get the sources and build it:
 
-    git clone git://github.com/krasin/llvm-dcpu16.git # Checkout LLVM
+    git clone git://github.com/llvm-dcpu16/llvm-dcpu16.git # Checkout LLVM
     cd llvm-dcpu16/tools
     git clone git://github.com/llvm-dcpu16/clang.git # Checkout Clang
     mkdir ../cbuild
@@ -159,4 +159,4 @@ After you compile and run the program, the final state would be something like:
 
 X=13 has the value of Fib_5 (you may want to play other values of argument to fib).
 
-Enjoy and, please, [report bugs](https://github.com/krasin/llvm-dcpu16/issues)!
+Enjoy and, please, [report bugs](https://github.com/llvm-dcpu16/llvm-dcpu16/issues)!
