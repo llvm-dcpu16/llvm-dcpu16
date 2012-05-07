@@ -64,35 +64,33 @@ void DCPU16InstPrinter::printSrcMemOperand(const MCInst *MI, unsigned OpNo,
   const MCOperand &Base = MI->getOperand(OpNo);
   const MCOperand &Disp = MI->getOperand(OpNo+1);
 
-  // Print displacement first
-
-  // If the global address expression is a part of displacement field with a
-  // register base, we should not emit any prefix symbol here, e.g.
-  //   SET r1, &foo ; The Notch order
-  // vs
-  //   SET r2, glb(r1) ; The Notch order
-  // Otherwise (!) dcpu16-as will silently miscompile the output :(
   O << '[';
 
-  if (Disp.isExpr())
+  if (Disp.isExpr()) {
     O << *Disp.getExpr();
-  else {
-    assert(Disp.isImm() && "Expected immediate in displacement field");
+    if (Base.getReg())
+      O << "+";
+  } else {
+    assert(Disp.isImm() &&
+        "Expected immediate or expression in displacement field");
+    if (Base.getReg()) {
+      // Only print the immediate if it isn't 0, easier to read and
+      // generates more efficient code on bad assemblers
+      if (Disp.getImm() != 0) {
+        O << "0x";
+        O.write_hex(Disp.getImm() & 0xFFFF);
+        O << "+";
+      }
+    } else {
+      O << "0x";
+      O.write_hex(Disp.getImm() & 0xFFFF);
+    }
   }
-  if (!Base.getReg() && Disp.isImm()) {
-	  if(Disp.getImm() != 0) {
-		  O << "0x";
-		  O.write_hex((Disp.getImm()) & 0xFFFF);
-	  }
-  } else if (Base.getReg()) {
-	  // Print register base field
-	  if(Disp.isImm() && Disp.getImm() != 0) {
-		  O << "0x";
-		  O.write_hex((Disp.getImm()) & 0xFFFF);
-		  O << "+";
-	  }
+
+  if (Base.getReg()) {
     O << getRegisterName(Base.getReg());
   }
+
   O << ']';
 }
 
