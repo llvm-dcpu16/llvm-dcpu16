@@ -64,6 +64,20 @@ void DCPU16InstPrinter::printSrcMemOperand(const MCInst *MI, unsigned OpNo,
   const MCOperand &Base = MI->getOperand(OpNo);
   const MCOperand &Disp = MI->getOperand(OpNo+1);
 
+  // Special case for PICK n syntax
+  if (Base.getReg() == DCPU16::SP) {
+    if (Disp.isImm()) {
+      O << "PICK 0x";
+      O.write_hex(Disp.getImm() & 0xFFFF);
+    } else {
+      assert(Disp.isExpr() &&
+             "Expected immediate or expression in displacement field");
+      O << "PICK ";
+      O << *Disp.getExpr();
+    }
+    return;
+  }
+
   O << '[';
 
   if (Disp.isExpr()) {

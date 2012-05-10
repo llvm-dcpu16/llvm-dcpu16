@@ -113,17 +113,28 @@ void DCPU16AsmPrinter::printSrcMemOperand(const MachineInstr *MI, int OpNum,
   const MachineOperand &Base = MI->getOperand(OpNum);
   const MachineOperand &Disp = MI->getOperand(OpNum+1);
 
+  // Special case for PICK n syntax
+  if (Base.getReg() == DCPU16::SP) {
+    if (Disp.isImm()) {
+      O << "PICK 0x";
+      O.write_hex(Disp.getImm() & 0xFFFF);
+    } else {
+      llvm_unreachable("Unsupported src mem expression in inline asm");
+    }
+    return;
+  }
+
   if (Base.getReg())
     O << '[';
 
-  if(Disp.isImm()) {
-	  if (Disp.getImm() != 0) {
-        O << "0x";
-        O.write_hex((Disp.getImm()) & 0xFFFF);
-        O << "+";
-	  }
+  if (Disp.isImm()) {
+    if (Disp.getImm() != 0) {
+      O << "0x";
+      O.write_hex((Disp.getImm()) & 0xFFFF);
+      O << "+";
+    }
   } else {
-	  llvm_unreachable("Unsupported src mem operand in inline asm");
+    llvm_unreachable("Unsupported src mem operand in inline asm");
   }
 
   // Print register base field
