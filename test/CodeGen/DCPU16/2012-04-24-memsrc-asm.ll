@@ -13,4 +13,4 @@ entry:
 !0 = metadata !{i32 58}
 
 ; CHECK: :func
-; CHECK: SET [SP], SP
+; CHECK: SET PICK 0x0, SP
