@@ -19,6 +19,6 @@ entry:
   ret i16 0
 }
 
-; CHECK:        ADD     A, [0x{{.}}+SP]
-; CHECK:        ADX     B, [0x{{.}}+SP]
+; CHECK:        ADD     A, PICK 0x{{.}}
+; CHECK:        ADX     B, PICK 0x{{.}}
 

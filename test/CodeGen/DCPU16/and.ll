@@ -14,9 +14,9 @@ entry:
   ret i16 %and
 }
 ; CHECK: :f1
-; CHECK: SET [0x1+SP], A
-; CHECK: SET [SP], B
-; CHECK: AND B, [0x1+SP]
+; CHECK: SET PICK 0x1, A
+; CHECK: SET PICK 0x0, B
+; CHECK: AND B, PICK 0x1
 ; CHECK: SET A, B
 ; CHECK: ADD SP, 0x2
 
