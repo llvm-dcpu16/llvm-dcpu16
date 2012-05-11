@@ -164,7 +164,7 @@ define i32* @test13() {
 }
 
 declare noalias i8* @malloc(i32)
-
+declare noalias i8* @calloc(i32, i32)
 
 
 define void @test14(i32* %Q) {
@@ -258,3 +258,21 @@ define void @test20() {
 }
 ; CHECK: @test20
 ; CHECK-NEXT: ret void
+
+; CHECK: @test21
+define void @test21() {
+  %m = call i8* @calloc(i32 9, i32 7)
+  store i8 0, i8* %m
+; CHECK-NEXT: ret void
+  ret void
+}
+
+; CHECK: @test22(
+define void @test22(i1 %i, i32 %k, i32 %m) nounwind {
+  %k.addr = alloca i32
+  %m.addr = alloca i32
+  %k.addr.m.addr = select i1 %i, i32* %k.addr, i32* %m.addr
+  store i32 0, i32* %k.addr.m.addr, align 4
+; CHECK-NEXT: ret void
+  ret void
+}

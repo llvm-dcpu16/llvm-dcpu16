@@ -55,7 +55,9 @@ HexagonTargetMachine::HexagonTargetMachine(const Target &T, StringRef TT,
                                            CodeModel::Model CM,
                                            CodeGenOpt::Level OL)
   : LLVMTargetMachine(T, TT, CPU, FS, Options, RM, CM, OL),
-    DataLayout("e-p:32:32:32-i64:64:64-i32:32:32-i16:16:16-i1:32:32-a0:0") ,
+    DataLayout("e-p:32:32:32-"
+                "i64:64:64-i32:32:32-i16:16:16-i1:32:32-"
+                "f64:64:64-f32:32:32-a0:0-n32") ,
     Subtarget(TT, CPU, FS), InstrInfo(Subtarget), TLInfo(*this),
     TSInfo(*this),
     FrameLowering(Subtarget),
@@ -100,23 +102,22 @@ TargetPassConfig *HexagonTargetMachine::createPassConfig(PassManagerBase &PM) {
 }
 
 bool HexagonPassConfig::addInstSelector() {
-  PM.add(createHexagonRemoveExtendOps(getHexagonTargetMachine()));
-  PM.add(createHexagonISelDag(getHexagonTargetMachine()));
-  PM.add(createHexagonPeephole());
+  PM->add(createHexagonRemoveExtendOps(getHexagonTargetMachine()));
+  PM->add(createHexagonISelDag(getHexagonTargetMachine()));
+  PM->add(createHexagonPeephole());
   return false;
 }
 
 
 bool HexagonPassConfig::addPreRegAlloc() {
   if (!DisableHardwareLoops) {
-    PM.add(createHexagonHardwareLoops());
+    PM->add(createHexagonHardwareLoops());
   }
-
   return false;
 }
 
 bool HexagonPassConfig::addPostRegAlloc() {
-  PM.add(createHexagonCFGOptimizer(getHexagonTargetMachine()));
+  PM->add(createHexagonCFGOptimizer(getHexagonTargetMachine()));
   return true;
 }
 
@@ -129,14 +130,17 @@ bool HexagonPassConfig::addPreSched2() {
 bool HexagonPassConfig::addPreEmitPass() {
 
   if (!DisableHardwareLoops) {
-    PM.add(createHexagonFixupHwLoops());
+    PM->add(createHexagonFixupHwLoops());
   }
 
   // Expand Spill code for predicate registers.
-  PM.add(createHexagonExpandPredSpillCode(getHexagonTargetMachine()));
+  PM->add(createHexagonExpandPredSpillCode(getHexagonTargetMachine()));
 
   // Split up TFRcondsets into conditional transfers.
-  PM.add(createHexagonSplitTFRCondSets(getHexagonTargetMachine()));
+  PM->add(createHexagonSplitTFRCondSets(getHexagonTargetMachine()));
+
+  // Create Packets.
+  PM->add(createHexagonPacketizer());
 
   return false;
 }

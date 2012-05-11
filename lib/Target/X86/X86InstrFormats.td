@@ -255,8 +255,9 @@ class Ii32PCRel<bits<8> o, Format f, dag outs, dag ins, string asm,
 
 // FPStack Instruction Templates:
 // FPI - Floating Point Instruction template.
-class FPI<bits<8> o, Format F, dag outs, dag ins, string asm>
-  : I<o, F, outs, ins, asm, []> {}
+class FPI<bits<8> o, Format F, dag outs, dag ins, string asm,
+          InstrItinClass itin = IIC_DEFAULT>
+  : I<o, F, outs, ins, asm, [], itin> {}
 
 // FpI_ - Floating Point Pseudo Instruction template. Not Predicated.
 class FpI_<dag outs, dag ins, FPFormat fp, list<dag> pattern,
@@ -378,7 +379,7 @@ class SDIi8<bits<8> o, Format F, dag outs, dag ins, string asm,
             list<dag> pattern, InstrItinClass itin = IIC_DEFAULT>
       : Ii8<o, F, outs, ins, asm, pattern, itin>, XD, Requires<[HasSSE2]>;
 class SSDIi8<bits<8> o, Format F, dag outs, dag ins, string asm,
-             list<dag> pattern>
+             list<dag> pattern, InstrItinClass itin = IIC_DEFAULT>
       : Ii8<o, F, outs, ins, asm, pattern>, XS, Requires<[HasSSE2]>;
 class PDI<bits<8> o, Format F, dag outs, dag ins, string asm,
           list<dag> pattern, InstrItinClass itin = IIC_DEFAULT>
@@ -503,18 +504,18 @@ class AVX2AIi8<bits<8> o, Format F, dag outs, dag ins, string asm,
 class AES8I<bits<8> o, Format F, dag outs, dag ins, string asm,
             list<dag>pattern, InstrItinClass itin = IIC_DEFAULT>
       : I<o, F, outs, ins, asm, pattern, itin, SSEPackedInt>, T8,
-        Requires<[HasSSE2, HasAES]>;
+        Requires<[HasAES]>;
 
 class AESAI<bits<8> o, Format F, dag outs, dag ins, string asm,
             list<dag> pattern, InstrItinClass itin = IIC_DEFAULT>
       : Ii8<o, F, outs, ins, asm, pattern, itin, SSEPackedInt>, TA,
-        Requires<[HasSSE2, HasAES]>;
+        Requires<[HasAES]>;
 
 // CLMUL Instruction Templates
 class CLMULIi8<bits<8> o, Format F, dag outs, dag ins, string asm,
                list<dag>pattern, InstrItinClass itin = IIC_DEFAULT>
       : Ii8<o, F, outs, ins, asm, pattern, itin, SSEPackedInt>, TA,
-        OpSize, Requires<[HasSSE2, HasCLMUL]>;
+        OpSize, Requires<[HasCLMUL]>;
 
 class AVXCLMULIi8<bits<8> o, Format F, dag outs, dag ins, string asm,
                   list<dag>pattern, InstrItinClass itin = IIC_DEFAULT>

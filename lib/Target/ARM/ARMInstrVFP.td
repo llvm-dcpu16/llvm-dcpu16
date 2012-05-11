@@ -221,11 +221,13 @@ defm : VFPDTAnyInstAlias<"vpop${p}", "$r",
 // FP Binary Operations.
 //
 
+let TwoOperandAliasConstraint = "$Dn = $Dd" in
 def VADDD  : ADbI<0b11100, 0b11, 0, 0,
                   (outs DPR:$Dd), (ins DPR:$Dn, DPR:$Dm),
                   IIC_fpALU64, "vadd", ".f64\t$Dd, $Dn, $Dm",
                   [(set DPR:$Dd, (fadd DPR:$Dn, (f64 DPR:$Dm)))]>;
 
+let TwoOperandAliasConstraint = "$Sn = $Sd" in
 def VADDS  : ASbIn<0b11100, 0b11, 0, 0,
                    (outs SPR:$Sd), (ins SPR:$Sn, SPR:$Sm),
                    IIC_fpALU32, "vadd", ".f32\t$Sd, $Sn, $Sm",
@@ -235,11 +237,13 @@ def VADDS  : ASbIn<0b11100, 0b11, 0, 0,
   let D = VFPNeonA8Domain;
 }
 
+let TwoOperandAliasConstraint = "$Dn = $Dd" in
 def VSUBD  : ADbI<0b11100, 0b11, 1, 0,
                   (outs DPR:$Dd), (ins DPR:$Dn, DPR:$Dm),
                   IIC_fpALU64, "vsub", ".f64\t$Dd, $Dn, $Dm",
                   [(set DPR:$Dd, (fsub DPR:$Dn, (f64 DPR:$Dm)))]>;
 
+let TwoOperandAliasConstraint = "$Sn = $Sd" in
 def VSUBS  : ASbIn<0b11100, 0b11, 1, 0,
                    (outs SPR:$Sd), (ins SPR:$Sn, SPR:$Sm),
                    IIC_fpALU32, "vsub", ".f32\t$Sd, $Sn, $Sm",
@@ -249,21 +253,25 @@ def VSUBS  : ASbIn<0b11100, 0b11, 1, 0,
   let D = VFPNeonA8Domain;
 }
 
+let TwoOperandAliasConstraint = "$Dn = $Dd" in
 def VDIVD  : ADbI<0b11101, 0b00, 0, 0,
                   (outs DPR:$Dd), (ins DPR:$Dn, DPR:$Dm),
                   IIC_fpDIV64, "vdiv", ".f64\t$Dd, $Dn, $Dm",
                   [(set DPR:$Dd, (fdiv DPR:$Dn, (f64 DPR:$Dm)))]>;
 
+let TwoOperandAliasConstraint = "$Sn = $Sd" in
 def VDIVS  : ASbI<0b11101, 0b00, 0, 0,
                   (outs SPR:$Sd), (ins SPR:$Sn, SPR:$Sm),
                   IIC_fpDIV32, "vdiv", ".f32\t$Sd, $Sn, $Sm",
                   [(set SPR:$Sd, (fdiv SPR:$Sn, SPR:$Sm))]>;
 
+let TwoOperandAliasConstraint = "$Dn = $Dd" in
 def VMULD  : ADbI<0b11100, 0b10, 0, 0,
                   (outs DPR:$Dd), (ins DPR:$Dn, DPR:$Dm),
                   IIC_fpMUL64, "vmul", ".f64\t$Dd, $Dn, $Dm",
                   [(set DPR:$Dd, (fmul DPR:$Dn, (f64 DPR:$Dm)))]>;
 
+let TwoOperandAliasConstraint = "$Sn = $Sd" in
 def VMULS  : ASbIn<0b11100, 0b10, 0, 0,
                    (outs SPR:$Sd), (ins SPR:$Sn, SPR:$Sm),
                    IIC_fpMUL32, "vmul", ".f32\t$Sd, $Sn, $Sm",
@@ -819,9 +827,9 @@ let Constraints = "$a = $dst" in {
 // FP to Fixed-Point:
 
 // Single Precision register
-class AVConv1XInsS_Encode<bits<5> op1, bits<2> op2, bits<4> op3, bits<4> op4, bit op5, 
-                dag oops, dag iops, InstrItinClass itin, string opc, string asm,
-                list<dag> pattern>
+class AVConv1XInsS_Encode<bits<5> op1, bits<2> op2, bits<4> op3, bits<4> op4,
+                          bit op5, dag oops, dag iops, InstrItinClass itin,
+                          string opc, string asm, list<dag> pattern>
   : AVConv1XI<op1, op2, op3, op4, op5, oops, iops, itin, opc, asm, pattern> {
   bits<5> dst;
   // if dp_operation then UInt(D:Vd) else UInt(Vd:D);
@@ -830,9 +838,9 @@ class AVConv1XInsS_Encode<bits<5> op1, bits<2> op2, bits<4> op3, bits<4> op4, bi
 }
 
 // Double Precision register
-class AVConv1XInsD_Encode<bits<5> op1, bits<2> op2, bits<4> op3, bits<4> op4, bit op5, 
-                dag oops, dag iops, InstrItinClass itin, string opc, string asm,
-                list<dag> pattern>
+class AVConv1XInsD_Encode<bits<5> op1, bits<2> op2, bits<4> op3, bits<4> op4,
+                          bit op5, dag oops, dag iops, InstrItinClass itin,
+                          string opc, string asm, list<dag> pattern>
   : AVConv1XI<op1, op2, op3, op4, op5, oops, iops, itin, opc, asm, pattern> {
   bits<5> dst;
   // if dp_operation then UInt(D:Vd) else UInt(Vd:D);
@@ -950,7 +958,7 @@ def VMLAD : ADbI<0b11100, 0b00, 0, 0,
                  [(set DPR:$Dd, (fadd_mlx (fmul_su DPR:$Dn, DPR:$Dm),
                                           (f64 DPR:$Ddin)))]>,
               RegConstraint<"$Ddin = $Dd">,
-              Requires<[HasVFP2,UseFPVMLx,NoVFP4]>;
+              Requires<[HasVFP2,UseFPVMLx,DontUseFusedMAC]>;
 
 def VMLAS : ASbIn<0b11100, 0b00, 0, 0,
                   (outs SPR:$Sd), (ins SPR:$Sdin, SPR:$Sn, SPR:$Sm),
@@ -958,7 +966,7 @@ def VMLAS : ASbIn<0b11100, 0b00, 0, 0,
                   [(set SPR:$Sd, (fadd_mlx (fmul_su SPR:$Sn, SPR:$Sm),
                                            SPR:$Sdin))]>,
               RegConstraint<"$Sdin = $Sd">,
-              Requires<[HasVFP2,DontUseNEONForFP,UseFPVMLx,NoVFP4]> {
+              Requires<[HasVFP2,DontUseNEONForFP,UseFPVMLx,DontUseFusedMAC]> {
   // Some single precision VFP instructions may be executed on both NEON and
   // VFP pipelines on A8.
   let D = VFPNeonA8Domain;
@@ -966,10 +974,10 @@ def VMLAS : ASbIn<0b11100, 0b00, 0, 0,
 
 def : Pat<(fadd_mlx DPR:$dstin, (fmul_su DPR:$a, (f64 DPR:$b))),
           (VMLAD DPR:$dstin, DPR:$a, DPR:$b)>,
-          Requires<[HasVFP2,UseFPVMLx,NoVFP4]>;
+          Requires<[HasVFP2,UseFPVMLx,DontUseFusedMAC]>;
 def : Pat<(fadd_mlx SPR:$dstin, (fmul_su SPR:$a, SPR:$b)),
           (VMLAS SPR:$dstin, SPR:$a, SPR:$b)>,
-          Requires<[HasVFP2,DontUseNEONForFP, UseFPVMLx,NoVFP4]>;
+          Requires<[HasVFP2,DontUseNEONForFP, UseFPVMLx,DontUseFusedMAC]>;
 
 def VMLSD : ADbI<0b11100, 0b00, 1, 0,
                  (outs DPR:$Dd), (ins DPR:$Ddin, DPR:$Dn, DPR:$Dm),
@@ -977,7 +985,7 @@ def VMLSD : ADbI<0b11100, 0b00, 1, 0,
                  [(set DPR:$Dd, (fadd_mlx (fneg (fmul_su DPR:$Dn,DPR:$Dm)),
                                           (f64 DPR:$Ddin)))]>,
               RegConstraint<"$Ddin = $Dd">,
-              Requires<[HasVFP2,UseFPVMLx,NoVFP4]>;
+              Requires<[HasVFP2,UseFPVMLx,DontUseFusedMAC]>;
 
 def VMLSS : ASbIn<0b11100, 0b00, 1, 0,
                   (outs SPR:$Sd), (ins SPR:$Sdin, SPR:$Sn, SPR:$Sm),
@@ -985,7 +993,7 @@ def VMLSS : ASbIn<0b11100, 0b00, 1, 0,
                   [(set SPR:$Sd, (fadd_mlx (fneg (fmul_su SPR:$Sn, SPR:$Sm)),
                                            SPR:$Sdin))]>,
               RegConstraint<"$Sdin = $Sd">,
-              Requires<[HasVFP2,DontUseNEONForFP,UseFPVMLx,NoVFP4]> {
+              Requires<[HasVFP2,DontUseNEONForFP,UseFPVMLx,DontUseFusedMAC]> {
   // Some single precision VFP instructions may be executed on both NEON and
   // VFP pipelines on A8.
   let D = VFPNeonA8Domain;
@@ -993,10 +1001,10 @@ def VMLSS : ASbIn<0b11100, 0b00, 1, 0,
 
 def : Pat<(fsub_mlx DPR:$dstin, (fmul_su DPR:$a, (f64 DPR:$b))),
           (VMLSD DPR:$dstin, DPR:$a, DPR:$b)>,
-          Requires<[HasVFP2,UseFPVMLx,NoVFP4]>;
+          Requires<[HasVFP2,UseFPVMLx,DontUseFusedMAC]>;
 def : Pat<(fsub_mlx SPR:$dstin, (fmul_su SPR:$a, SPR:$b)),
           (VMLSS SPR:$dstin, SPR:$a, SPR:$b)>,
-          Requires<[HasVFP2,DontUseNEONForFP,UseFPVMLx,NoVFP4]>;
+          Requires<[HasVFP2,DontUseNEONForFP,UseFPVMLx,DontUseFusedMAC]>;
 
 def VNMLAD : ADbI<0b11100, 0b01, 1, 0,
                   (outs DPR:$Dd), (ins DPR:$Ddin, DPR:$Dn, DPR:$Dm),
@@ -1004,7 +1012,7 @@ def VNMLAD : ADbI<0b11100, 0b01, 1, 0,
                   [(set DPR:$Dd,(fsub_mlx (fneg (fmul_su DPR:$Dn,DPR:$Dm)),
                                           (f64 DPR:$Ddin)))]>,
                 RegConstraint<"$Ddin = $Dd">,
-                Requires<[HasVFP2,UseFPVMLx,NoVFP4]>;
+                Requires<[HasVFP2,UseFPVMLx,DontUseFusedMAC]>;
 
 def VNMLAS : ASbI<0b11100, 0b01, 1, 0,
                   (outs SPR:$Sd), (ins SPR:$Sdin, SPR:$Sn, SPR:$Sm),
@@ -1012,7 +1020,7 @@ def VNMLAS : ASbI<0b11100, 0b01, 1, 0,
                   [(set SPR:$Sd, (fsub_mlx (fneg (fmul_su SPR:$Sn, SPR:$Sm)),
                                            SPR:$Sdin))]>,
                 RegConstraint<"$Sdin = $Sd">,
-                Requires<[HasVFP2,DontUseNEONForFP,UseFPVMLx,NoVFP4]> {
+                Requires<[HasVFP2,DontUseNEONForFP,UseFPVMLx,DontUseFusedMAC]> {
   // Some single precision VFP instructions may be executed on both NEON and
   // VFP pipelines on A8.
   let D = VFPNeonA8Domain;
@@ -1020,10 +1028,10 @@ def VNMLAS : ASbI<0b11100, 0b01, 1, 0,
 
 def : Pat<(fsub_mlx (fneg (fmul_su DPR:$a, (f64 DPR:$b))), DPR:$dstin),
           (VNMLAD DPR:$dstin, DPR:$a, DPR:$b)>,
-          Requires<[HasVFP2,UseFPVMLx,NoVFP4]>;
+          Requires<[HasVFP2,UseFPVMLx,DontUseFusedMAC]>;
 def : Pat<(fsub_mlx (fneg (fmul_su SPR:$a, SPR:$b)), SPR:$dstin),
           (VNMLAS SPR:$dstin, SPR:$a, SPR:$b)>,
-          Requires<[HasVFP2,DontUseNEONForFP,UseFPVMLx,NoVFP4]>;
+          Requires<[HasVFP2,DontUseNEONForFP,UseFPVMLx,DontUseFusedMAC]>;
 
 def VNMLSD : ADbI<0b11100, 0b01, 0, 0,
                   (outs DPR:$Dd), (ins DPR:$Ddin, DPR:$Dn, DPR:$Dm),
@@ -1031,14 +1039,14 @@ def VNMLSD : ADbI<0b11100, 0b01, 0, 0,
                   [(set DPR:$Dd, (fsub_mlx (fmul_su DPR:$Dn, DPR:$Dm),
                                            (f64 DPR:$Ddin)))]>,
                RegConstraint<"$Ddin = $Dd">,
-               Requires<[HasVFP2,UseFPVMLx,NoVFP4]>;
+               Requires<[HasVFP2,UseFPVMLx,DontUseFusedMAC]>;
 
 def VNMLSS : ASbI<0b11100, 0b01, 0, 0,
                   (outs SPR:$Sd), (ins SPR:$Sdin, SPR:$Sn, SPR:$Sm),
                   IIC_fpMAC32, "vnmls", ".f32\t$Sd, $Sn, $Sm",
              [(set SPR:$Sd, (fsub_mlx (fmul_su SPR:$Sn, SPR:$Sm), SPR:$Sdin))]>,
                          RegConstraint<"$Sdin = $Sd">,
-                  Requires<[HasVFP2,DontUseNEONForFP,UseFPVMLx,NoVFP4]> {
+                Requires<[HasVFP2,DontUseNEONForFP,UseFPVMLx,DontUseFusedMAC]> {
   // Some single precision VFP instructions may be executed on both NEON and
   // VFP pipelines on A8.
   let D = VFPNeonA8Domain;
@@ -1046,10 +1054,10 @@ def VNMLSS : ASbI<0b11100, 0b01, 0, 0,
 
 def : Pat<(fsub_mlx (fmul_su DPR:$a, (f64 DPR:$b)), DPR:$dstin),
           (VNMLSD DPR:$dstin, DPR:$a, DPR:$b)>,
-          Requires<[HasVFP2,UseFPVMLx,NoVFP4]>;
+          Requires<[HasVFP2,UseFPVMLx,DontUseFusedMAC]>;
 def : Pat<(fsub_mlx (fmul_su SPR:$a, SPR:$b), SPR:$dstin),
           (VNMLSS SPR:$dstin, SPR:$a, SPR:$b)>,
-          Requires<[HasVFP2,DontUseNEONForFP,UseFPVMLx,NoVFP4]>;
+          Requires<[HasVFP2,DontUseNEONForFP,UseFPVMLx,DontUseFusedMAC]>;
 
 //===----------------------------------------------------------------------===//
 // Fused FP Multiply-Accumulate Operations.
@@ -1060,7 +1068,7 @@ def VFMAD : ADbI<0b11101, 0b10, 0, 0,
                  [(set DPR:$Dd, (fadd_mlx (fmul_su DPR:$Dn, DPR:$Dm),
                                           (f64 DPR:$Ddin)))]>,
               RegConstraint<"$Ddin = $Dd">,
-              Requires<[HasVFP4,FPContractions]>;
+              Requires<[HasVFP4,UseFusedMAC]>;
 
 def VFMAS : ASbIn<0b11101, 0b10, 0, 0,
                   (outs SPR:$Sd), (ins SPR:$Sdin, SPR:$Sn, SPR:$Sm),
@@ -1068,17 +1076,26 @@ def VFMAS : ASbIn<0b11101, 0b10, 0, 0,
                   [(set SPR:$Sd, (fadd_mlx (fmul_su SPR:$Sn, SPR:$Sm),
                                            SPR:$Sdin))]>,
               RegConstraint<"$Sdin = $Sd">,
-              Requires<[HasVFP4,DontUseNEONForFP,FPContractions]> {
+              Requires<[HasVFP4,DontUseNEONForFP,UseFusedMAC]> {
   // Some single precision VFP instructions may be executed on both NEON and
   // VFP pipelines.
 }
 
 def : Pat<(fadd_mlx DPR:$dstin, (fmul_su DPR:$a, (f64 DPR:$b))),
           (VFMAD DPR:$dstin, DPR:$a, DPR:$b)>,
-          Requires<[HasVFP4,FPContractions]>;
+          Requires<[HasVFP4,UseFusedMAC]>;
 def : Pat<(fadd_mlx SPR:$dstin, (fmul_su SPR:$a, SPR:$b)),
           (VFMAS SPR:$dstin, SPR:$a, SPR:$b)>,
-          Requires<[HasVFP4,DontUseNEONForFP,FPContractions]>;
+          Requires<[HasVFP4,DontUseNEONForFP,UseFusedMAC]>;
+
+// Match @llvm.fma.* intrinsics
+// (fma x, y, z) -> (vfms z, x, y)
+def : Pat<(f64 (fma DPR:$Dn, DPR:$Dm, DPR:$Ddin)),
+          (VFMAD DPR:$Ddin, DPR:$Dn, DPR:$Dm)>,
+      Requires<[HasVFP4]>;
+def : Pat<(f32 (fma SPR:$Sn, SPR:$Sm, SPR:$Sdin)),
+          (VFMAS SPR:$Sdin, SPR:$Sn, SPR:$Sm)>,
+      Requires<[HasVFP4]>;
 
 def VFMSD : ADbI<0b11101, 0b10, 1, 0,
                  (outs DPR:$Dd), (ins DPR:$Ddin, DPR:$Dn, DPR:$Dm),
@@ -1086,7 +1103,7 @@ def VFMSD : ADbI<0b11101, 0b10, 1, 0,
                  [(set DPR:$Dd, (fadd_mlx (fneg (fmul_su DPR:$Dn,DPR:$Dm)),
                                           (f64 DPR:$Ddin)))]>,
               RegConstraint<"$Ddin = $Dd">,
-              Requires<[HasVFP4,FPContractions]>;
+              Requires<[HasVFP4,UseFusedMAC]>;
 
 def VFMSS : ASbIn<0b11101, 0b10, 1, 0,
                   (outs SPR:$Sd), (ins SPR:$Sdin, SPR:$Sn, SPR:$Sm),
@@ -1094,17 +1111,33 @@ def VFMSS : ASbIn<0b11101, 0b10, 1, 0,
                   [(set SPR:$Sd, (fadd_mlx (fneg (fmul_su SPR:$Sn, SPR:$Sm)),
                                            SPR:$Sdin))]>,
               RegConstraint<"$Sdin = $Sd">,
-              Requires<[HasVFP4,DontUseNEONForFP,FPContractions]> {
+              Requires<[HasVFP4,DontUseNEONForFP,UseFusedMAC]> {
   // Some single precision VFP instructions may be executed on both NEON and
   // VFP pipelines.
 }
 
 def : Pat<(fsub_mlx DPR:$dstin, (fmul_su DPR:$a, (f64 DPR:$b))),
           (VFMSD DPR:$dstin, DPR:$a, DPR:$b)>,
-          Requires<[HasVFP4,FPContractions]>;
+          Requires<[HasVFP4,UseFusedMAC]>;
 def : Pat<(fsub_mlx SPR:$dstin, (fmul_su SPR:$a, SPR:$b)),
           (VFMSS SPR:$dstin, SPR:$a, SPR:$b)>,
-          Requires<[HasVFP4,DontUseNEONForFP,FPContractions]>;
+          Requires<[HasVFP4,DontUseNEONForFP,UseFusedMAC]>;
+
+// Match @llvm.fma.* intrinsics
+// (fma (fneg x), y, z) -> (vfms z, x, y)
+def : Pat<(f64 (fma (fneg DPR:$Dn), DPR:$Dm, DPR:$Ddin)),
+          (VFMSD DPR:$Ddin, DPR:$Dn, DPR:$Dm)>,
+      Requires<[HasVFP4]>;
+def : Pat<(f32 (fma (fneg SPR:$Sn), SPR:$Sm, SPR:$Sdin)),
+          (VFMSS SPR:$Sdin, SPR:$Sn, SPR:$Sm)>,
+      Requires<[HasVFP4]>;
+// (fma x, (fneg y), z) -> (vfms z, x, y)
+def : Pat<(f64 (fma DPR:$Dn, (fneg DPR:$Dm), DPR:$Ddin)),
+          (VFMSD DPR:$Ddin, DPR:$Dn, DPR:$Dm)>,
+      Requires<[HasVFP4]>;
+def : Pat<(f32 (fma SPR:$Sn, (fneg SPR:$Sm), SPR:$Sdin)),
+          (VFMSS SPR:$Sdin, SPR:$Sn, SPR:$Sm)>,
+      Requires<[HasVFP4]>;
 
 def VFNMAD : ADbI<0b11101, 0b01, 1, 0,
                   (outs DPR:$Dd), (ins DPR:$Ddin, DPR:$Dn, DPR:$Dm),
@@ -1112,7 +1145,7 @@ def VFNMAD : ADbI<0b11101, 0b01, 1, 0,
                   [(set DPR:$Dd,(fsub_mlx (fneg (fmul_su DPR:$Dn,DPR:$Dm)),
                                           (f64 DPR:$Ddin)))]>,
                 RegConstraint<"$Ddin = $Dd">,
-                Requires<[HasVFP4,FPContractions]>;
+                Requires<[HasVFP4,UseFusedMAC]>;
 
 def VFNMAS : ASbI<0b11101, 0b01, 1, 0,
                   (outs SPR:$Sd), (ins SPR:$Sdin, SPR:$Sn, SPR:$Sm),
@@ -1120,17 +1153,33 @@ def VFNMAS : ASbI<0b11101, 0b01, 1, 0,
                   [(set SPR:$Sd, (fsub_mlx (fneg (fmul_su SPR:$Sn, SPR:$Sm)),
                                            SPR:$Sdin))]>,
                 RegConstraint<"$Sdin = $Sd">,
-                Requires<[HasVFP4,DontUseNEONForFP,FPContractions]> {
+                Requires<[HasVFP4,DontUseNEONForFP,UseFusedMAC]> {
   // Some single precision VFP instructions may be executed on both NEON and
   // VFP pipelines.
 }
 
 def : Pat<(fsub_mlx (fneg (fmul_su DPR:$a, (f64 DPR:$b))), DPR:$dstin),
           (VFNMAD DPR:$dstin, DPR:$a, DPR:$b)>,
-          Requires<[HasVFP4,FPContractions]>;
+          Requires<[HasVFP4,UseFusedMAC]>;
 def : Pat<(fsub_mlx (fneg (fmul_su SPR:$a, SPR:$b)), SPR:$dstin),
           (VFNMAS SPR:$dstin, SPR:$a, SPR:$b)>,
-          Requires<[HasVFP4,DontUseNEONForFP,FPContractions]>;
+          Requires<[HasVFP4,DontUseNEONForFP,UseFusedMAC]>;
+
+// Match @llvm.fma.* intrinsics
+// (fneg (fma x, y, z)) -> (vfnma z, x, y)
+def : Pat<(fneg (fma (f64 DPR:$Dn), (f64 DPR:$Dm), (f64 DPR:$Ddin))),
+          (VFNMAD DPR:$Ddin, DPR:$Dn, DPR:$Dm)>,
+      Requires<[HasVFP4]>;
+def : Pat<(fneg (fma (f32 SPR:$Sn), (f32 SPR:$Sm), (f32 SPR:$Sdin))),
+          (VFNMAS SPR:$Sdin, SPR:$Sn, SPR:$Sm)>,
+      Requires<[HasVFP4]>;
+// (fma (fneg x), y, (fneg z)) -> (vfnma z, x, y)
+def : Pat<(f64 (fma (fneg DPR:$Dn), DPR:$Dm, (fneg DPR:$Ddin))),
+          (VFNMAD DPR:$Ddin, DPR:$Dn, DPR:$Dm)>,
+      Requires<[HasVFP4]>;
+def : Pat<(f32 (fma (fneg SPR:$Sn), SPR:$Sm, (fneg SPR:$Sdin))),
+          (VFNMAS SPR:$Sdin, SPR:$Sn, SPR:$Sm)>,
+      Requires<[HasVFP4]>;
 
 def VFNMSD : ADbI<0b11101, 0b01, 0, 0,
                   (outs DPR:$Dd), (ins DPR:$Ddin, DPR:$Dn, DPR:$Dm),
@@ -1138,24 +1187,40 @@ def VFNMSD : ADbI<0b11101, 0b01, 0, 0,
                   [(set DPR:$Dd, (fsub_mlx (fmul_su DPR:$Dn, DPR:$Dm),
                                            (f64 DPR:$Ddin)))]>,
                RegConstraint<"$Ddin = $Dd">,
-               Requires<[HasVFP4,FPContractions]>;
+               Requires<[HasVFP4,UseFusedMAC]>;
 
 def VFNMSS : ASbI<0b11101, 0b01, 0, 0,
                   (outs SPR:$Sd), (ins SPR:$Sdin, SPR:$Sn, SPR:$Sm),
                   IIC_fpFMAC32, "vfnms", ".f32\t$Sd, $Sn, $Sm",
              [(set SPR:$Sd, (fsub_mlx (fmul_su SPR:$Sn, SPR:$Sm), SPR:$Sdin))]>,
                          RegConstraint<"$Sdin = $Sd">,
-                  Requires<[HasVFP4,DontUseNEONForFP,FPContractions]> {
+                  Requires<[HasVFP4,DontUseNEONForFP,UseFusedMAC]> {
   // Some single precision VFP instructions may be executed on both NEON and
   // VFP pipelines.
 }
 
 def : Pat<(fsub_mlx (fmul_su DPR:$a, (f64 DPR:$b)), DPR:$dstin),
           (VFNMSD DPR:$dstin, DPR:$a, DPR:$b)>,
-          Requires<[HasVFP4,FPContractions]>;
+          Requires<[HasVFP4,UseFusedMAC]>;
 def : Pat<(fsub_mlx (fmul_su SPR:$a, SPR:$b), SPR:$dstin),
           (VFNMSS SPR:$dstin, SPR:$a, SPR:$b)>,
-          Requires<[HasVFP4,DontUseNEONForFP,FPContractions]>;
+          Requires<[HasVFP4,DontUseNEONForFP,UseFusedMAC]>;
+
+// Match @llvm.fma.* intrinsics
+// (fneg (fma (fneg x), y, z)) -> (vfnms z, x, y)
+def : Pat<(fneg (f64 (fma (fneg DPR:$Dn), DPR:$Dm, DPR:$Ddin))),
+          (VFNMSD DPR:$Ddin, DPR:$Dn, DPR:$Dm)>,
+      Requires<[HasVFP4]>;
+def : Pat<(fneg (f32 (fma (fneg SPR:$Sn), SPR:$Sm, SPR:$Sdin))),
+          (VFNMSS SPR:$Sdin, SPR:$Sn, SPR:$Sm)>,
+      Requires<[HasVFP4]>;
+// (fneg (fma x, (fneg y), z) -> (vfnms z, x, y)
+def : Pat<(fneg (f64 (fma DPR:$Dn, (fneg DPR:$Dm), DPR:$Ddin))),
+          (VFNMSD DPR:$Ddin, DPR:$Dn, DPR:$Dm)>,
+      Requires<[HasVFP4]>;
+def : Pat<(fneg (f32 (fma SPR:$Sn, (fneg SPR:$Sm), SPR:$Sdin))),
+          (VFNMSS SPR:$Sdin, SPR:$Sn, SPR:$Sm)>,
+      Requires<[HasVFP4]>;
 
 //===----------------------------------------------------------------------===//
 // FP Conditional moves.
@@ -1369,22 +1434,6 @@ def : VFP2InstAlias<"vldr${p}.64 $Dd, $addr",
                     (VLDRD DPR:$Dd, addrmode5:$addr, pred:$p)>;
 def : VFP2InstAlias<"vstr${p}.64 $Dd, $addr",
                     (VSTRD DPR:$Dd, addrmode5:$addr, pred:$p)>;
-
-// VMUL has a two-operand form (implied destination operand)
-def : VFP2InstAlias<"vmul${p}.f64 $Dn, $Dm",
-                    (VMULD DPR:$Dn, DPR:$Dn, DPR:$Dm, pred:$p)>;
-def : VFP2InstAlias<"vmul${p}.f32 $Sn, $Sm",
-                    (VMULS SPR:$Sn, SPR:$Sn, SPR:$Sm, pred:$p)>;
-// VADD has a two-operand form (implied destination operand)
-def : VFP2InstAlias<"vadd${p}.f64 $Dn, $Dm",
-                    (VADDD DPR:$Dn, DPR:$Dn, DPR:$Dm, pred:$p)>;
-def : VFP2InstAlias<"vadd${p}.f32 $Sn, $Sm",
-                    (VADDS SPR:$Sn, SPR:$Sn, SPR:$Sm, pred:$p)>;
-// VSUB has a two-operand form (implied destination operand)
-def : VFP2InstAlias<"vsub${p}.f64 $Dn, $Dm",
-                    (VSUBD DPR:$Dn, DPR:$Dn, DPR:$Dm, pred:$p)>;
-def : VFP2InstAlias<"vsub${p}.f32 $Sn, $Sm",
-                    (VSUBS SPR:$Sn, SPR:$Sn, SPR:$Sm, pred:$p)>;
 
 // VMOV can accept optional 32-bit or less data type suffix suffix.
 def : VFP2InstAlias<"vmov${p}.8 $Rt, $Sn",

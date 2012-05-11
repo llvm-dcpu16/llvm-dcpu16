@@ -828,7 +828,7 @@ void MCAsmStreamer::EmitDwarfLocDirective(unsigned FileNo, unsigned Line,
 
   if (IsVerboseAsm) {
     OS.PadToColumn(MAI.getCommentColumn());
-    OS << MAI.getCommentString() << ' ' << FileName << ':' 
+    OS << MAI.getCommentString() << ' ' << FileName << ':'
        << Line << ':' << Column;
   }
   EmitEOL();

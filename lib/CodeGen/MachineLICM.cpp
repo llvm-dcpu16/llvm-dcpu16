@@ -80,6 +80,14 @@ namespace {
     MachineLoop *CurLoop;          // The current loop we are working on.
     MachineBasicBlock *CurPreheader; // The preheader for CurLoop.
 
+    // Exit blocks for CurLoop.
+    SmallVector<MachineBasicBlock*, 8> ExitBlocks;
+
+    bool isExitBlock(const MachineBasicBlock *MBB) const {
+      return std::find(ExitBlocks.begin(), ExitBlocks.end(), MBB) !=
+        ExitBlocks.end();
+    }
+
     // Track 'estimated' register pressure.
     SmallSet<unsigned, 32> RegSeen;
     SmallVector<unsigned, 8> RegPressure;
@@ -182,9 +190,9 @@ namespace {
     ///
     bool IsLoopInvariantInst(MachineInstr &I);
 
-    /// HasAnyPHIUse - Return true if the specified register is used by any
-    /// phi node.
-    bool HasAnyPHIUse(unsigned Reg) const;
+    /// HasLoopPHIUse - Return true if the specified instruction is used by any
+    /// phi node in the current loop.
+    bool HasLoopPHIUse(const MachineInstr *MI) const;
 
     /// HasHighOperandLatency - Compute operand latency between a def of 'Reg'
     /// and an use in the current loop, return true if the target considered
@@ -197,7 +205,7 @@ namespace {
     /// CanCauseHighRegPressure - Visit BBs from header to current BB,
     /// check if hoisting an instruction of the given cost matrix can cause high
     /// register pressure.
-    bool CanCauseHighRegPressure(DenseMap<unsigned, int> &Cost);
+    bool CanCauseHighRegPressure(DenseMap<unsigned, int> &Cost, bool Cheap);
 
     /// UpdateBackTraceRegPressure - Traverse the back trace from header to
     /// the current block and update their register pressures to reflect the
@@ -348,6 +356,7 @@ bool MachineLICM::runOnMachineFunction(MachineFunction &MF) {
   while (!Worklist.empty()) {
     CurLoop = Worklist.pop_back_val();
     CurPreheader = 0;
+    ExitBlocks.clear();
 
     // If this is done before regalloc, only visit outer-most preheader-sporting
     // loops.
@@ -355,6 +364,8 @@ bool MachineLICM::runOnMachineFunction(MachineFunction &MF) {
       Worklist.append(CurLoop->begin(), CurLoop->end());
       continue;
     }
+
+    CurLoop->getExitBlocks(ExitBlocks);
 
     if (!PreRegAlloc)
       HoistRegionPostRA();
@@ -955,22 +966,40 @@ bool MachineLICM::IsLoopInvariantInst(MachineInstr &I) {
 }
 
 
-/// HasAnyPHIUse - Return true if the specified register is used by any
-/// phi node.
-bool MachineLICM::HasAnyPHIUse(unsigned Reg) const {
-  for (MachineRegisterInfo::use_iterator UI = MRI->use_begin(Reg),
-         UE = MRI->use_end(); UI != UE; ++UI) {
-    MachineInstr *UseMI = &*UI;
-    if (UseMI->isPHI())
-      return true;
-    // Look pass copies as well.
-    if (UseMI->isCopy()) {
-      unsigned Def = UseMI->getOperand(0).getReg();
-      if (TargetRegisterInfo::isVirtualRegister(Def) &&
-          HasAnyPHIUse(Def))
-        return true;
+/// HasLoopPHIUse - Return true if the specified instruction is used by a
+/// phi node and hoisting it could cause a copy to be inserted.
+bool MachineLICM::HasLoopPHIUse(const MachineInstr *MI) const {
+  SmallVector<const MachineInstr*, 8> Work(1, MI);
+  do {
+    MI = Work.pop_back_val();
+    for (ConstMIOperands MO(MI); MO.isValid(); ++MO) {
+      if (!MO->isReg() || !MO->isDef())
+        continue;
+      unsigned Reg = MO->getReg();
+      if (!TargetRegisterInfo::isVirtualRegister(Reg))
+        continue;
+      for (MachineRegisterInfo::use_iterator UI = MRI->use_begin(Reg),
+           UE = MRI->use_end(); UI != UE; ++UI) {
+        MachineInstr *UseMI = &*UI;
+        // A PHI may cause a copy to be inserted.
+        if (UseMI->isPHI()) {
+          // A PHI inside the loop causes a copy because the live range of Reg is
+          // extended across the PHI.
+          if (CurLoop->contains(UseMI))
+            return true;
+          // A PHI in an exit block can cause a copy to be inserted if the PHI
+          // has multiple predecessors in the loop with different values.
+          // For now, approximate by rejecting all exit blocks.
+          if (isExitBlock(UseMI->getParent()))
+            return true;
+          continue;
+        }
+        // Look past copies as well.
+        if (UseMI->isCopy() && CurLoop->contains(UseMI))
+          Work.push_back(UseMI);
+      }
     }
-  }
+  } while (!Work.empty());
   return false;
 }
 
@@ -1038,7 +1067,8 @@ bool MachineLICM::IsCheapInstruction(MachineInstr &MI) const {
 /// CanCauseHighRegPressure - Visit BBs from header to current BB, check
 /// if hoisting an instruction of the given cost matrix can cause high
 /// register pressure.
-bool MachineLICM::CanCauseHighRegPressure(DenseMap<unsigned, int> &Cost) {
+bool MachineLICM::CanCauseHighRegPressure(DenseMap<unsigned, int> &Cost,
+                                          bool CheapInstr) {
   for (DenseMap<unsigned, int>::iterator CI = Cost.begin(), CE = Cost.end();
        CI != CE; ++CI) {
     if (CI->second <= 0)
@@ -1047,6 +1077,12 @@ bool MachineLICM::CanCauseHighRegPressure(DenseMap<unsigned, int> &Cost) {
     unsigned RCId = CI->first;
     unsigned Limit = RegLimit[RCId];
     int Cost = CI->second;
+
+    // Don't hoist cheap instructions if they would increase register pressure,
+    // even if we're under the limit.
+    if (CheapInstr)
+      return true;
+
     for (unsigned i = BackTrace.size(); i != 0; --i) {
       SmallVector<unsigned, 8> &RP = BackTrace[i-1];
       if (RP[RCId] + Cost >= Limit)
@@ -1109,87 +1145,95 @@ bool MachineLICM::IsProfitableToHoist(MachineInstr &MI) {
   if (MI.isImplicitDef())
     return true;
 
-  // If the instruction is cheap, only hoist if it is re-materilizable. LICM
-  // will increase register pressure. It's probably not worth it if the
-  // instruction is cheap.
-  // Also hoist loads from constant memory, e.g. load from stubs, GOT. Hoisting
-  // these tend to help performance in low register pressure situation. The
-  // trade off is it may cause spill in high pressure situation. It will end up
-  // adding a store in the loop preheader. But the reload is no more expensive.
-  // The side benefit is these loads are frequently CSE'ed.
-  if (IsCheapInstruction(MI)) {
-    if (!TII->isTriviallyReMaterializable(&MI, AA))
-      return false;
-  } else {
-    // Estimate register pressure to determine whether to LICM the instruction.
-    // In low register pressure situation, we can be more aggressive about
-    // hoisting. Also, favors hoisting long latency instructions even in
-    // moderately high pressure situation.
-    // FIXME: If there are long latency loop-invariant instructions inside the
-    // loop at this point, why didn't the optimizer's LICM hoist them?
-    DenseMap<unsigned, int> Cost;
-    for (unsigned i = 0, e = MI.getDesc().getNumOperands(); i != e; ++i) {
-      const MachineOperand &MO = MI.getOperand(i);
-      if (!MO.isReg() || MO.isImplicit())
-        continue;
-      unsigned Reg = MO.getReg();
-      if (!TargetRegisterInfo::isVirtualRegister(Reg))
-        continue;
+  // Besides removing computation from the loop, hoisting an instruction has
+  // these effects:
+  //
+  // - The value defined by the instruction becomes live across the entire
+  //   loop. This increases register pressure in the loop.
+  //
+  // - If the value is used by a PHI in the loop, a copy will be required for
+  //   lowering the PHI after extending the live range.
+  //
+  // - When hoisting the last use of a value in the loop, that value no longer
+  //   needs to be live in the loop. This lowers register pressure in the loop.
 
-      unsigned RCId, RCCost;
-      getRegisterClassIDAndCost(&MI, Reg, i, RCId, RCCost);
-      if (MO.isDef()) {
-        if (HasHighOperandLatency(MI, i, Reg)) {
-          ++NumHighLatency;
-          return true;
-        }
+  bool CheapInstr = IsCheapInstruction(MI);
+  bool CreatesCopy = HasLoopPHIUse(&MI);
 
-        DenseMap<unsigned, int>::iterator CI = Cost.find(RCId);
-        if (CI != Cost.end())
-          CI->second += RCCost;
-        else
-          Cost.insert(std::make_pair(RCId, RCCost));
-      } else if (isOperandKill(MO, MRI)) {
-        // Is a virtual register use is a kill, hoisting it out of the loop
-        // may actually reduce register pressure or be register pressure
-        // neutral.
-        DenseMap<unsigned, int>::iterator CI = Cost.find(RCId);
-        if (CI != Cost.end())
-          CI->second -= RCCost;
-        else
-          Cost.insert(std::make_pair(RCId, -RCCost));
-      }
-    }
-
-    // Visit BBs from header to current BB, if hoisting this doesn't cause
-    // high register pressure, then it's safe to proceed.
-    if (!CanCauseHighRegPressure(Cost)) {
-      ++NumLowRP;
-      return true;
-    }
-
-    // Do not "speculate" in high register pressure situation. If an
-    // instruction is not guaranteed to be executed in the loop, it's best to be
-    // conservative.
-    if (AvoidSpeculation &&
-        (!IsGuaranteedToExecute(MI.getParent()) && !MayCSE(&MI)))
-      return false;
-
-    // High register pressure situation, only hoist if the instruction is going
-    // to be remat'ed.
-    if (!TII->isTriviallyReMaterializable(&MI, AA) &&
-        !MI.isInvariantLoad(AA))
-      return false;
+  // Don't hoist a cheap instruction if it would create a copy in the loop.
+  if (CheapInstr && CreatesCopy) {
+    DEBUG(dbgs() << "Won't hoist cheap instr with loop PHI use: " << MI);
+    return false;
   }
 
-  // If result(s) of this instruction is used by PHIs outside of the loop, then
-  // don't hoist it if the instruction because it will introduce an extra copy.
-  for (unsigned i = 0, e = MI.getNumOperands(); i != e; ++i) {
+  // Rematerializable instructions should always be hoisted since the register
+  // allocator can just pull them down again when needed.
+  if (TII->isTriviallyReMaterializable(&MI, AA))
+    return true;
+
+  // Estimate register pressure to determine whether to LICM the instruction.
+  // In low register pressure situation, we can be more aggressive about
+  // hoisting. Also, favors hoisting long latency instructions even in
+  // moderately high pressure situation.
+  // Cheap instructions will only be hoisted if they don't increase register
+  // pressure at all.
+  // FIXME: If there are long latency loop-invariant instructions inside the
+  // loop at this point, why didn't the optimizer's LICM hoist them?
+  DenseMap<unsigned, int> Cost;
+  for (unsigned i = 0, e = MI.getDesc().getNumOperands(); i != e; ++i) {
     const MachineOperand &MO = MI.getOperand(i);
-    if (!MO.isReg() || !MO.isDef())
+    if (!MO.isReg() || MO.isImplicit())
       continue;
-    if (HasAnyPHIUse(MO.getReg()))
-      return false;
+    unsigned Reg = MO.getReg();
+    if (!TargetRegisterInfo::isVirtualRegister(Reg))
+      continue;
+
+    unsigned RCId, RCCost;
+    getRegisterClassIDAndCost(&MI, Reg, i, RCId, RCCost);
+    if (MO.isDef()) {
+      if (HasHighOperandLatency(MI, i, Reg)) {
+        DEBUG(dbgs() << "Hoist High Latency: " << MI);
+        ++NumHighLatency;
+        return true;
+      }
+      Cost[RCId] += RCCost;
+    } else if (isOperandKill(MO, MRI)) {
+      // Is a virtual register use is a kill, hoisting it out of the loop
+      // may actually reduce register pressure or be register pressure
+      // neutral.
+      Cost[RCId] -= RCCost;
+    }
+  }
+
+  // Visit BBs from header to current BB, if hoisting this doesn't cause
+  // high register pressure, then it's safe to proceed.
+  if (!CanCauseHighRegPressure(Cost, CheapInstr)) {
+    DEBUG(dbgs() << "Hoist non-reg-pressure: " << MI);
+    ++NumLowRP;
+    return true;
+  }
+
+  // Don't risk increasing register pressure if it would create copies.
+  if (CreatesCopy) {
+    DEBUG(dbgs() << "Won't hoist instr with loop PHI use: " << MI);
+    return false;
+  }
+
+  // Do not "speculate" in high register pressure situation. If an
+  // instruction is not guaranteed to be executed in the loop, it's best to be
+  // conservative.
+  if (AvoidSpeculation &&
+      (!IsGuaranteedToExecute(MI.getParent()) && !MayCSE(&MI))) {
+    DEBUG(dbgs() << "Won't speculate: " << MI);
+    return false;
+  }
+
+  // High register pressure situation, only hoist if the instruction is going
+  // to be remat'ed.
+  if (!TII->isTriviallyReMaterializable(&MI, AA) &&
+      !MI.isInvariantLoad(AA)) {
+    DEBUG(dbgs() << "Can't remat / high reg-pressure: " << MI);
+    return false;
   }
 
   return true;
@@ -1216,11 +1260,11 @@ MachineInstr *MachineLICM::ExtractHoistableLoad(MachineInstr *MI) {
   if (NewOpc == 0) return 0;
   const MCInstrDesc &MID = TII->get(NewOpc);
   if (MID.getNumDefs() != 1) return 0;
-  const TargetRegisterClass *RC = TII->getRegClass(MID, LoadRegIndex, TRI);
+  MachineFunction &MF = *MI->getParent()->getParent();
+  const TargetRegisterClass *RC = TII->getRegClass(MID, LoadRegIndex, TRI, MF);
   // Ok, we're unfolding. Create a temporary register and do the unfold.
   unsigned Reg = MRI->createVirtualRegister(RC);
 
-  MachineFunction &MF = *MI->getParent()->getParent();
   SmallVector<MachineInstr *, 2> NewMIs;
   bool Success =
     TII->unfoldMemoryOperand(MF, MI, Reg,

@@ -1008,8 +1008,8 @@ def : Pat<(X86call (i64 texternalsym:$dst)),
           (CALL64pcrel32 texternalsym:$dst)>;
 
 // tailcall stuff
-def : Pat<(X86tcret GR32_TC:$dst, imm:$off),
-          (TCRETURNri GR32_TC:$dst, imm:$off)>,
+def : Pat<(X86tcret ptr_rc_tailcall:$dst, imm:$off),
+          (TCRETURNri ptr_rc_tailcall:$dst, imm:$off)>,
           Requires<[In32BitMode]>;
 
 // FIXME: This is disabled for 32-bit PIC mode because the global base
@@ -1622,6 +1622,12 @@ def : Pat<(sub GR16:$src1, i16immSExt8:$src2),
           (SUB16ri8 GR16:$src1, i16immSExt8:$src2)>;
 def : Pat<(sub GR32:$src1, i32immSExt8:$src2),
           (SUB32ri8 GR32:$src1, i32immSExt8:$src2)>;
+
+// sub 0, reg
+def : Pat<(X86sub_flag 0, GR8 :$src), (NEG8r  GR8 :$src)>;
+def : Pat<(X86sub_flag 0, GR16:$src), (NEG16r GR16:$src)>;
+def : Pat<(X86sub_flag 0, GR32:$src), (NEG32r GR32:$src)>;
+def : Pat<(X86sub_flag 0, GR64:$src), (NEG64r GR64:$src)>;
 
 // mul reg, reg
 def : Pat<(mul GR16:$src1, GR16:$src2),

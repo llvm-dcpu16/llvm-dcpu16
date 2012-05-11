@@ -70,6 +70,7 @@ private:
   llvm::TargetMachine*        _target;
   bool                        _emitDwarfDebugInfo;
   bool                        _scopeRestrictionsDone;
+  bool                        _runInternalizePass;
   lto_codegen_model           _codeModel;
   StringSet                   _mustPreserveSymbols;
   StringSet                   _asmUndefinedRefs;

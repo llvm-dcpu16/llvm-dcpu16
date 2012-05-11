@@ -163,6 +163,7 @@ struct AddressSanitizer : public ModulePass {
     return getAlignedSize(SizeInBytes);
   }
 
+  Function *checkInterfaceFunction(Constant *FuncOrBitcast);
   void PoisonStack(const ArrayRef<AllocaInst*> &AllocaVec, IRBuilder<> IRB,
                    Value *ShadowBase, bool DoPoison);
   bool LooksLikeCodeInBug11395(Instruction *I);
@@ -317,6 +318,17 @@ void AddressSanitizer::instrumentMop(Instruction *I) {
   instrumentAddress(I, IRB, Addr, TypeSize, IsWrite);
 }
 
+// Validate the result of Module::getOrInsertFunction called for an interface
+// function of AddressSanitizer. If the instrumented module defines a function
+// with the same name, their prototypes must match, otherwise
+// getOrInsertFunction returns a bitcast.
+Function *AddressSanitizer::checkInterfaceFunction(Constant *FuncOrBitcast) {
+  if (isa<Function>(FuncOrBitcast)) return cast<Function>(FuncOrBitcast);
+  FuncOrBitcast->dump();
+  report_fatal_error("trying to redefine an AddressSanitizer "
+                     "interface function");
+}
+
 Instruction *AddressSanitizer::generateCrashCode(
     IRBuilder<> &IRB, Value *Addr, bool IsWrite, uint32_t TypeSize) {
   // IsWrite and TypeSize are encoded in the function name.
@@ -351,11 +363,12 @@ void AddressSanitizer::instrumentAddress(Instruction *OrigIns,
   size_t Granularity = 1 << MappingScale;
   if (TypeSize < 8 * Granularity) {
     // Addr & (Granularity - 1)
-    Value *Lower3Bits = IRB2.CreateAnd(
+    Value *LastAccessedByte = IRB2.CreateAnd(
         AddrLong, ConstantInt::get(IntptrTy, Granularity - 1));
     // (Addr & (Granularity - 1)) + size - 1
-    Value *LastAccessedByte = IRB2.CreateAdd(
-        Lower3Bits, ConstantInt::get(IntptrTy, TypeSize / 8 - 1));
+    if (TypeSize / 8 > 1)
+      LastAccessedByte = IRB2.CreateAdd(
+          LastAccessedByte, ConstantInt::get(IntptrTy, TypeSize / 8 - 1));
     // (uint8_t) ((Addr & (Granularity-1)) + size - 1)
     LastAccessedByte = IRB2.CreateIntCast(
         LastAccessedByte, IRB.getInt8Ty(), false);
@@ -501,7 +514,7 @@ bool AddressSanitizer::insertGlobalRedzones(Module &M) {
       M, ArrayOfGlobalStructTy, false, GlobalVariable::PrivateLinkage,
       ConstantArray::get(ArrayOfGlobalStructTy, Initializers), "");
 
-  Function *AsanRegisterGlobals = cast<Function>(M.getOrInsertFunction(
+  Function *AsanRegisterGlobals = checkInterfaceFunction(M.getOrInsertFunction(
       kAsanRegisterGlobalsName, IRB.getVoidTy(), IntptrTy, IntptrTy, NULL));
   AsanRegisterGlobals->setLinkage(Function::ExternalLinkage);
 
@@ -516,8 +529,10 @@ bool AddressSanitizer::insertGlobalRedzones(Module &M) {
       GlobalValue::InternalLinkage, kAsanModuleDtorName, &M);
   BasicBlock *AsanDtorBB = BasicBlock::Create(*C, "", AsanDtorFunction);
   IRBuilder<> IRB_Dtor(ReturnInst::Create(*C, AsanDtorBB));
-  Function *AsanUnregisterGlobals = cast<Function>(M.getOrInsertFunction(
-      kAsanUnregisterGlobalsName, IRB.getVoidTy(), IntptrTy, IntptrTy, NULL));
+  Function *AsanUnregisterGlobals =
+      checkInterfaceFunction(M.getOrInsertFunction(
+          kAsanUnregisterGlobalsName,
+          IRB.getVoidTy(), IntptrTy, IntptrTy, NULL));
   AsanUnregisterGlobals->setLinkage(Function::ExternalLinkage);
 
   IRB_Dtor.CreateCall2(AsanUnregisterGlobals,
@@ -551,7 +566,7 @@ bool AddressSanitizer::runOnModule(Module &M) {
 
   // call __asan_init in the module ctor.
   IRBuilder<> IRB(CtorInsertBefore);
-  AsanInitFunction = cast<Function>(
+  AsanInitFunction = checkInterfaceFunction(
       M.getOrInsertFunction(kAsanInitName, IRB.getVoidTy(), NULL));
   AsanInitFunction->setLinkage(Function::ExternalLinkage);
   IRB.CreateCall(AsanInitFunction);

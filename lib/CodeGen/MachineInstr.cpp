@@ -255,12 +255,16 @@ void MachineOperand::print(raw_ostream &OS, const TargetMachine *TM) const {
           OS << "imp-";
         OS << "def";
         NeedComma = true;
+        // <def,read-undef> only makes sense when getSubReg() is set.
+        // Don't clutter the output otherwise.
+        if (isUndef() && getSubReg())
+          OS << ",read-undef";
       } else if (isImplicit()) {
           OS << "imp-use";
           NeedComma = true;
       }
 
-      if (isKill() || isDead() || isUndef() || isInternalRead()) {
+      if (isKill() || isDead() || (isUndef() && isUse()) || isInternalRead()) {
         if (NeedComma) OS << ',';
         NeedComma = false;
         if (isKill()) {
@@ -271,7 +275,7 @@ void MachineOperand::print(raw_ostream &OS, const TargetMachine *TM) const {
           OS << "dead";
           NeedComma = true;
         }
-        if (isUndef()) {
+        if (isUndef() && isUse()) {
           if (NeedComma) OS << ',';
           OS << "undef";
           NeedComma = true;
@@ -938,9 +942,13 @@ const TargetRegisterClass*
 MachineInstr::getRegClassConstraint(unsigned OpIdx,
                                     const TargetInstrInfo *TII,
                                     const TargetRegisterInfo *TRI) const {
+  assert(getParent() && "Can't have an MBB reference here!");
+  assert(getParent()->getParent() && "Can't have an MF reference here!");
+  const MachineFunction &MF = *getParent()->getParent();
+
   // Most opcodes have fixed constraints in their MCInstrDesc.
   if (!isInlineAsm())
-    return TII->getRegClass(getDesc(), OpIdx, TRI);
+    return TII->getRegClass(getDesc(), OpIdx, TRI, MF);
 
   if (!getOperand(OpIdx).isReg())
     return NULL;
@@ -962,7 +970,7 @@ MachineInstr::getRegClassConstraint(unsigned OpIdx,
 
   // Assume that all registers in a memory operand are pointers.
   if (InlineAsm::getKind(Flag) == InlineAsm::Kind_Mem)
-    return TRI->getPointerRegClass();
+    return TRI->getPointerRegClass(MF);
 
   return NULL;
 }

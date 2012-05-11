@@ -65,7 +65,8 @@ public:
   int getCompactUnwindRegNum(unsigned RegNum, bool isEH) const;
 
   /// Code Generation virtual methods...
-  /// 
+  ///
+  virtual bool trackLivenessAfterRegAlloc(const MachineFunction &MF) const;
 
   /// getMatchingSuperRegClass - Return a subclass of the specified register
   /// class A so that each register in it has a sub-register of the
@@ -82,7 +83,8 @@ public:
 
   /// getPointerRegClass - Returns a TargetRegisterClass used for pointer
   /// values.
-  const TargetRegisterClass *getPointerRegClass(unsigned Kind = 0) const;
+  const TargetRegisterClass *
+  getPointerRegClass(const MachineFunction &MF, unsigned Kind = 0) const;
 
   /// getCrossCopyRegClass - Returns a legal register class to copy a register
   /// in the specified class to or from. Returns NULL if it is possible to copy

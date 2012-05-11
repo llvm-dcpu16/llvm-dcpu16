@@ -25,6 +25,7 @@
 #include "llvm/CodeGen/MachineJumpTableInfo.h"
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/SelectionDAG.h"
+#include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -604,6 +605,7 @@ TargetLowering::TargetLowering(const TargetMachine &tm,
   IntDivIsCheap = false;
   Pow2DivIsCheap = false;
   JumpIsExpensive = false;
+  predictableSelectIsExpensive = false;
   StackPointerRegisterToSaveRestore = 0;
   ExceptionPointerRegister = 0;
   ExceptionSelectorRegister = 0;
@@ -708,41 +710,33 @@ bool TargetLowering::isLegalRC(const TargetRegisterClass *RC) const {
   return false;
 }
 
-/// hasLegalSuperRegRegClasses - Return true if the specified register class
-/// has one or more super-reg register classes that are legal.
-bool
-TargetLowering::hasLegalSuperRegRegClasses(const TargetRegisterClass *RC) const{
-  if (*RC->superregclasses_begin() == 0)
-    return false;
-  for (TargetRegisterInfo::regclass_iterator I = RC->superregclasses_begin(),
-         E = RC->superregclasses_end(); I != E; ++I) {
-    const TargetRegisterClass *RRC = *I;
-    if (isLegalRC(RRC))
-      return true;
-  }
-  return false;
-}
-
 /// findRepresentativeClass - Return the largest legal super-reg register class
 /// of the register class for the specified type and its associated "cost".
 std::pair<const TargetRegisterClass*, uint8_t>
 TargetLowering::findRepresentativeClass(EVT VT) const {
+  const TargetRegisterInfo *TRI = getTargetMachine().getRegisterInfo();
   const TargetRegisterClass *RC = RegClassForVT[VT.getSimpleVT().SimpleTy];
   if (!RC)
     return std::make_pair(RC, 0);
+
+  // Compute the set of all super-register classes.
+  BitVector SuperRegRC(TRI->getNumRegClasses());
+  for (SuperRegClassIterator RCI(RC, TRI); RCI.isValid(); ++RCI)
+    SuperRegRC.setBitsInMask(RCI.getMask());
+
+  // Find the first legal register class with the largest spill size.
   const TargetRegisterClass *BestRC = RC;
-  for (TargetRegisterInfo::regclass_iterator I = RC->superregclasses_begin(),
-         E = RC->superregclasses_end(); I != E; ++I) {
-    const TargetRegisterClass *RRC = *I;
-    if (RRC->isASubClass() || !isLegalRC(RRC))
+  for (int i = SuperRegRC.find_first(); i >= 0; i = SuperRegRC.find_next(i)) {
+    const TargetRegisterClass *SuperRC = TRI->getRegClass(i);
+    // We want the largest possible spill size.
+    if (SuperRC->getSize() <= BestRC->getSize())
       continue;
-    if (!hasLegalSuperRegRegClasses(RRC))
-      return std::make_pair(RRC, 1);
-    BestRC = RRC;
+    if (!isLegalRC(SuperRC))
+      continue;
+    BestRC = SuperRC;
   }
   return std::make_pair(BestRC, 1);
 }
-
 
 /// computeRegisterProperties - Once all of the register classes are added,
 /// this allows us to compute derived properties we expose.
@@ -940,9 +934,12 @@ unsigned TargetLowering::getVectorTypeBreakdown(LLVMContext &Context, EVT VT,
   unsigned NumElts = VT.getVectorNumElements();
 
   // If there is a wider vector type with the same element type as this one,
-  // we should widen to that legal vector type.  This handles things like
-  // <2 x float> -> <4 x float>.
-  if (NumElts != 1 && getTypeAction(Context, VT) == TypeWidenVector) {
+  // or a promoted vector type that has the same number of elements which
+  // are wider, then we should convert to that legal vector type.
+  // This handles things like <2 x float> -> <4 x float> and
+  // <4 x i1> -> <4 x i32>.
+  LegalizeTypeAction TA = getTypeAction(Context, VT);
+  if (NumElts != 1 && (TA == TypeWidenVector || TA == TypePromoteInteger)) {
     RegisterVT = getTypeToTransformTo(Context, VT);
     if (isTypeLegal(RegisterVT)) {
       IntermediateVT = RegisterVT;
@@ -1079,8 +1076,12 @@ unsigned TargetLowering::getJumpTableEncoding() const {
 SDValue TargetLowering::getPICJumpTableRelocBase(SDValue Table,
                                                  SelectionDAG &DAG) const {
   // If our PIC model is GP relative, use the global offset table as the base.
-  if (getJumpTableEncoding() == MachineJumpTableInfo::EK_GPRel32BlockAddress)
+  unsigned JTEncoding = getJumpTableEncoding();
+
+  if ((JTEncoding == MachineJumpTableInfo::EK_GPRel64BlockAddress) ||
+      (JTEncoding == MachineJumpTableInfo::EK_GPRel32BlockAddress))
     return DAG.getGLOBAL_OFFSET_TABLE(getPointerTy());
+
   return Table;
 }
 
@@ -1363,8 +1364,9 @@ bool TargetLowering::SimplifyDemandedBits(SDValue Op,
     // bits on that side are also known to be set on the other side, turn this
     // into an AND, as we know the bits will be cleared.
     //    e.g. (X | C1) ^ C2 --> (X | C1) & ~C2 iff (C1&C2) == C2
-    if ((NewMask & (KnownZero|KnownOne)) == NewMask) { // all known
-      if ((KnownOne & KnownOne2) == KnownOne) {
+    // NB: it is okay if more bits are known than are requested
+    if ((NewMask & (KnownZero|KnownOne)) == NewMask) { // all known on one side 
+      if (KnownOne == KnownOne2) { // set bits are the same on both sides
         EVT VT = Op.getValueType();
         SDValue ANDC = TLO.DAG.getConstant(~KnownOne & NewMask, VT);
         return TLO.CombineTo(Op, TLO.DAG.getNode(ISD::AND, dl, VT,

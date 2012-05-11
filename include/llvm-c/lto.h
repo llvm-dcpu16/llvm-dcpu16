@@ -258,7 +258,6 @@ lto_codegen_set_assembler_args(lto_code_gen_t cg, const char **args,
 extern void
 lto_codegen_add_must_preserve_symbol(lto_code_gen_t cg, const char* symbol);
 
-
 /**
  * Writes a new object file at the specified path that contains the
  * merged contents of all modules added so far.
@@ -266,7 +265,6 @@ lto_codegen_add_must_preserve_symbol(lto_code_gen_t cg, const char* symbol);
  */
 extern bool
 lto_codegen_write_merged_modules(lto_code_gen_t cg, const char* path);
-
 
 /**
  * Generates code for all added modules into one native object file.

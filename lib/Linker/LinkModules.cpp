@@ -25,6 +25,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/ValueMapper.h"
+#include "llvm-c/Linker.h"
 #include <cctype>
 using namespace llvm;
 
@@ -595,12 +596,12 @@ void ModuleLinker::computeTypeMapping() {
   // example.  When the source module got loaded into the same LLVMContext, if
   // it had the same type, it would have been renamed to "%foo.42 = { i32 }".
   std::vector<StructType*> SrcStructTypes;
-  SrcM->findUsedStructTypes(SrcStructTypes);
+  SrcM->findUsedStructTypes(SrcStructTypes, true);
   SmallPtrSet<StructType*, 32> SrcStructTypesSet(SrcStructTypes.begin(),
                                                  SrcStructTypes.end());
 
   std::vector<StructType*> DstStructTypes;
-  DstM->findUsedStructTypes(DstStructTypes);
+  DstM->findUsedStructTypes(DstStructTypes, true);
   SmallPtrSet<StructType*, 32> DstStructTypesSet(DstStructTypes.begin(),
                                                  DstStructTypes.end());
 
@@ -1336,4 +1337,18 @@ bool Linker::LinkModules(Module *Dest, Module *Src, unsigned Mode,
   }
 
   return false;
+}
+
+//===----------------------------------------------------------------------===//
+// C API.
+//===----------------------------------------------------------------------===//
+
+LLVMBool LLVMLinkModules(LLVMModuleRef Dest, LLVMModuleRef Src,
+                         LLVMLinkerMode Mode, char **OutMessages) {
+  std::string Messages;
+  LLVMBool Result = Linker::LinkModules(unwrap(Dest), unwrap(Src),
+                                        Mode, OutMessages? &Messages : 0);
+  if (OutMessages)
+    *OutMessages = strdup(Messages.c_str());
+  return Result;
 }

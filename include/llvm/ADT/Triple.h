@@ -64,6 +64,8 @@ public:
     mblaze,  // MBlaze: mblaze
     ptx32,   // PTX: ptx (32-bit)
     ptx64,   // PTX: ptx (64-bit)
+    nvptx,   // NVPTX: 32-bit
+    nvptx64, // NVPTX: 64-bit
     le32,    // le32: generic little-endian 32-bit CPU (PNaCl / Emscripten)
     amdil,   // amdil: amd IL
     dcpu16   // DCPU16: dcpu16
@@ -194,6 +196,11 @@ public:
   /// just set to a constant 10.4.0 in that case.  Returns true if successful.
   bool getMacOSXVersion(unsigned &Major, unsigned &Minor,
                         unsigned &Micro) const;
+
+  /// getiOSVersion - Parse the version number as with getOSVersion.  This should
+  /// only be called with IOS triples.
+  void getiOSVersion(unsigned &Major, unsigned &Minor,
+                     unsigned &Micro) const;
 
   /// @}
   /// @name Direct Component Access

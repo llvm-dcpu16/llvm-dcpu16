@@ -1,4 +1,4 @@
-@ RUN: llvm-mc -triple=thumbv7-apple-darwin -show-encoding < %s | FileCheck %s
+@ RUN: llvm-mc -triple=thumbv7-apple-darwin -mcpu=cortex-a8 -show-encoding < %s | FileCheck %s
   .syntax unified
   .globl _func
 
@@ -48,6 +48,7 @@ _func:
         adcs	r0, r1, r3, lsl #7
         adc.w	r0, r1, r3, lsr #31
         adcs.w	r0, r1, r3, asr #32
+        add r2, sp, ip
 
 @ CHECK: adc.w	r4, r5, r6              @ encoding: [0x45,0xeb,0x06,0x04]
 @ CHECK: adcs.w	r4, r5, r6              @ encoding: [0x55,0xeb,0x06,0x04]
@@ -57,6 +58,7 @@ _func:
 @ CHECK: adcs.w	r0, r1, r3, lsl #7      @ encoding: [0x51,0xeb,0xc3,0x10]
 @ CHECK: adc.w	r0, r1, r3, lsr #31     @ encoding: [0x41,0xeb,0xd3,0x70]
 @ CHECK: adcs.w	r0, r1, r3, asr #32     @ encoding: [0x51,0xeb,0x23,0x00]
+@ CHECK: add.w	r2, sp, r12             @ encoding: [0x0d,0xeb,0x0c,0x02]
 
 
 @------------------------------------------------------------------------------
@@ -78,6 +80,12 @@ _func:
         adds r2, r2, #56
         adds r2, #56
 
+        adds.w r2, #-16
+        adds.w r2, r2, #-16
+        addw r2, #-16
+        addw r2, #-16
+        addw r2, r2, #-16
+
 @ CHECK: itet	eq                      @ encoding: [0x0a,0xbf]
 @ CHECK: addeq	r1, r2, #4              @ encoding: [0x11,0x1d]
 @ CHECK: addwne	r5, r3, #1023           @ encoding: [0x03,0xf2,0xff,0x35]
@@ -93,6 +101,12 @@ _func:
 @ CHECK: add.w	r0, r0, #32             @ encoding: [0x00,0xf1,0x20,0x00]
 @ CHECK: adds	r2, #56                 @ encoding: [0x38,0x32]
 @ CHECK: adds	r2, #56                 @ encoding: [0x38,0x32]
+
+@ CHECK: subs.w	r2, r2, #16             @ encoding: [0xb2,0xf1,0x10,0x02]
+@ CHECK: subs.w	r2, r2, #16             @ encoding: [0xb2,0xf1,0x10,0x02]
+@ CHECK: subw	r2, r2, #16             @ encoding: [0xa2,0xf2,0x10,0x02]
+@ CHECK: subw	r2, r2, #16             @ encoding: [0xa2,0xf2,0x10,0x02]
+@ CHECK: subw	r2, r2, #16             @ encoding: [0xa2,0xf2,0x10,0x02]
 
 
 @------------------------------------------------------------------------------
@@ -509,6 +523,19 @@ _func:
 @ CHECK: subne	r5, r6, r7              @ encoding: [0xf5,0x1b]
 @ CHECK: addeq	r1, r2, #4              @ encoding: [0x11,0x1d]
 
+@ Should also work for UPPER CASE condition codes.
+
+        ITEET EQ
+        ADDEQ R0, R1, R2
+        NOPNE
+        SUBNE R5, R6, R7
+        ADDEQ R1, R2, #4
+
+@ CHECK: iteet	eq                      @ encoding: [0x0d,0xbf]
+@ CHECK: addeq	r0, r1, r2              @ encoding: [0x88,0x18]
+@ CHECK: nopne                          @ encoding: [0x00,0xbf]
+@ CHECK: subne	r5, r6, r7              @ encoding: [0xf5,0x1b]
+@ CHECK: addeq	r1, r2, #4              @ encoding: [0x11,0x1d]
 
 @------------------------------------------------------------------------------
 @ LDC{L}/LDC2{L}
@@ -2686,6 +2713,12 @@ _func:
         sub r4, r5, r6, asr #5
         sub r4, r5, r6, ror #5
         sub.w r5, r2, r12, rrx
+        sub r2, sp, ip
+        sub sp, sp, ip
+        sub sp, ip
+        sub.w r2, sp, ip
+        sub.w sp, sp, ip
+        sub.w sp, ip
 
 @ CHECK: sub.w	r4, r5, r6              @ encoding: [0xa5,0xeb,0x06,0x04]
 @ CHECK: sub.w	r4, r5, r6, lsl #5      @ encoding: [0xa5,0xeb,0x46,0x14]
@@ -2694,6 +2727,12 @@ _func:
 @ CHECK: sub.w	r4, r5, r6, asr #5      @ encoding: [0xa5,0xeb,0x66,0x14]
 @ CHECK: sub.w	r4, r5, r6, ror #5      @ encoding: [0xa5,0xeb,0x76,0x14]
 @ CHECK: sub.w r5, r2, r12, rrx         @ encoding: [0xa2,0xeb,0x3c,0x05]
+@ CHECK: sub.w	r2, sp, r12             @ encoding: [0xad,0xeb,0x0c,0x02]
+@ CHECK: sub.w	sp, sp, r12             @ encoding: [0xad,0xeb,0x0c,0x0d]
+@ CHECK: sub.w	sp, sp, r12             @ encoding: [0xad,0xeb,0x0c,0x0d]
+@ CHECK: sub.w	r2, sp, r12             @ encoding: [0xad,0xeb,0x0c,0x02]
+@ CHECK: sub.w	sp, sp, r12             @ encoding: [0xad,0xeb,0x0c,0x0d]
+@ CHECK: sub.w	sp, sp, r12             @ encoding: [0xad,0xeb,0x0c,0x0d]
 
 
 @------------------------------------------------------------------------------
