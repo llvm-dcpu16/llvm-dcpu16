@@ -11,11 +11,14 @@ set(CMAKE_MODULE_PATH
   )
 
 set(LLVM_VERSION_MAJOR 3)
-set(LLVM_VERSION_MINOR 1)
+set(LLVM_VERSION_MINOR 2)
 
 set(PACKAGE_VERSION "${LLVM_VERSION_MAJOR}.${LLVM_VERSION_MINOR}svn")
 
-set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+option(LLVM_USE_FOLDERS "Enable solution folders in Visual Studio. Disable for Express versions." ON)
+if ( LLVM_USE_FOLDERS )
+  set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+endif()
 
 include(VersionFromVCS)
 
@@ -79,6 +82,7 @@ set(LLVM_ALL_TARGETS
   MBlaze
   MSP430
   DCPU16
+  NVPTX
   PowerPC
   PTX
   Sparc
@@ -214,15 +218,6 @@ if( WIN32 AND NOT CYGWIN )
   set(LLVM_LIT_TOOLS_DIR "" CACHE PATH "Path to GnuWin32 tools")
 endif()
 
-# On Win32 using MS tools, provide an option to set the number of parallel jobs
-# to use.
-if( MSVC_IDE AND ( MSVC90 OR MSVC10 ) )
-  # Only Visual Studio 2008 and 2010 officially supports /MP.  Visual Studio
-  # 2005 supports it but it is experimental.
-  set(LLVM_COMPILER_JOBS "0" CACHE STRING
-    "Number of parallel compiler jobs. 0 means use all processors. Default is 0.")
-endif()
-
 # Define options to control the inclusion and default build behavior for
 # components which may not strictly be necessary (tools, runtime, examples, and
 # tests).
@@ -278,11 +273,21 @@ set(LLVMCONFIGLIBRARYDEPENDENCIESINC
   "${LLVM_BINARY_DIR}/tools/llvm-config/LibraryDependencies.inc")
 set(LLVMBUILDCMAKEFRAG
   "${LLVM_BINARY_DIR}/LLVMBuild.cmake")
+
+# Create the list of optional components that are enabled
+if (LLVM_USE_INTEL_JITEVENTS)
+  set(LLVMOPTIONALCOMPONENTS IntelJITEvents)
+endif (LLVM_USE_INTEL_JITEVENTS)
+if (LLVM_USE_OPROFILE)
+  set(LLVMOPTIONALCOMPONENTS ${LLVMOPTIONALCOMPONENTS} OProfileJIT)
+endif (LLVM_USE_OPROFILE)
+
 message(STATUS "Constructing LLVMBuild project information")
 execute_process(
   COMMAND ${PYTHON_EXECUTABLE} ${LLVMBUILDTOOL}
             --native-target "${LLVM_NATIVE_ARCH}"
             --enable-targets "${LLVM_TARGETS_TO_BUILD}"
+            --enable-optional-components "${LLVMOPTIONALCOMPONENTS}"
             --write-library-table ${LLVMCONFIGLIBRARYDEPENDENCIESINC}
             --write-cmake-fragment ${LLVMBUILDCMAKEFRAG}
             ERROR_VARIABLE LLVMBUILDOUTPUT
@@ -397,7 +402,6 @@ add_subdirectory(utils/FileUpdate)
 add_subdirectory(utils/count)
 add_subdirectory(utils/not)
 add_subdirectory(utils/llvm-lit)
-add_subdirectory(utils/json-bench)
 add_subdirectory(utils/yaml-bench)
 
 add_subdirectory(projects)

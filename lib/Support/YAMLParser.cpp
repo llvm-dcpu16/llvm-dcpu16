@@ -658,7 +658,7 @@ std::string yaml::escape(StringRef Input) {
       EscapedInput += "\\r";
     else if (*i == 0x1B)
       EscapedInput += "\\e";
-    else if (*i >= 0 && *i < 0x20) { // Control characters not handled above.
+    else if ((unsigned char)*i < 0x20) { // Control characters not handled above.
       std::string HexStr = utohexstr(*i);
       EscapedInput += "\\x" + std::string(2 - HexStr.size(), '0') + HexStr;
     } else if (*i & 0x80) { // UTF-8 multiple code unit subsequence.
@@ -755,6 +755,8 @@ Token Scanner::getNext() {
 }
 
 StringRef::iterator Scanner::skip_nb_char(StringRef::iterator Position) {
+  if (Position == End)
+    return Position;
   // Check 7 bit c-printable - b-char.
   if (   *Position == 0x09
       || (*Position >= 0x20 && *Position <= 0x7E))
@@ -778,6 +780,8 @@ StringRef::iterator Scanner::skip_nb_char(StringRef::iterator Position) {
 }
 
 StringRef::iterator Scanner::skip_b_break(StringRef::iterator Position) {
+  if (Position == End)
+    return Position;
   if (*Position == 0x0D) {
     if (Position + 1 != End && *(Position + 1) == 0x0A)
       return Position + 2;
@@ -1211,7 +1215,9 @@ bool Scanner::scanFlowScalar(bool IsDoubleQuoted) {
         ++Current;
       // Repeat until the previous character was not a '\' or was an escaped
       // backslash.
-    } while (*(Current - 1) == '\\' && wasEscaped(Start + 1, Current));
+    } while (   Current != End
+             && *(Current - 1) == '\\'
+             && wasEscaped(Start + 1, Current));
   } else {
     skip(1);
     while (true) {
@@ -1733,7 +1739,9 @@ StringRef ScalarNode::unescapeDoubleQuoted( StringRef UnquotedValue
             // TODO: Report error.
             break;
           unsigned int UnicodeScalarValue;
-          UnquotedValue.substr(1, 2).getAsInteger(16, UnicodeScalarValue);
+          if (UnquotedValue.substr(1, 2).getAsInteger(16, UnicodeScalarValue))
+            // TODO: Report error.
+            UnicodeScalarValue = 0xFFFD;
           encodeUTF8(UnicodeScalarValue, Storage);
           UnquotedValue = UnquotedValue.substr(2);
           break;
@@ -1743,7 +1751,9 @@ StringRef ScalarNode::unescapeDoubleQuoted( StringRef UnquotedValue
             // TODO: Report error.
             break;
           unsigned int UnicodeScalarValue;
-          UnquotedValue.substr(1, 4).getAsInteger(16, UnicodeScalarValue);
+          if (UnquotedValue.substr(1, 4).getAsInteger(16, UnicodeScalarValue))
+            // TODO: Report error.
+            UnicodeScalarValue = 0xFFFD;
           encodeUTF8(UnicodeScalarValue, Storage);
           UnquotedValue = UnquotedValue.substr(4);
           break;
@@ -1753,7 +1763,9 @@ StringRef ScalarNode::unescapeDoubleQuoted( StringRef UnquotedValue
             // TODO: Report error.
             break;
           unsigned int UnicodeScalarValue;
-          UnquotedValue.substr(1, 8).getAsInteger(16, UnicodeScalarValue);
+          if (UnquotedValue.substr(1, 8).getAsInteger(16, UnicodeScalarValue))
+            // TODO: Report error.
+            UnicodeScalarValue = 0xFFFD;
           encodeUTF8(UnicodeScalarValue, Storage);
           UnquotedValue = UnquotedValue.substr(8);
           break;
@@ -2113,5 +2125,3 @@ bool Document::expectToken(int TK) {
   }
   return true;
 }
-
-OwningPtr<Document> document_iterator::NullDoc;

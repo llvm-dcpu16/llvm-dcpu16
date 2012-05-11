@@ -308,7 +308,8 @@ void CompileUnit::addComplexAddress(DbgVariable *&DV, DIE *Die,
       addUInt(Block, 0, dwarf::DW_FORM_data1, dwarf::DW_OP_plus_uconst);
       addUInt(Block, 0, dwarf::DW_FORM_udata, DV->getAddrElement(++i));
     } else if (Element == DIBuilder::OpDeref) {
-      addUInt(Block, 0, dwarf::DW_FORM_data1, dwarf::DW_OP_deref);
+      if (!Location.isReg())
+        addUInt(Block, 0, dwarf::DW_FORM_data1, dwarf::DW_OP_deref);
     } else llvm_unreachable("unknown DIBuilder Opcode");
   }
 
@@ -1032,9 +1033,10 @@ DIE *CompileUnit::getOrCreateSubprogramDIE(DISubprogram SP) {
   // Add function template parameters.
   addTemplateParams(*SPDie, SP.getTemplateParams());
 
-  // Unfortunately this code needs to stay here to work around
-  // a bug in older gdbs that requires the linkage name to resolve
-  // multiple template functions.
+  // Unfortunately this code needs to stay here instead of below the
+  // AT_specification code in order to work around a bug in older
+  // gdbs that requires the linkage name to resolve multiple template
+  // functions.
   StringRef LinkageName = SP.getLinkageName();
   if (!LinkageName.empty())
     addString(SPDie, dwarf::DW_AT_MIPS_linkage_name,

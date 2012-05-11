@@ -74,9 +74,9 @@ MCJIT::MCJIT(Module *m, TargetMachine *tm, TargetJITInfo &tji,
   OS.flush();
 
   // Load the object into the dynamic linker.
-  // FIXME: It would be nice to avoid making yet another copy.
-  MemoryBuffer *MB = MemoryBuffer::getMemBufferCopy(StringRef(Buffer.data(),
-                                                              Buffer.size()));
+  MemoryBuffer *MB = MemoryBuffer::getMemBuffer(StringRef(Buffer.data(),
+                                                          Buffer.size()),
+                                                "", false);
   if (Dyld.loadObject(MB))
     report_fatal_error(Dyld.getErrorString());
   // Resolve any relocations.
@@ -217,7 +217,7 @@ GenericValue MCJIT::runFunction(Function *F,
 }
 
 void *MCJIT::getPointerToNamedFunction(const std::string &Name,
-                                       bool AbortOnFailure){
+                                       bool AbortOnFailure) {
   if (!isSymbolSearchingDisabled() && MemMgr) {
     void *ptr = MemMgr->getPointerToNamedFunction(Name, false);
     if (ptr)
@@ -231,7 +231,7 @@ void *MCJIT::getPointerToNamedFunction(const std::string &Name,
 
   if (AbortOnFailure) {
     report_fatal_error("Program used external function '"+Name+
-                      "' which could not be resolved!");
+                       "' which could not be resolved!");
   }
   return 0;
 }

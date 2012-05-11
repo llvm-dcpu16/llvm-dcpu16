@@ -21,20 +21,25 @@ let isTerminator = 1, isReturn = 1, isBarrier = 1,
   def RET    : I   <0xC3, RawFrm, (outs), (ins variable_ops),
                     "ret",
                     [(X86retflag 0)], IIC_RET>;
+  def RETW   : I   <0xC3, RawFrm, (outs), (ins variable_ops),
+                    "ret{w}",
+                    [], IIC_RET>, OpSize;
   def RETI   : Ii16<0xC2, RawFrm, (outs), (ins i16imm:$amt, variable_ops),
                     "ret\t$amt",
                     [(X86retflag timm:$amt)], IIC_RET_IMM>;
   def RETIW  : Ii16<0xC2, RawFrm, (outs), (ins i16imm:$amt, variable_ops),
-                    "retw\t$amt",
+                    "ret{w}\t$amt",
                     [], IIC_RET_IMM>, OpSize;
   def LRETL  : I   <0xCB, RawFrm, (outs), (ins),
-                    "lretl", [], IIC_RET>;
+                    "{l}ret{l|f}", [], IIC_RET>;
+  def LRETW  : I   <0xCB, RawFrm, (outs), (ins),
+                    "{l}ret{w|f}", [], IIC_RET>, OpSize;
   def LRETQ  : RI  <0xCB, RawFrm, (outs), (ins),
-                    "lretq", [], IIC_RET>;
+                    "{l}ret{q|f}", [], IIC_RET>;
   def LRETI  : Ii16<0xCA, RawFrm, (outs), (ins i16imm:$amt),
-                    "lret\t$amt", [], IIC_RET>;
+                    "{l}ret{l|f}\t$amt", [], IIC_RET>;
   def LRETIW : Ii16<0xCA, RawFrm, (outs), (ins i16imm:$amt),
-                    "lretw\t$amt", [], IIC_RET>, OpSize;
+                    "{l}ret{w|f}\t$amt", [], IIC_RET>, OpSize;
 }
 
 // Unconditional branches.
@@ -182,7 +187,7 @@ let isCall = 1, isTerminator = 1, isReturn = 1, isBarrier = 1,
   def TCRETURNdi : PseudoI<(outs),
                      (ins i32imm_pcrel:$dst, i32imm:$offset, variable_ops), []>;
   def TCRETURNri : PseudoI<(outs),
-                     (ins GR32_TC:$dst, i32imm:$offset, variable_ops), []>;
+                     (ins ptr_rc_tailcall:$dst, i32imm:$offset, variable_ops), []>;
   let mayLoad = 1 in
   def TCRETURNmi : PseudoI<(outs),
                      (ins i32mem_TC:$dst, i32imm:$offset, variable_ops), []>;
@@ -193,7 +198,7 @@ let isCall = 1, isTerminator = 1, isReturn = 1, isBarrier = 1,
                            (ins i32imm_pcrel:$dst, variable_ops),
                            "jmp\t$dst  # TAILCALL",
                            [], IIC_JMP_REL>;
-  def TAILJMPr : I<0xFF, MRM4r, (outs), (ins GR32_TC:$dst, variable_ops),
+  def TAILJMPr : I<0xFF, MRM4r, (outs), (ins ptr_rc_tailcall:$dst, variable_ops),
                    "", [], IIC_JMP_REG>;  // FIXME: Remove encoding when JIT is dead.
   let mayLoad = 1 in
   def TAILJMPm : I<0xFF, MRM4m, (outs), (ins i32mem_TC:$dst, variable_ops),

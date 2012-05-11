@@ -39,28 +39,24 @@ class MDString : public Value {
   virtual void anchor();
   MDString(const MDString &);            // DO NOT IMPLEMENT
 
-  StringRef Str;
-  explicit MDString(LLVMContext &C, StringRef S);
-
+  explicit MDString(LLVMContext &C);
 public:
   static MDString *get(LLVMContext &Context, StringRef Str);
   static MDString *get(LLVMContext &Context, const char *Str) {
     return get(Context, Str ? StringRef(Str) : StringRef());
   }
 
-  StringRef getString() const { return Str; }
+  StringRef getString() const { return getName(); }
 
-  unsigned getLength() const { return (unsigned)Str.size(); }
+  unsigned getLength() const { return (unsigned)getName().size(); }
 
   typedef StringRef::iterator iterator;
   
   /// begin() - Pointer to the first byte of the string.
-  ///
-  iterator begin() const { return Str.begin(); }
+  iterator begin() const { return getName().begin(); }
 
   /// end() - Pointer to one byte past the end of the string.
-  ///
-  iterator end() const { return Str.end(); }
+  iterator end() const { return getName().end(); }
 
   /// Methods for support type inquiry through isa, cast, and dyn_cast:
   static inline bool classof(const MDString *) { return true; }
@@ -79,6 +75,10 @@ class MDNode : public Value, public FoldingSetNode {
   void operator=(const MDNode &);        // DO NOT IMPLEMENT
   friend class MDNodeOperand;
   friend class LLVMContextImpl;
+  friend struct FoldingSetTrait<MDNode>;
+
+  /// Hash - If the MDNode is uniqued cache the hash to speed up lookup.
+  unsigned Hash;
 
   /// NumOperands - This many 'MDNodeOperand' items are co-allocated onto the
   /// end of this MDNode.

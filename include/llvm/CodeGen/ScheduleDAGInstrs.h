@@ -28,6 +28,7 @@ namespace llvm {
   class MachineLoopInfo;
   class MachineDominatorTree;
   class LiveIntervals;
+  class RegPressureTracker;
 
   /// LoopDependencies - This class analyzes loop-oriented register
   /// dependencies, which are used to guide scheduling decisions.
@@ -105,7 +106,7 @@ namespace llvm {
 
     VReg2SUnit(unsigned reg, SUnit *su): VirtReg(reg), SU(su) {}
 
-    unsigned getSparseSetKey() const {
+    unsigned getSparseSetIndex() const {
       return TargetRegisterInfo::virtReg2Index(VirtReg);
     }
   };
@@ -160,7 +161,7 @@ namespace llvm {
   /// compares ValueT's, only unsigned keys. This allows the set to be cleared
   /// between scheduling regions in constant time as long as ValueT does not
   /// require a destructor.
-  typedef SparseSet<VReg2SUnit> VReg2SUnitMap;
+  typedef SparseSet<VReg2SUnit, VirtReg2IndexFunctor> VReg2SUnitMap;
 
   /// ScheduleDAGInstrs - A ScheduleDAG subclass for scheduling lists of
   /// MachineInstrs.
@@ -180,6 +181,13 @@ namespace llvm {
     /// UnitLatencies (misnamed) flag avoids computing def-use latencies, using
     /// the def-side latency only.
     bool UnitLatencies;
+
+    /// The standard DAG builder does not normally include terminators as DAG
+    /// nodes because it does not create the necessary dependencies to prevent
+    /// reordering. A specialized scheduler can overide
+    /// TargetInstrInfo::isSchedulingBoundary then enable this flag to indicate
+    /// it has taken responsibility for scheduling the terminator correctly.
+    bool CanHandleTerminators;
 
     /// State specific to the current scheduling region.
     /// ------------------------------------------------
@@ -268,7 +276,7 @@ namespace llvm {
 
     /// buildSchedGraph - Build SUnits from the MachineBasicBlock that we are
     /// input.
-    void buildSchedGraph(AliasAnalysis *AA);
+    void buildSchedGraph(AliasAnalysis *AA, RegPressureTracker *RPTracker = 0);
 
     /// addSchedBarrierDeps - Add dependencies from instructions in the current
     /// list of instructions being scheduled to scheduling barrier. We want to
@@ -314,10 +322,6 @@ namespace llvm {
     void addPhysRegDeps(SUnit *SU, unsigned OperIdx);
     void addVRegDefDeps(SUnit *SU, unsigned OperIdx);
     void addVRegUseDeps(SUnit *SU, unsigned OperIdx);
-
-    VReg2SUnitMap::iterator findVRegDef(unsigned VirtReg) {
-      return VRegDefs.find(TargetRegisterInfo::virtReg2Index(VirtReg));
-    }
   };
 
   /// newSUnit - Creates a new SUnit and return a ptr to it.

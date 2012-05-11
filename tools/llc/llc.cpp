@@ -210,29 +210,6 @@ DontPlaceZerosInBSS("nozero-initialized-in-bss",
   cl::init(false));
 
 static cl::opt<bool>
-EnableJITExceptionHandling("jit-enable-eh",
-  cl::desc("Emit exception handling information"),
-  cl::init(false));
-
-// In debug builds, make this default to true.
-#ifdef NDEBUG
-#define EMIT_DEBUG false
-#else
-#define EMIT_DEBUG true
-#endif
-static cl::opt<bool>
-EmitJitDebugInfo("jit-emit-debug",
-  cl::desc("Emit debug information to debugger"),
-  cl::init(EMIT_DEBUG));
-#undef EMIT_DEBUG
-
-static cl::opt<bool>
-EmitJitDebugInfoToDisk("jit-emit-debug-to-disk",
-  cl::Hidden,
-  cl::desc("Emit debug info objfiles to disk"),
-  cl::init(false));
-
-static cl::opt<bool>
 EnableGuaranteedTailCallOpt("tailcallopt",
   cl::desc("Turn fastcc calls into tail calls by (potentially) changing ABI."),
   cl::init(false));
@@ -389,42 +366,18 @@ int main(int argc, char **argv) {
   if (!TargetTriple.empty())
     mod.setTargetTriple(Triple::normalize(TargetTriple));
 
+  // Figure out the target triple.
   Triple TheTriple(mod.getTargetTriple());
   if (TheTriple.getTriple().empty())
     TheTriple.setTriple(sys::getDefaultTargetTriple());
 
-  // Allocate target machine.  First, check whether the user has explicitly
-  // specified an architecture to compile for. If so we have to look it up by
-  // name, because it might be a backend that has no mapping to a target triple.
-  const Target *TheTarget = 0;
-  if (!MArch.empty()) {
-    for (TargetRegistry::iterator it = TargetRegistry::begin(),
-           ie = TargetRegistry::end(); it != ie; ++it) {
-      if (MArch == it->getName()) {
-        TheTarget = &*it;
-        break;
-      }
-    }
-
-    if (!TheTarget) {
-      errs() << argv[0] << ": error: invalid target '" << MArch << "'.\n";
-      return 1;
-    }
-
-    // Adjust the triple to match (if known), otherwise stick with the
-    // module/host triple.
-    Triple::ArchType Type = Triple::getArchTypeForLLVMName(MArch);
-    if (Type != Triple::UnknownArch)
-      TheTriple.setArch(Type);
-  } else {
-    std::string Err;
-    TheTarget = TargetRegistry::lookupTarget(TheTriple.getTriple(), Err);
-    if (TheTarget == 0) {
-      errs() << argv[0] << ": error auto-selecting target for module '"
-             << Err << "'.  Please use the -march option to explicitly "
-             << "pick a target.\n";
-      return 1;
-    }
+  // Get the target specific parser.
+  std::string Error;
+  const Target *TheTarget = TargetRegistry::lookupTarget(MArch, TheTriple,
+                                                         Error);
+  if (!TheTarget) {
+    errs() << argv[0] << ": " << Error;
+    return 1;
   }
 
   // Package up features to be passed to target/subtarget
@@ -463,9 +416,6 @@ int main(int argc, char **argv) {
   if (FloatABIForCalls != FloatABI::Default)
     Options.FloatABIType = FloatABIForCalls;
   Options.NoZerosInBSS = DontPlaceZerosInBSS;
-  Options.JITExceptionHandling = EnableJITExceptionHandling;
-  Options.JITEmitDebugInfo = EmitJitDebugInfo;
-  Options.JITEmitDebugInfoToDisk = EmitJitDebugInfoToDisk;
   Options.GuaranteedTailCallOpt = EnableGuaranteedTailCallOpt;
   Options.DisableTailCalls = DisableTailCalls;
   Options.StackAlignmentOverride = OverrideStackAlignment;

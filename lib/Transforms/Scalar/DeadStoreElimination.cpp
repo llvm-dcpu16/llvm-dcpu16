@@ -282,6 +282,12 @@ static uint64_t getPointerSize(const Value *V, AliasAnalysis &AA) {
       return C->getZExtValue();
   }
 
+  if (const CallInst *CI = extractCallocCall(V)) {
+    if (const ConstantInt *C1 = dyn_cast<ConstantInt>(CI->getArgOperand(0)))
+      if (const ConstantInt *C2 = dyn_cast<ConstantInt>(CI->getArgOperand(1)))
+       return (C1->getValue() * C2->getValue()).getZExtValue();
+  }
+
   if (TD == 0)
     return AliasAnalysis::UnknownSize;
 
@@ -704,9 +710,11 @@ bool DSE::handleEndBlock(BasicBlock &BB) {
 
     // Okay, so these are dead heap objects, but if the pointer never escapes
     // then it's leaked by this function anyways.
-    if (CallInst *CI = extractMallocCall(I))
-      if (!PointerMayBeCaptured(CI, true, true))
-        DeadStackObjects.insert(CI);
+    CallInst *CI = extractMallocCall(I);
+    if (!CI)
+      CI = extractCallocCall(I);
+    if (CI && !PointerMayBeCaptured(CI, true, true))
+      DeadStackObjects.insert(CI);
   }
 
   // Treat byval arguments the same, stores to them are dead at the end of the
@@ -723,14 +731,30 @@ bool DSE::handleEndBlock(BasicBlock &BB) {
     // If we find a store, check to see if it points into a dead stack value.
     if (hasMemoryWrite(BBI) && isRemovable(BBI)) {
       // See through pointer-to-pointer bitcasts
-      Value *Pointer = GetUnderlyingObject(getStoredPointerOperand(BBI));
+      SmallVector<Value *, 4> Pointers;
+      GetUnderlyingObjects(getStoredPointerOperand(BBI), Pointers);
 
       // Stores to stack values are valid candidates for removal.
-      if (DeadStackObjects.count(Pointer)) {
+      bool AllDead = true;
+      for (SmallVectorImpl<Value *>::iterator I = Pointers.begin(),
+           E = Pointers.end(); I != E; ++I)
+        if (!DeadStackObjects.count(*I)) {
+          AllDead = false;
+          break;
+        }
+
+      if (AllDead) {
         Instruction *Dead = BBI++;
 
         DEBUG(dbgs() << "DSE: Dead Store at End of Block:\n  DEAD: "
-                     << *Dead << "\n  Object: " << *Pointer << '\n');
+                     << *Dead << "\n  Objects: ";
+              for (SmallVectorImpl<Value *>::iterator I = Pointers.begin(),
+                   E = Pointers.end(); I != E; ++I) {
+                dbgs() << **I;
+                if (llvm::next(I) != E)
+                  dbgs() << ", ";
+              }
+              dbgs() << '\n');
 
         // DCE instructions only used to calculate that store.
         DeleteDeadInstruction(Dead, *MD, &DeadStackObjects);
@@ -755,6 +779,11 @@ bool DSE::handleEndBlock(BasicBlock &BB) {
     }
 
     if (CallInst *CI = extractMallocCall(BBI)) {
+      DeadStackObjects.erase(CI);
+      continue;
+    }
+
+    if (CallInst *CI = extractCallocCall(BBI)) {
       DeadStackObjects.erase(CI);
       continue;
     }

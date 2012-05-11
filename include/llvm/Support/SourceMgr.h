@@ -123,13 +123,23 @@ public:
 
   /// FindLineNumber - Find the line number for the specified location in the
   /// specified file.  This is not a fast method.
-  unsigned FindLineNumber(SMLoc Loc, int BufferID = -1) const;
+  unsigned FindLineNumber(SMLoc Loc, int BufferID = -1) const {
+    return getLineAndColumn(Loc, BufferID).first;
+  }
+
+  /// getLineAndColumn - Find the line and column number for the specified
+  /// location in the specified file.  This is not a fast method.
+  std::pair<unsigned, unsigned>
+    getLineAndColumn(SMLoc Loc, int BufferID = -1) const;
 
   /// PrintMessage - Emit a message about the specified location with the
   /// specified string.
   ///
+  /// @param ShowColors - Display colored messages if output is a terminal and
+  /// the default error handler is used.
   void PrintMessage(SMLoc Loc, DiagKind Kind, const Twine &Msg,
-                    ArrayRef<SMRange> Ranges = ArrayRef<SMRange>()) const;
+                    ArrayRef<SMRange> Ranges = ArrayRef<SMRange>(),
+                    bool ShowColors = true) const;
 
 
   /// GetMessage - Return an SMDiagnostic at the specified location with the
@@ -188,7 +198,7 @@ public:
   const std::vector<std::pair<unsigned, unsigned> > &getRanges() const {
     return Ranges;
   }
-  void print(const char *ProgName, raw_ostream &S) const;
+  void print(const char *ProgName, raw_ostream &S, bool ShowColors = true) const;
 };
 
 }  // end llvm namespace

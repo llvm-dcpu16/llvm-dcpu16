@@ -285,14 +285,22 @@ static unsigned GetAutoSenseRadix(StringRef &Str) {
   if (Str.startswith("0x")) {
     Str = Str.substr(2);
     return 16;
-  } else if (Str.startswith("0b")) {
+  }
+  
+  if (Str.startswith("0b")) {
     Str = Str.substr(2);
     return 2;
-  } else if (Str.startswith("0")) {
-    return 8;
-  } else {
-    return 10;
   }
+
+  if (Str.startswith("0o")) {
+    Str = Str.substr(2);
+    return 8;
+  }
+
+  if (Str.startswith("0"))
+    return 8;
+  
+  return 10;
 }
 
 
@@ -396,7 +404,7 @@ bool StringRef::getAsInteger(unsigned Radix, APInt &Result) const {
   unsigned BitWidth = Log2Radix * Str.size();
   if (BitWidth < Result.getBitWidth())
     BitWidth = Result.getBitWidth(); // don't shrink the result
-  else
+  else if (BitWidth > Result.getBitWidth())
     Result = Result.zext(BitWidth);
 
   APInt RadixAP, CharAP; // unused unless !IsPowerOf2Radix

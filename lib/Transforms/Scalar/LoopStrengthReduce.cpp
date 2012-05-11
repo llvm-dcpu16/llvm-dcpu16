@@ -77,6 +77,12 @@
 #include <algorithm>
 using namespace llvm;
 
+/// MaxIVUsers is an arbitrary threshold that provides an early opportunitiy for
+/// bail out. This threshold is far beyond the number of users that LSR can
+/// conceivably solve, so it should not affect generated code, but catches the
+/// worst cases before LSR burns too much compile time and stack space.
+static const unsigned MaxIVUsers = 200;
+
 // Temporary flag to cleanup congruent phis after LSR phi expansion.
 // It's currently disabled until we can determine whether it's truly useful or
 // not. The flag should be removed after the v3.0 release.
@@ -1433,7 +1439,41 @@ struct IVInc {
 
 // IVChain - The list of IV increments in program order.
 // We typically add the head of a chain without finding subsequent links.
-typedef SmallVector<IVInc,1> IVChain;
+struct IVChain {
+  SmallVector<IVInc,1> Incs;
+  const SCEV *ExprBase;
+
+  IVChain() : ExprBase(0) {}
+
+  IVChain(const IVInc &Head, const SCEV *Base)
+    : Incs(1, Head), ExprBase(Base) {}
+
+  typedef SmallVectorImpl<IVInc>::const_iterator const_iterator;
+
+  // begin - return the first increment in the chain.
+  const_iterator begin() const {
+    assert(!Incs.empty());
+    return llvm::next(Incs.begin());
+  }
+  const_iterator end() const {
+    return Incs.end();
+  }
+
+  // hasIncs - Returns true if this chain contains any increments.
+  bool hasIncs() const { return Incs.size() >= 2; }
+
+  // add - Add an IVInc to the end of this chain.
+  void add(const IVInc &X) { Incs.push_back(X); }
+
+  // tailUserInst - Returns the last UserInst in the chain.
+  Instruction *tailUserInst() const { return Incs.back().UserInst; }
+
+  // isProfitableIncrement - Returns true if IncExpr can be profitably added to
+  // this chain.
+  bool isProfitableIncrement(const SCEV *OperExpr,
+                             const SCEV *IncExpr,
+                             ScalarEvolution&);
+};
 
 /// ChainUsers - Helper for CollectChains to track multiple IV increment uses.
 /// Distinguish between FarUsers that definitely cross IV increments and
@@ -2313,41 +2353,23 @@ static const SCEV *getExprBase(const SCEV *S) {
 /// increment will be an offset relative to the same base. We allow such offsets
 /// to potentially be used as chain increment as long as it's not obviously
 /// expensive to expand using real instructions.
-static const SCEV *
-getProfitableChainIncrement(Value *NextIV, Value *PrevIV,
-                            const IVChain &Chain, Loop *L,
-                            ScalarEvolution &SE, const TargetLowering *TLI) {
-  // Prune the solution space aggressively by checking that both IV operands
-  // are expressions that operate on the same unscaled SCEVUnknown. This
-  // "base" will be canceled by the subsequent getMinusSCEV call. Checking first
-  // avoids creating extra SCEV expressions.
-  const SCEV *OperExpr = SE.getSCEV(NextIV);
-  const SCEV *PrevExpr = SE.getSCEV(PrevIV);
-  if (getExprBase(OperExpr) != getExprBase(PrevExpr) && !StressIVChain)
-    return 0;
-
-  const SCEV *IncExpr = SE.getMinusSCEV(OperExpr, PrevExpr);
-  if (!SE.isLoopInvariant(IncExpr, L))
-    return 0;
-
-  // We are not able to expand an increment unless it is loop invariant,
-  // however, the following checks are purely for profitability.
+bool IVChain::isProfitableIncrement(const SCEV *OperExpr,
+                                    const SCEV *IncExpr,
+                                    ScalarEvolution &SE) {
+  // Aggressively form chains when -stress-ivchain.
   if (StressIVChain)
-    return IncExpr;
+    return true;
 
   // Do not replace a constant offset from IV head with a nonconstant IV
   // increment.
   if (!isa<SCEVConstant>(IncExpr)) {
-    const SCEV *HeadExpr = SE.getSCEV(getWideOperand(Chain[0].IVOperand));
+    const SCEV *HeadExpr = SE.getSCEV(getWideOperand(Incs[0].IVOperand));
     if (isa<SCEVConstant>(SE.getMinusSCEV(OperExpr, HeadExpr)))
       return 0;
   }
 
   SmallPtrSet<const SCEV*, 8> Processed;
-  if (isHighCostExpansion(IncExpr, Processed, SE))
-    return 0;
-
-  return IncExpr;
+  return !isHighCostExpansion(IncExpr, Processed, SE);
 }
 
 /// Return true if the number of registers needed for the chain is estimated to
@@ -2366,18 +2388,18 @@ isProfitableChain(IVChain &Chain, SmallPtrSet<Instruction*, 4> &Users,
   if (StressIVChain)
     return true;
 
-  if (Chain.size() <= 2)
+  if (!Chain.hasIncs())
     return false;
 
   if (!Users.empty()) {
-    DEBUG(dbgs() << "Chain: " << *Chain[0].UserInst << " users:\n";
+    DEBUG(dbgs() << "Chain: " << *Chain.Incs[0].UserInst << " users:\n";
           for (SmallPtrSet<Instruction*, 4>::const_iterator I = Users.begin(),
                  E = Users.end(); I != E; ++I) {
             dbgs() << "  " << **I << "\n";
           });
     return false;
   }
-  assert(!Chain.empty() && "empty IV chains are not allowed");
+  assert(!Chain.Incs.empty() && "empty IV chains are not allowed");
 
   // The chain itself may require a register, so intialize cost to 1.
   int cost = 1;
@@ -2385,15 +2407,15 @@ isProfitableChain(IVChain &Chain, SmallPtrSet<Instruction*, 4> &Users,
   // A complete chain likely eliminates the need for keeping the original IV in
   // a register. LSR does not currently know how to form a complete chain unless
   // the header phi already exists.
-  if (isa<PHINode>(Chain.back().UserInst)
-      && SE.getSCEV(Chain.back().UserInst) == Chain[0].IncExpr) {
+  if (isa<PHINode>(Chain.tailUserInst())
+      && SE.getSCEV(Chain.tailUserInst()) == Chain.Incs[0].IncExpr) {
     --cost;
   }
   const SCEV *LastIncExpr = 0;
   unsigned NumConstIncrements = 0;
   unsigned NumVarIncrements = 0;
   unsigned NumReusedIncrements = 0;
-  for (IVChain::const_iterator I = llvm::next(Chain.begin()), E = Chain.end();
+  for (IVChain::const_iterator I = Chain.begin(), E = Chain.end();
        I != E; ++I) {
 
     if (I->IncExpr->isZero())
@@ -2429,7 +2451,8 @@ isProfitableChain(IVChain &Chain, SmallPtrSet<Instruction*, 4> &Users,
   // the stride.
   cost -= NumReusedIncrements;
 
-  DEBUG(dbgs() << "Chain: " << *Chain[0].UserInst << " Cost: " << cost << "\n");
+  DEBUG(dbgs() << "Chain: " << *Chain.Incs[0].UserInst << " Cost: " << cost
+               << "\n");
 
   return cost < 0;
 }
@@ -2440,25 +2463,39 @@ void LSRInstance::ChainInstruction(Instruction *UserInst, Instruction *IVOper,
                                    SmallVectorImpl<ChainUsers> &ChainUsersVec) {
   // When IVs are used as types of varying widths, they are generally converted
   // to a wider type with some uses remaining narrow under a (free) trunc.
-  Value *NextIV = getWideOperand(IVOper);
+  Value *const NextIV = getWideOperand(IVOper);
+  const SCEV *const OperExpr = SE.getSCEV(NextIV);
+  const SCEV *const OperExprBase = getExprBase(OperExpr);
 
   // Visit all existing chains. Check if its IVOper can be computed as a
   // profitable loop invariant increment from the last link in the Chain.
   unsigned ChainIdx = 0, NChains = IVChainVec.size();
   const SCEV *LastIncExpr = 0;
   for (; ChainIdx < NChains; ++ChainIdx) {
-    Value *PrevIV = getWideOperand(IVChainVec[ChainIdx].back().IVOperand);
+    IVChain &Chain = IVChainVec[ChainIdx];
+
+    // Prune the solution space aggressively by checking that both IV operands
+    // are expressions that operate on the same unscaled SCEVUnknown. This
+    // "base" will be canceled by the subsequent getMinusSCEV call. Checking
+    // first avoids creating extra SCEV expressions.
+    if (!StressIVChain && Chain.ExprBase != OperExprBase)
+      continue;
+
+    Value *PrevIV = getWideOperand(Chain.Incs.back().IVOperand);
     if (!isCompatibleIVType(PrevIV, NextIV))
       continue;
 
     // A phi node terminates a chain.
-    if (isa<PHINode>(UserInst)
-        && isa<PHINode>(IVChainVec[ChainIdx].back().UserInst))
+    if (isa<PHINode>(UserInst) && isa<PHINode>(Chain.tailUserInst()))
       continue;
 
-    if (const SCEV *IncExpr =
-        getProfitableChainIncrement(NextIV, PrevIV, IVChainVec[ChainIdx],
-                                    L, SE, TLI)) {
+    // The increment must be loop-invariant so it can be kept in a register.
+    const SCEV *PrevExpr = SE.getSCEV(PrevIV);
+    const SCEV *IncExpr = SE.getMinusSCEV(OperExpr, PrevExpr);
+    if (!SE.isLoopInvariant(IncExpr, L))
+      continue;
+
+    if (Chain.isProfitableIncrement(OperExpr, IncExpr, SE)) {
       LastIncExpr = IncExpr;
       break;
     }
@@ -2472,24 +2509,24 @@ void LSRInstance::ChainInstruction(Instruction *UserInst, Instruction *IVOper,
       DEBUG(dbgs() << "IV Chain Limit\n");
       return;
     }
-    LastIncExpr = SE.getSCEV(NextIV);
+    LastIncExpr = OperExpr;
     // IVUsers may have skipped over sign/zero extensions. We don't currently
     // attempt to form chains involving extensions unless they can be hoisted
     // into this loop's AddRec.
     if (!isa<SCEVAddRecExpr>(LastIncExpr))
       return;
     ++NChains;
-    IVChainVec.resize(NChains);
+    IVChainVec.push_back(IVChain(IVInc(UserInst, IVOper, LastIncExpr),
+                                 OperExprBase));
     ChainUsersVec.resize(NChains);
-    DEBUG(dbgs() << "IV Head: (" << *UserInst << ") IV=" << *LastIncExpr
-          << "\n");
+    DEBUG(dbgs() << "IV Chain#" << ChainIdx << " Head: (" << *UserInst
+                 << ") IV=" << *LastIncExpr << "\n");
+  } else {
+    DEBUG(dbgs() << "IV Chain#" << ChainIdx << "  Inc: (" << *UserInst
+                 << ") IV+" << *LastIncExpr << "\n");
+    // Add this IV user to the end of the chain.
+    IVChainVec[ChainIdx].add(IVInc(UserInst, IVOper, LastIncExpr));
   }
-  else
-    DEBUG(dbgs() << "IV  Inc: (" << *UserInst << ") IV+" << *LastIncExpr
-          << "\n");
-
-  // Add this IV user to the end of the chain.
-  IVChainVec[ChainIdx].push_back(IVInc(UserInst, IVOper, LastIncExpr));
 
   SmallPtrSet<Instruction*,4> &NearUsers = ChainUsersVec[ChainIdx].NearUsers;
   // This chain's NearUsers become FarUsers.
@@ -2545,6 +2582,7 @@ void LSRInstance::ChainInstruction(Instruction *UserInst, Instruction *IVOper,
 /// loop latch. This will discover chains on side paths, but requires
 /// maintaining multiple copies of the Chains state.
 void LSRInstance::CollectChains() {
+  DEBUG(dbgs() << "Collecting IV Chains.\n");
   SmallVector<ChainUsers, 8> ChainUsersVec;
 
   SmallVector<BasicBlock *,8> LatchPath;
@@ -2616,10 +2654,10 @@ void LSRInstance::CollectChains() {
 }
 
 void LSRInstance::FinalizeChain(IVChain &Chain) {
-  assert(!Chain.empty() && "empty IV chains are not allowed");
-  DEBUG(dbgs() << "Final Chain: " << *Chain[0].UserInst << "\n");
+  assert(!Chain.Incs.empty() && "empty IV chains are not allowed");
+  DEBUG(dbgs() << "Final Chain: " << *Chain.Incs[0].UserInst << "\n");
 
-  for (IVChain::const_iterator I = llvm::next(Chain.begin()), E = Chain.end();
+  for (IVChain::const_iterator I = Chain.begin(), E = Chain.end();
        I != E; ++I) {
     DEBUG(dbgs() << "        Inc: " << *I->UserInst << "\n");
     User::op_iterator UseI =
@@ -2653,7 +2691,7 @@ void LSRInstance::GenerateIVChain(const IVChain &Chain, SCEVExpander &Rewriter,
                                   SmallVectorImpl<WeakVH> &DeadInsts) {
   // Find the new IVOperand for the head of the chain. It may have been replaced
   // by LSR.
-  const IVInc &Head = Chain[0];
+  const IVInc &Head = Chain.Incs[0];
   User::op_iterator IVOpEnd = Head.UserInst->op_end();
   User::op_iterator IVOpIter = findIVOperand(Head.UserInst->op_begin(),
                                              IVOpEnd, L, SE);
@@ -2685,7 +2723,7 @@ void LSRInstance::GenerateIVChain(const IVChain &Chain, SCEVExpander &Rewriter,
   Type *IVTy = IVSrc->getType();
   Type *IntTy = SE.getEffectiveSCEVType(IVTy);
   const SCEV *LeftOverExpr = 0;
-  for (IVChain::const_iterator IncI = llvm::next(Chain.begin()),
+  for (IVChain::const_iterator IncI = Chain.begin(),
          IncE = Chain.end(); IncI != IncE; ++IncI) {
 
     Instruction *InsertPt = IncI->UserInst;
@@ -2730,7 +2768,7 @@ void LSRInstance::GenerateIVChain(const IVChain &Chain, SCEVExpander &Rewriter,
   }
   // If LSR created a new, wider phi, we may also replace its postinc. We only
   // do this if we also found a wide value for the head of the chain.
-  if (isa<PHINode>(Chain.back().UserInst)) {
+  if (isa<PHINode>(Chain.tailUserInst())) {
     for (BasicBlock::iterator I = L->getHeader()->begin();
          PHINode *Phi = dyn_cast<PHINode>(I); ++I) {
       if (!isCompatibleIVType(Phi, IVSrc))
@@ -4102,7 +4140,7 @@ LSRInstance::HoistInsertPosition(BasicBlock::iterator IP,
       // Attempt to find an insert position in the middle of the block,
       // instead of at the end, so that it can be used for other expansions.
       if (IDom == Inst->getParent() &&
-          (!BetterPos || DT.dominates(BetterPos, Inst)))
+          (!BetterPos || !DT.dominates(Inst, BetterPos)))
         BetterPos = llvm::next(BasicBlock::iterator(Inst));
     }
     if (!AllDominate)
@@ -4479,7 +4517,7 @@ LSRInstance::ImplementSolution(const SmallVectorImpl<const Formula *> &Solution,
   // Mark phi nodes that terminate chains so the expander tries to reuse them.
   for (SmallVectorImpl<IVChain>::const_iterator ChainI = IVChainVec.begin(),
          ChainE = IVChainVec.end(); ChainI != ChainE; ++ChainI) {
-    if (PHINode *PN = dyn_cast<PHINode>(ChainI->back().UserInst))
+    if (PHINode *PN = dyn_cast<PHINode>(ChainI->tailUserInst()))
       Rewriter.setChainedPhi(PN);
   }
 
@@ -4518,6 +4556,17 @@ LSRInstance::LSRInstance(const TargetLowering *tli, Loop *l, Pass *P)
 
   // If there's no interesting work to be done, bail early.
   if (IU.empty()) return;
+
+  // If there's too much analysis to be done, bail early. We won't be able to
+  // model the problem anyway.
+  unsigned NumUsers = 0;
+  for (IVUsers::const_iterator UI = IU.begin(), E = IU.end(); UI != E; ++UI) {
+    if (++NumUsers > MaxIVUsers) {
+      DEBUG(dbgs() << "LSR skipping loop, too many IV Users in " << *L
+            << "\n");
+      return;
+    }
+  }
 
 #ifndef NDEBUG
   // All dominating loops must have preheaders, or SCEVExpander may not be able

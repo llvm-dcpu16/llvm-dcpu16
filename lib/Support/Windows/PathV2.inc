@@ -301,11 +301,21 @@ error_code rename(const Twine &from, const Twine &to) {
   if (error_code ec = UTF8ToUTF16(f, wide_from)) return ec;
   if (error_code ec = UTF8ToUTF16(t, wide_to)) return ec;
 
-  if (!::MoveFileExW(wide_from.begin(), wide_to.begin(),
-                     MOVEFILE_COPY_ALLOWED | MOVEFILE_REPLACE_EXISTING))
-    return windows_error(::GetLastError());
+  error_code ec = error_code::success();
+  for (int i = 0; i < 2000; i++) {
+    if (::MoveFileExW(wide_from.begin(), wide_to.begin(),
+                      MOVEFILE_COPY_ALLOWED | MOVEFILE_REPLACE_EXISTING))
+      return error_code::success();
+    ec = windows_error(::GetLastError());
+    if (ec != windows_error::access_denied)
+      break;
+    // Retry MoveFile() at ACCESS_DENIED.
+    // System scanners (eg. indexer) might open the source file when
+    // It is written and closed.
+    ::Sleep(1);
+  }
 
-  return error_code::success();
+  return ec;
 }
 
 error_code resize_file(const Twine &path, uint64_t size) {
@@ -487,9 +497,11 @@ handle_status_error:
   return error_code::success();
 }
 
+// FIXME: mode should be used here and default to user r/w only,
+// it currently comes in as a UNIX mode.
 error_code unique_file(const Twine &model, int &result_fd,
-                             SmallVectorImpl<char> &result_path,
-                             bool makeAbsolute) {
+                       SmallVectorImpl<char> &result_path,
+                       bool makeAbsolute, unsigned mode) {
   // Use result_path as temp storage.
   result_path.set_size(0);
   StringRef m = model.toStringRef(result_path);

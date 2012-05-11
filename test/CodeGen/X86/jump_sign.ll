@@ -22,6 +22,7 @@ declare i32 @bar(...)
 declare i32 @baz(...)
 
 ; rdar://10633221
+; rdar://11355268
 define i32 @g(i32 %a, i32 %b) nounwind {
 entry:
 ; CHECK: g:
@@ -29,6 +30,56 @@ entry:
 ; CHECK: cmovs
   %sub = sub nsw i32 %a, %b
   %cmp = icmp sgt i32 %sub, 0
+  %cond = select i1 %cmp, i32 %sub, i32 0
+  ret i32 %cond
+}
+
+; rdar://10734411
+define i32 @h(i32 %a, i32 %b) nounwind {
+entry:
+; CHECK: h:
+; CHECK-NOT: cmp
+; CHECK: cmov
+; CHECK-NOT: movl
+; CHECK: ret
+  %cmp = icmp slt i32 %b, %a
+  %sub = sub nsw i32 %a, %b
+  %cond = select i1 %cmp, i32 %sub, i32 0
+  ret i32 %cond
+}
+define i32 @i(i32 %a, i32 %b) nounwind {
+entry:
+; CHECK: i:
+; CHECK-NOT: cmp
+; CHECK: cmov
+; CHECK-NOT: movl
+; CHECK: ret
+  %cmp = icmp sgt i32 %a, %b
+  %sub = sub nsw i32 %a, %b
+  %cond = select i1 %cmp, i32 %sub, i32 0
+  ret i32 %cond
+}
+define i32 @j(i32 %a, i32 %b) nounwind {
+entry:
+; CHECK: j:
+; CHECK-NOT: cmp
+; CHECK: cmov
+; CHECK-NOT: movl
+; CHECK: ret
+  %cmp = icmp ugt i32 %a, %b
+  %sub = sub i32 %a, %b
+  %cond = select i1 %cmp, i32 %sub, i32 0
+  ret i32 %cond
+}
+define i32 @k(i32 %a, i32 %b) nounwind {
+entry:
+; CHECK: k:
+; CHECK-NOT: cmp
+; CHECK: cmov
+; CHECK-NOT: movl
+; CHECK: ret
+  %cmp = icmp ult i32 %b, %a
+  %sub = sub i32 %a, %b
   %cond = select i1 %cmp, i32 %sub, i32 0
   ret i32 %cond
 }

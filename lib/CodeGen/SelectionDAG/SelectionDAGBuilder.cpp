@@ -2804,11 +2804,11 @@ void SelectionDAGBuilder::visitExtractElement(const User &I) {
 }
 
 // Utility for visitShuffleVector - Return true if every element in Mask,
-// begining // from position Pos and ending in Pos+Size, falls within the
+// begining from position Pos and ending in Pos+Size, falls within the
 // specified sequential range [L, L+Pos). or is undef.
 static bool isSequentialInRange(const SmallVectorImpl<int> &Mask,
-                                int Pos, int Size, int Low) {
-  for (int i = Pos, e = Pos+Size; i != e; ++i, ++Low)
+                                unsigned Pos, unsigned Size, int Low) {
+  for (unsigned i = Pos, e = Pos+Size; i != e; ++i, ++Low)
     if (Mask[i] >= 0 && Mask[i] != Low)
       return false;
   return true;
@@ -2878,10 +2878,9 @@ void SelectionDAGBuilder::visitShuffleVector(const User &I) {
     SmallVector<int, 8> MappedOps;
     for (unsigned i = 0; i != MaskNumElts; ++i) {
       int Idx = Mask[i];
-      if (Idx < (int)SrcNumElts)
-        MappedOps.push_back(Idx);
-      else
-        MappedOps.push_back(Idx + MaskNumElts - SrcNumElts);
+      if (Idx >= (int)SrcNumElts)
+        Idx -= SrcNumElts - MaskNumElts;
+      MappedOps.push_back(Idx);
     }
 
     setValue(&I, DAG.getVectorShuffle(VT, getCurDebugLoc(), Src1, Src2,
@@ -2893,13 +2892,13 @@ void SelectionDAGBuilder::visitShuffleVector(const User &I) {
     // Analyze the access pattern of the vector to see if we can extract
     // two subvectors and do the shuffle. The analysis is done by calculating
     // the range of elements the mask access on both vectors.
-    int MinRange[2] = { static_cast<int>(SrcNumElts+1),
-                        static_cast<int>(SrcNumElts+1)};
+    int MinRange[2] = { static_cast<int>(SrcNumElts),
+                        static_cast<int>(SrcNumElts)};
     int MaxRange[2] = {-1, -1};
 
     for (unsigned i = 0; i != MaskNumElts; ++i) {
       int Idx = Mask[i];
-      int Input = 0;
+      unsigned Input = 0;
       if (Idx < 0)
         continue;
 
@@ -2915,11 +2914,11 @@ void SelectionDAGBuilder::visitShuffleVector(const User &I) {
 
     // Check if the access is smaller than the vector size and can we find
     // a reasonable extract index.
-    int RangeUse[2] = { 2, 2 };  // 0 = Unused, 1 = Extract, 2 = Can not
-                                 // Extract.
+    int RangeUse[2] = { -1, -1 };  // 0 = Unused, 1 = Extract, -1 = Can not
+                                   // Extract.
     int StartIdx[2];  // StartIdx to extract from
-    for (int Input=0; Input < 2; ++Input) {
-      if (MinRange[Input] == (int)(SrcNumElts+1) && MaxRange[Input] == -1) {
+    for (unsigned Input = 0; Input < 2; ++Input) {
+      if (MinRange[Input] >= (int)SrcNumElts && MaxRange[Input] < 0) {
         RangeUse[Input] = 0; // Unused
         StartIdx[Input] = 0;
         continue;
@@ -2937,9 +2936,9 @@ void SelectionDAGBuilder::visitShuffleVector(const User &I) {
       setValue(&I, DAG.getUNDEF(VT)); // Vectors are not used.
       return;
     }
-    if (RangeUse[0] < 2 && RangeUse[1] < 2) {
+    if (RangeUse[0] >= 0 && RangeUse[1] >= 0) {
       // Extract appropriate subvector and generate a vector shuffle
-      for (int Input=0; Input < 2; ++Input) {
+      for (unsigned Input = 0; Input < 2; ++Input) {
         SDValue &Src = Input == 0 ? Src1 : Src2;
         if (RangeUse[Input] == 0)
           Src = DAG.getUNDEF(VT);
@@ -2952,12 +2951,13 @@ void SelectionDAGBuilder::visitShuffleVector(const User &I) {
       SmallVector<int, 8> MappedOps;
       for (unsigned i = 0; i != MaskNumElts; ++i) {
         int Idx = Mask[i];
-        if (Idx < 0)
-          MappedOps.push_back(Idx);
-        else if (Idx < (int)SrcNumElts)
-          MappedOps.push_back(Idx - StartIdx[0]);
-        else
-          MappedOps.push_back(Idx - SrcNumElts - StartIdx[1] + MaskNumElts);
+        if (Idx >= 0) {
+          if (Idx < (int)SrcNumElts)
+            Idx -= StartIdx[0];
+          else
+            Idx -= SrcNumElts + StartIdx[1] - MaskNumElts;
+        }
+        MappedOps.push_back(Idx);
       }
 
       setValue(&I, DAG.getVectorShuffle(VT, getCurDebugLoc(), Src1, Src2,
@@ -2973,22 +2973,20 @@ void SelectionDAGBuilder::visitShuffleVector(const User &I) {
   EVT PtrVT = TLI.getPointerTy();
   SmallVector<SDValue,8> Ops;
   for (unsigned i = 0; i != MaskNumElts; ++i) {
-    if (Mask[i] < 0) {
-      Ops.push_back(DAG.getUNDEF(EltVT));
+    int Idx = Mask[i];
+    SDValue Res;
+
+    if (Idx < 0) {
+      Res = DAG.getUNDEF(EltVT);
     } else {
-      int Idx = Mask[i];
-      SDValue Res;
+      SDValue &Src = Idx < (int)SrcNumElts ? Src1 : Src2;
+      if (Idx >= (int)SrcNumElts) Idx -= SrcNumElts;
 
-      if (Idx < (int)SrcNumElts)
-        Res = DAG.getNode(ISD::EXTRACT_VECTOR_ELT, getCurDebugLoc(),
-                          EltVT, Src1, DAG.getConstant(Idx, PtrVT));
-      else
-        Res = DAG.getNode(ISD::EXTRACT_VECTOR_ELT, getCurDebugLoc(),
-                          EltVT, Src2,
-                          DAG.getConstant(Idx - SrcNumElts, PtrVT));
-
-      Ops.push_back(Res);
+      Res = DAG.getNode(ISD::EXTRACT_VECTOR_ELT, getCurDebugLoc(),
+                        EltVT, Src, DAG.getConstant(Idx, PtrVT));
     }
+
+    Ops.push_back(Res);
   }
 
   setValue(&I, DAG.getNode(ISD::BUILD_VECTOR, getCurDebugLoc(),
@@ -3629,17 +3627,6 @@ GetExponent(SelectionDAG &DAG, SDValue Op, const TargetLowering &TLI,
 static SDValue
 getF32Constant(SelectionDAG &DAG, unsigned Flt) {
   return DAG.getConstantFP(APFloat(APInt(32, Flt)), MVT::f32);
-}
-
-// implVisitAluOverflow - Lower arithmetic overflow instrinsics.
-const char *
-SelectionDAGBuilder::implVisitAluOverflow(const CallInst &I, ISD::NodeType Op) {
-  SDValue Op1 = getValue(I.getArgOperand(0));
-  SDValue Op2 = getValue(I.getArgOperand(1));
-
-  SDVTList VTs = DAG.getVTList(Op1.getValueType(), MVT::i1);
-  setValue(&I, DAG.getNode(Op, getCurDebugLoc(), VTs, Op1, Op2));
-  return 0;
 }
 
 /// visitExp - Lower an exp intrinsic. Handles the special sequences for
@@ -4401,9 +4388,8 @@ static unsigned getTruncatedArgReg(const SDValue &N) {
     const SDValue &CFR = Ext.getOperand(0);
     if (CFR.getOpcode() == ISD::CopyFromReg)
       return cast<RegisterSDNode>(CFR.getOperand(1))->getReg();
-    else
-      if (CFR.getOpcode() == ISD::TRUNCATE)
-        return getTruncatedArgReg(CFR);
+    if (CFR.getOpcode() == ISD::TRUNCATE)
+      return getTruncatedArgReg(CFR);
   }
   return 0;
 }
@@ -4432,7 +4418,7 @@ SelectionDAGBuilder::EmitFuncArgumentDbgValue(const Value *V, MDNode *Variable,
   // Some arguments' frame index is recorded during argument lowering.
   Offset = FuncInfo.getArgumentFrameIndex(Arg);
   if (Offset)
-      Reg = TRI->getFrameRegister(MF);
+    Reg = TRI->getFrameRegister(MF);
 
   if (!Reg && N.getNode()) {
     if (N.getOpcode() == ISD::CopyFromReg)
@@ -4869,6 +4855,7 @@ SelectionDAGBuilder::visitIntrinsicCall(const CallInst &I, unsigned Intrinsic) {
   case Intrinsic::convertuu: {
     ISD::CvtCode Code = ISD::CVT_INVALID;
     switch (Intrinsic) {
+    default: llvm_unreachable("Impossible intrinsic");  // Can't reach here.
     case Intrinsic::convertff:  Code = ISD::CVT_FF; break;
     case Intrinsic::convertfsi: Code = ISD::CVT_FS; break;
     case Intrinsic::convertfui: Code = ISD::CVT_FU; break;
@@ -5063,7 +5050,7 @@ SelectionDAGBuilder::visitIntrinsicCall(const CallInst &I, unsigned Intrinsic) {
   }
   case Intrinsic::gcroot:
     if (GFI) {
-      const Value *Alloca = I.getArgOperand(0);
+      const Value *Alloca = I.getArgOperand(0)->stripPointerCasts();
       const Constant *TypeMap = cast<Constant>(I.getArgOperand(1));
 
       FrameIndexSDNode *FI = cast<FrameIndexSDNode>(getValue(Alloca).getNode());
@@ -5100,19 +5087,33 @@ SelectionDAGBuilder::visitIntrinsicCall(const CallInst &I, unsigned Intrinsic) {
     DAG.setRoot(Result.second);
     return 0;
   }
+  case Intrinsic::debugger: {
+    DAG.setRoot(DAG.getNode(ISD::DEBUGGER, dl,MVT::Other, getRoot()));
+    return 0;
+  }
   case Intrinsic::uadd_with_overflow:
-    return implVisitAluOverflow(I, ISD::UADDO);
   case Intrinsic::sadd_with_overflow:
-    return implVisitAluOverflow(I, ISD::SADDO);
   case Intrinsic::usub_with_overflow:
-    return implVisitAluOverflow(I, ISD::USUBO);
   case Intrinsic::ssub_with_overflow:
-    return implVisitAluOverflow(I, ISD::SSUBO);
   case Intrinsic::umul_with_overflow:
-    return implVisitAluOverflow(I, ISD::UMULO);
-  case Intrinsic::smul_with_overflow:
-    return implVisitAluOverflow(I, ISD::SMULO);
+  case Intrinsic::smul_with_overflow: {
+    ISD::NodeType Op;
+    switch (Intrinsic) {
+    default: llvm_unreachable("Impossible intrinsic");  // Can't reach here.
+    case Intrinsic::uadd_with_overflow: Op = ISD::UADDO; break;
+    case Intrinsic::sadd_with_overflow: Op = ISD::SADDO; break;
+    case Intrinsic::usub_with_overflow: Op = ISD::USUBO; break;
+    case Intrinsic::ssub_with_overflow: Op = ISD::SSUBO; break;
+    case Intrinsic::umul_with_overflow: Op = ISD::UMULO; break;
+    case Intrinsic::smul_with_overflow: Op = ISD::SMULO; break;
+    }
+    SDValue Op1 = getValue(I.getArgOperand(0));
+    SDValue Op2 = getValue(I.getArgOperand(1));
 
+    SDVTList VTs = DAG.getVTList(Op1.getValueType(), MVT::i1);
+    setValue(&I, DAG.getNode(Op, getCurDebugLoc(), VTs, Op1, Op2));
+    return 0;
+  }
   case Intrinsic::prefetch: {
     SDValue Ops[5];
     unsigned rw = cast<ConstantInt>(I.getArgOperand(1))->getZExtValue();

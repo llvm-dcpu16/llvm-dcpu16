@@ -33,6 +33,15 @@
 namespace llvm {
 namespace object {
 
+// Subclasses of ELFObjectFile may need this for template instantiation
+inline std::pair<unsigned char, unsigned char>
+getElfArchType(MemoryBuffer *Object) {
+  if (Object->getBufferSize() < ELF::EI_NIDENT)
+    return std::make_pair((uint8_t)ELF::ELFCLASSNONE,(uint8_t)ELF::ELFDATANONE);
+  return std::make_pair( (uint8_t)Object->getBufferStart()[ELF::EI_CLASS]
+                       , (uint8_t)Object->getBufferStart()[ELF::EI_DATA]);
+}
+
 // Templates to choose Elf_Addr and Elf_Off depending on is64Bits.
 template<support::endianness target_endianness>
 struct ELFDataTypeTypedefHelperCommon {
@@ -290,9 +299,7 @@ class DynRefImpl {
   const OwningType *OwningObject;
 
 public:
-  DynRefImpl() : OwningObject(NULL) {
-    std::memset(&DynPimpl, 0, sizeof(DynPimpl));
-  }
+  DynRefImpl() : OwningObject(NULL) { }
 
   DynRefImpl(DataRefImpl DynP, const OwningType *Owner);
 
@@ -542,6 +549,10 @@ protected:
   virtual error_code isSectionText(DataRefImpl Sec, bool &Res) const;
   virtual error_code isSectionData(DataRefImpl Sec, bool &Res) const;
   virtual error_code isSectionBSS(DataRefImpl Sec, bool &Res) const;
+  virtual error_code isSectionRequiredForExecution(DataRefImpl Sec,
+                                                   bool &Res) const;
+  virtual error_code isSectionVirtual(DataRefImpl Sec, bool &Res) const;
+  virtual error_code isSectionZeroInit(DataRefImpl Sec, bool &Res) const;
   virtual error_code sectionContainsSymbol(DataRefImpl Sec, DataRefImpl Symb,
                                            bool &Result) const;
   virtual relocation_iterator getSectionRelBegin(DataRefImpl Sec) const;
@@ -1096,6 +1107,43 @@ error_code ELFObjectFile<target_endianness, is64Bits>
 
 template<support::endianness target_endianness, bool is64Bits>
 error_code ELFObjectFile<target_endianness, is64Bits>
+                        ::isSectionRequiredForExecution(DataRefImpl Sec,
+                                                        bool &Result) const {
+  const Elf_Shdr *sec = reinterpret_cast<const Elf_Shdr *>(Sec.p);
+  if (sec->sh_flags & ELF::SHF_ALLOC)
+    Result = true;
+  else
+    Result = false;
+  return object_error::success;
+}
+
+template<support::endianness target_endianness, bool is64Bits>
+error_code ELFObjectFile<target_endianness, is64Bits>
+                        ::isSectionVirtual(DataRefImpl Sec,
+                                           bool &Result) const {
+  const Elf_Shdr *sec = reinterpret_cast<const Elf_Shdr *>(Sec.p);
+  if (sec->sh_type == ELF::SHT_NOBITS)
+    Result = true;
+  else
+    Result = false;
+  return object_error::success;
+}
+
+template<support::endianness target_endianness, bool is64Bits>
+error_code ELFObjectFile<target_endianness, is64Bits>::isSectionZeroInit(DataRefImpl Sec,
+                                            bool &Result) const {
+  const Elf_Shdr *sec = reinterpret_cast<const Elf_Shdr *>(Sec.p);
+  // For ELF, all zero-init sections are virtual (that is, they occupy no space
+  //   in the object image) and vice versa.
+  if (sec->sh_flags & ELF::SHT_NOBITS)
+    Result = true;
+  else
+    Result = false;
+  return object_error::success;
+}
+
+template<support::endianness target_endianness, bool is64Bits>
+error_code ELFObjectFile<target_endianness, is64Bits>
                           ::sectionContainsSymbol(DataRefImpl Sec,
                                                   DataRefImpl Symb,
                                                   bool &Result) const {
@@ -1108,7 +1156,6 @@ template<support::endianness target_endianness, bool is64Bits>
 relocation_iterator ELFObjectFile<target_endianness, is64Bits>
                                  ::getSectionRelBegin(DataRefImpl Sec) const {
   DataRefImpl RelData;
-  memset(&RelData, 0, sizeof(RelData));
   const Elf_Shdr *sec = reinterpret_cast<const Elf_Shdr *>(Sec.p);
   typename RelocMap_t::const_iterator ittr = SectionRelocMap.find(sec);
   if (sec != 0 && ittr != SectionRelocMap.end()) {
@@ -1123,7 +1170,6 @@ template<support::endianness target_endianness, bool is64Bits>
 relocation_iterator ELFObjectFile<target_endianness, is64Bits>
                                  ::getSectionRelEnd(DataRefImpl Sec) const {
   DataRefImpl RelData;
-  memset(&RelData, 0, sizeof(RelData));
   const Elf_Shdr *sec = reinterpret_cast<const Elf_Shdr *>(Sec.p);
   typename RelocMap_t::const_iterator ittr = SectionRelocMap.find(sec);
   if (sec != 0 && ittr != SectionRelocMap.end()) {
@@ -1626,7 +1672,6 @@ template<support::endianness target_endianness, bool is64Bits>
 symbol_iterator ELFObjectFile<target_endianness, is64Bits>
                              ::begin_symbols() const {
   DataRefImpl SymbolData;
-  memset(&SymbolData, 0, sizeof(SymbolData));
   if (SymbolTableSections.size() <= 1) {
     SymbolData.d.a = std::numeric_limits<uint32_t>::max();
     SymbolData.d.b = std::numeric_limits<uint32_t>::max();
@@ -1641,7 +1686,6 @@ template<support::endianness target_endianness, bool is64Bits>
 symbol_iterator ELFObjectFile<target_endianness, is64Bits>
                              ::end_symbols() const {
   DataRefImpl SymbolData;
-  memset(&SymbolData, 0, sizeof(SymbolData));
   SymbolData.d.a = std::numeric_limits<uint32_t>::max();
   SymbolData.d.b = std::numeric_limits<uint32_t>::max();
   return symbol_iterator(SymbolRef(SymbolData, this));
@@ -1651,7 +1695,6 @@ template<support::endianness target_endianness, bool is64Bits>
 symbol_iterator ELFObjectFile<target_endianness, is64Bits>
                              ::begin_dynamic_symbols() const {
   DataRefImpl SymbolData;
-  memset(&SymbolData, 0, sizeof(SymbolData));
   if (SymbolTableSections[0] == NULL) {
     SymbolData.d.a = std::numeric_limits<uint32_t>::max();
     SymbolData.d.b = std::numeric_limits<uint32_t>::max();
@@ -1666,7 +1709,6 @@ template<support::endianness target_endianness, bool is64Bits>
 symbol_iterator ELFObjectFile<target_endianness, is64Bits>
                              ::end_dynamic_symbols() const {
   DataRefImpl SymbolData;
-  memset(&SymbolData, 0, sizeof(SymbolData));
   SymbolData.d.a = std::numeric_limits<uint32_t>::max();
   SymbolData.d.b = std::numeric_limits<uint32_t>::max();
   return symbol_iterator(SymbolRef(SymbolData, this));
@@ -1676,7 +1718,6 @@ template<support::endianness target_endianness, bool is64Bits>
 section_iterator ELFObjectFile<target_endianness, is64Bits>
                               ::begin_sections() const {
   DataRefImpl ret;
-  memset(&ret, 0, sizeof(DataRefImpl));
   ret.p = reinterpret_cast<intptr_t>(base() + Header->e_shoff);
   return section_iterator(SectionRef(ret, this));
 }
@@ -1685,7 +1726,6 @@ template<support::endianness target_endianness, bool is64Bits>
 section_iterator ELFObjectFile<target_endianness, is64Bits>
                               ::end_sections() const {
   DataRefImpl ret;
-  memset(&ret, 0, sizeof(DataRefImpl));
   ret.p = reinterpret_cast<intptr_t>(base()
                                      + Header->e_shoff
                                      + (Header->e_shentsize*getNumSections()));
@@ -1696,7 +1736,6 @@ template<support::endianness target_endianness, bool is64Bits>
 typename ELFObjectFile<target_endianness, is64Bits>::dyn_iterator
 ELFObjectFile<target_endianness, is64Bits>::begin_dynamic_table() const {
   DataRefImpl DynData;
-  memset(&DynData, 0, sizeof(DynData));
   if (dot_dynamic_sec == NULL || dot_dynamic_sec->sh_size == 0) {
     DynData.d.a = std::numeric_limits<uint32_t>::max();
   } else {
@@ -1710,7 +1749,6 @@ typename ELFObjectFile<target_endianness, is64Bits>::dyn_iterator
 ELFObjectFile<target_endianness, is64Bits>
                           ::end_dynamic_table() const {
   DataRefImpl DynData;
-  memset(&DynData, 0, sizeof(DynData));
   DynData.d.a = std::numeric_limits<uint32_t>::max();
   return dyn_iterator(DynRef(DynData, this));
 }

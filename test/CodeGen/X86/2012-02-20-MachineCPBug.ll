@@ -1,4 +1,4 @@
-; RUN: llc < %s -mtriple=i386-apple-macosx -mattr=+sse | FileCheck %s
+; RUN: llc < %s -mtriple=i386-apple-macosx -mcpu=core2 -mattr=+sse | FileCheck %s
 ; PR11940: Do not optimize away movb %al, %ch
 
 %struct.APInt = type { i64* }
@@ -52,7 +52,8 @@ for.body9.lr.ph.i:                                ; preds = %if.end.i, %for.cond
 
 for.body9.i:                                      ; preds = %for.body9.i, %for.body9.lr.ph.i
 ; CHECK: %for.body9.i
-; CHECK: movb %al, %ch
+; CHECK: movb
+; CHECK: shrdl
   %i6.02.i = phi i32 [ 0, %for.body9.lr.ph.i ], [ %inc21.i, %for.body9.i ]
   %add10.i = add i32 %i6.02.i, %div.i
   %arrayidx12.i = getelementptr inbounds i64* %.pre.i, i32 %add10.i

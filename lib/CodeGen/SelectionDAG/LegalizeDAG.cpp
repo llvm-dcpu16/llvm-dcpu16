@@ -150,21 +150,21 @@ public:
   // Node replacement helpers
   void ReplacedNode(SDNode *N) {
     if (N->use_empty()) {
-      DAG.RemoveDeadNode(N, this);
+      DAG.RemoveDeadNode(N);
     } else {
       ForgetNode(N);
     }
   }
   void ReplaceNode(SDNode *Old, SDNode *New) {
-    DAG.ReplaceAllUsesWith(Old, New, this);
+    DAG.ReplaceAllUsesWith(Old, New);
     ReplacedNode(Old);
   }
   void ReplaceNode(SDValue Old, SDValue New) {
-    DAG.ReplaceAllUsesWith(Old, New, this);
+    DAG.ReplaceAllUsesWith(Old, New);
     ReplacedNode(Old.getNode());
   }
   void ReplaceNode(SDNode *Old, const SDValue *New) {
-    DAG.ReplaceAllUsesWith(Old, New, this);
+    DAG.ReplaceAllUsesWith(Old, New);
     ReplacedNode(Old);
   }
 };
@@ -203,7 +203,8 @@ SelectionDAGLegalize::ShuffleWithNarrowerEltType(EVT NVT, EVT VT,  DebugLoc dl,
 }
 
 SelectionDAGLegalize::SelectionDAGLegalize(SelectionDAG &dag)
-  : TM(dag.getTarget()), TLI(dag.getTargetLoweringInfo()),
+  : SelectionDAG::DAGUpdateListener(dag),
+    TM(dag.getTarget()), TLI(dag.getTargetLoweringInfo()),
     DAG(dag) {
 }
 
@@ -851,7 +852,7 @@ void SelectionDAGLegalize::LegalizeOp(SDNode *Node) {
 
     SDNode *NewNode = DAG.UpdateNodeOperands(Node, Ops.data(), Ops.size());
     if (NewNode != Node) {
-      DAG.ReplaceAllUsesWith(Node, NewNode, this);
+      DAG.ReplaceAllUsesWith(Node, NewNode);
       for (unsigned i = 0, e = Node->getNumValues(); i != e; ++i)
         DAG.TransferDbgValues(SDValue(Node, i), SDValue(NewNode, i));
       ReplacedNode(Node);
@@ -873,7 +874,7 @@ void SelectionDAGLegalize::LegalizeOp(SDNode *Node) {
             ResultVals.push_back(Tmp1.getValue(i));
         }
         if (Tmp1.getNode() != Node || Tmp1.getResNo() != 0) {
-          DAG.ReplaceAllUsesWith(Node, ResultVals.data(), this);
+          DAG.ReplaceAllUsesWith(Node, ResultVals.data());
           for (unsigned i = 0, e = Node->getNumValues(); i != e; ++i)
             DAG.TransferDbgValues(SDValue(Node, i), ResultVals[i]);
           ReplacedNode(Node);
@@ -1767,11 +1768,6 @@ SDValue SelectionDAGLegalize::ExpandBUILD_VECTOR(SDNode *Node) {
 // and leave the Hi part unset.
 SDValue SelectionDAGLegalize::ExpandLibCall(RTLIB::Libcall LC, SDNode *Node,
                                             bool isSigned) {
-  // The input chain to this libcall is the entry node of the function.
-  // Legalizing the call will automatically add the previous call to the
-  // dependence.
-  SDValue InChain = DAG.getEntryNode();
-
   TargetLowering::ArgListTy Args;
   TargetLowering::ArgListEntry Entry;
   for (unsigned i = 0, e = Node->getNumOperands(); i != e; ++i) {
@@ -1787,9 +1783,19 @@ SDValue SelectionDAGLegalize::ExpandLibCall(RTLIB::Libcall LC, SDNode *Node,
 
   Type *RetTy = Node->getValueType(0).getTypeForEVT(*DAG.getContext());
 
+  // By default, the input chain to this libcall is the entry node of the
+  // function. If the libcall is going to be emitted as a tail call then
+  // TLI.isUsedByReturnOnly will change it to the right chain if the return
+  // node which is being folded has a non-entry input chain.
+  SDValue InChain = DAG.getEntryNode();
+
   // isTailCall may be true since the callee does not reference caller stack
   // frame. Check if it's in the right position.
-  bool isTailCall = isInTailCallPosition(DAG, Node, TLI);
+  SDValue TCChain = InChain;
+  bool isTailCall = isInTailCallPosition(DAG, Node, TCChain, TLI);
+  if (isTailCall)
+    InChain = TCChain;
+
   std::pair<SDValue, SDValue> CallInfo =
     TLI.LowerCallTo(InChain, RetTy, isSigned, !isSigned, false, false,
                     0, TLI.getLibcallCallingConv(LC), isTailCall,
@@ -1825,7 +1831,7 @@ SDValue SelectionDAGLegalize::ExpandLibCall(RTLIB::Libcall LC, EVT RetVT,
   Type *RetTy = RetVT.getTypeForEVT(*DAG.getContext());
   std::pair<SDValue,SDValue> CallInfo =
   TLI.LowerCallTo(DAG.getEntryNode(), RetTy, isSigned, !isSigned, false,
-                  false, 0, TLI.getLibcallCallingConv(LC), false,
+                  false, 0, TLI.getLibcallCallingConv(LC), /*isTailCall=*/false,
                   /*doesNotReturn=*/false, /*isReturnValueUsed=*/true,
                   Callee, Args, DAG, dl);
 

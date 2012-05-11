@@ -1,4 +1,4 @@
-; RUN: llc < %s -march=arm -mattr=+neon,+vfp4 | FileCheck %s
+; RUN: llc < %s -mtriple=armv7-eabi -mattr=+neon,+vfp4 | FileCheck %s
 ; Check generated fused MAC and MLS.
 
 define double @fusedMACTest1(double %d1, double %d2, double %d3) {
@@ -98,3 +98,97 @@ define <4 x float> @fusedMACTest12(<4 x float> %a, <4 x float> %b) {
   %sub = fsub <4 x float> %a, %mul
   ret <4 x float> %sub
 }
+
+define float @test_fma_f32(float %a, float %b, float %c) nounwind readnone ssp {
+entry:
+; CHECK: test_fma_f32
+; CHECK: vfma.f32
+  %tmp1 = tail call float @llvm.fma.f32(float %a, float %b, float %c) nounwind readnone
+  ret float %tmp1
+}
+
+define double @test_fma_f64(double %a, double %b, double %c) nounwind readnone ssp {
+entry:
+; CHECK: test_fma_f64
+; CHECK: vfma.f64
+  %tmp1 = tail call double @llvm.fma.f64(double %a, double %b, double %c) nounwind readnone
+  ret double %tmp1
+}
+
+define <2 x float> @test_fma_v2f32(<2 x float> %a, <2 x float> %b, <2 x float> %c) nounwind readnone ssp {
+entry:
+; CHECK: test_fma_v2f32
+; CHECK: vfma.f32
+  %tmp1 = tail call <2 x float> @llvm.fma.v2f32(<2 x float> %a, <2 x float> %b, <2 x float> %c) nounwind
+  ret <2 x float> %tmp1
+}
+
+define double @test_fms_f64(double %a, double %b, double %c) nounwind readnone ssp {
+entry:
+; CHECK: test_fms_f64
+; CHECK: vfms.f64
+  %tmp1 = fsub double -0.0, %a
+  %tmp2 = tail call double @llvm.fma.f64(double %tmp1, double %b, double %c) nounwind readnone
+  ret double %tmp2
+}
+
+define double @test_fms_f64_2(double %a, double %b, double %c) nounwind readnone ssp {
+entry:
+; CHECK: test_fms_f64_2
+; CHECK: vfms.f64
+  %tmp1 = fsub double -0.0, %b
+  %tmp2 = tail call double @llvm.fma.f64(double %a, double %tmp1, double %c) nounwind readnone
+  ret double %tmp2
+}
+
+define double @test_fnms_f64(double %a, double %b, double %c) nounwind readnone ssp {
+entry:
+; CHECK: test_fnms_f64
+; CHECK: vfnms.f64
+  %tmp1 = fsub double -0.0, %a
+  %tmp2 = tail call double @llvm.fma.f64(double %tmp1, double %b, double %c) nounwind readnone
+  %tmp3 = fsub double -0.0, %tmp2
+  ret double %tmp3
+}
+
+define double @test_fnms_f64_2(double %a, double %b, double %c) nounwind readnone ssp {
+entry:
+; CHECK: test_fnms_f64_2
+; CHECK: vfnms.f64
+  %tmp1 = fsub double -0.0, %b
+  %tmp2 = tail call double @llvm.fma.f64(double %a, double %tmp1, double %c) nounwind readnone
+  %tmp3 = fsub double -0.0, %tmp2
+  ret double %tmp3
+}
+
+define double @test_fnma_f64(double %a, double %b, double %c) nounwind readnone ssp {
+entry:
+; CHECK: test_fnma_f64
+; CHECK: vfnma.f64
+  %tmp1 = tail call double @llvm.fma.f64(double %a, double %b, double %c) nounwind readnone
+  %tmp2 = fsub double -0.0, %tmp1
+  ret double %tmp2
+}
+
+define double @test_fnma_f64_2(double %a, double %b, double %c) nounwind readnone ssp {
+entry:
+; CHECK: test_fnma_f64_2
+; CHECK: vfnma.f64
+  %tmp1 = fsub double -0.0, %a
+  %tmp2 = fsub double -0.0, %c
+  %tmp3 = tail call double @llvm.fma.f64(double %tmp1, double %b, double %tmp2) nounwind readnone
+  ret double %tmp3
+}
+
+define float @test_fma_const_fold(float %a, float %b) nounwind {
+; CHECK: test_fma_const_fold
+; CHECK-NOT: vfma
+; CHECK-NOT: vmul
+; CHECK: vadd
+  %ret = call float @llvm.fma.f32(float %a, float 1.0, float %b)
+  ret float %ret
+}
+
+declare float @llvm.fma.f32(float, float, float) nounwind readnone
+declare double @llvm.fma.f64(double, double, double) nounwind readnone
+declare <2 x float> @llvm.fma.v2f32(<2 x float>, <2 x float>, <2 x float>) nounwind readnone
