@@ -60,6 +60,6 @@ TargetPassConfig *DCPU16TargetMachine::createPassConfig(PassManagerBase &PM) {
 
 bool DCPU16PassConfig::addInstSelector() {
   // Install an instruction selector.
-  PM.add(createDCPU16ISelDag(getDCPU16TargetMachine(), getOptLevel()));
+  PM->add(createDCPU16ISelDag(getDCPU16TargetMachine(), getOptLevel()));
   return false;
 }
