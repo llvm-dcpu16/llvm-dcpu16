@@ -82,6 +82,8 @@ namespace llvm {
 
       FIRST_VECTOR_VALUETYPE = v2i8,
       LAST_VECTOR_VALUETYPE  = v4f64,
+      FIRST_INTEGER_VECTOR_VALUETYPE = v2i8,
+      LAST_INTEGER_VECTOR_VALUETYPE = v8i64,
       FIRST_FP_VECTOR_VALUETYPE = v2f16,
       LAST_FP_VECTOR_VALUETYPE = v4f64,
 
@@ -153,7 +155,7 @@ namespace llvm {
     bool isFloatingPoint() const {
       return ((SimpleTy >= MVT::FIRST_FP_VALUETYPE &&
                SimpleTy <= MVT::LAST_FP_VALUETYPE) ||
-	      (SimpleTy >= MVT::FIRST_FP_VECTOR_VALUETYPE &&
+              (SimpleTy >= MVT::FIRST_FP_VECTOR_VALUETYPE &&
          SimpleTy <= MVT::LAST_FP_VECTOR_VALUETYPE));
     }
 
@@ -161,7 +163,8 @@ namespace llvm {
     bool isInteger() const {
       return ((SimpleTy >= MVT::FIRST_INTEGER_VALUETYPE &&
                SimpleTy <= MVT::LAST_INTEGER_VALUETYPE) ||
-	      (SimpleTy >= MVT::v2i8 && SimpleTy <= MVT::v8i64));
+              (SimpleTy >= MVT::FIRST_INTEGER_VECTOR_VALUETYPE &&
+               SimpleTy <= MVT::LAST_INTEGER_VECTOR_VALUETYPE));
     }
 
     /// isVector - Return true if this is a vector value type.
@@ -196,7 +199,7 @@ namespace llvm {
     MVT getVectorElementType() const {
       switch (SimpleTy) {
       default:
-        return (MVT::SimpleValueType)(MVT::INVALID_SIMPLE_VALUE_TYPE);
+        llvm_unreachable("Not a vector MVT!");
       case v2i8 :
       case v4i8 :
       case v8i8 :
@@ -225,7 +228,7 @@ namespace llvm {
     unsigned getVectorNumElements() const {
       switch (SimpleTy) {
       default:
-        return ~0U;
+        llvm_unreachable("Not a vector MVT!");
       case v32i8: return 32;
       case v16i8:
       case v16i16: return 16;
@@ -503,7 +506,7 @@ namespace llvm {
     }
 
     /// is256BitVector - Return true if this is a 256-bit vector type.
-    inline bool is256BitVector() const {
+    bool is256BitVector() const {
       if (!isSimple())
         return isExtended256BitVector();
       return (V == MVT::v8f32  || V == MVT::v4f64 || V == MVT::v32i8 ||
@@ -511,7 +514,7 @@ namespace llvm {
     }
 
     /// is512BitVector - Return true if this is a 512-bit vector type.
-    inline bool is512BitVector() const {
+    bool is512BitVector() const {
       return isSimple() ? (V == MVT::v8i64) : isExtended512BitVector();
     }
 

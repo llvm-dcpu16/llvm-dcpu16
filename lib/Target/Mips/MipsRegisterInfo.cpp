@@ -85,16 +85,16 @@ BitVector MipsRegisterInfo::
 getReservedRegs(const MachineFunction &MF) const {
   static const uint16_t ReservedCPURegs[] = {
     Mips::ZERO, Mips::AT, Mips::K0, Mips::K1,
-    Mips::SP, Mips::FP, Mips::RA
+    Mips::SP, Mips::RA
   };
 
   static const uint16_t ReservedCPU64Regs[] = {
     Mips::ZERO_64, Mips::AT_64, Mips::K0_64, Mips::K1_64,
-    Mips::SP_64, Mips::FP_64, Mips::RA_64
+    Mips::SP_64, Mips::RA_64
   };
 
   BitVector Reserved(getNumRegs());
-  typedef TargetRegisterClass::iterator RegIter;
+  typedef TargetRegisterClass::const_iterator RegIter;
 
   for (unsigned I = 0; I < array_lengthof(ReservedCPURegs); ++I)
     Reserved.set(ReservedCPURegs[I]);
@@ -104,18 +104,17 @@ getReservedRegs(const MachineFunction &MF) const {
       Reserved.set(ReservedCPU64Regs[I]);
 
     // Reserve all registers in AFGR64.
-    for (RegIter Reg = Mips::AFGR64RegisterClass->begin();
-         Reg != Mips::AFGR64RegisterClass->end(); ++Reg)
+    for (RegIter Reg = Mips::AFGR64RegClass.begin(),
+         EReg = Mips::AFGR64RegClass.end(); Reg != EReg; ++Reg)
       Reserved.set(*Reg);
-  }
-  else {
+  } else {
     // Reserve all registers in CPU64Regs & FGR64.
-    for (RegIter Reg = Mips::CPU64RegsRegisterClass->begin();
-         Reg != Mips::CPU64RegsRegisterClass->end(); ++Reg)
+    for (RegIter Reg = Mips::CPU64RegsRegClass.begin(),
+         EReg = Mips::CPU64RegsRegClass.end(); Reg != EReg; ++Reg)
       Reserved.set(*Reg);
 
-    for (RegIter Reg = Mips::FGR64RegisterClass->begin();
-         Reg != Mips::FGR64RegisterClass->end(); ++Reg)
+    for (RegIter Reg = Mips::FGR64RegClass.begin(),
+         EReg = Mips::FGR64RegClass.end(); Reg != EReg; ++Reg)
       Reserved.set(*Reg);
   }
 
@@ -123,6 +122,12 @@ getReservedRegs(const MachineFunction &MF) const {
   if (MF.getInfo<MipsFunctionInfo>()->globalBaseRegFixed()) {
     Reserved.set(Mips::GP);
     Reserved.set(Mips::GP_64);
+  }
+
+  // Reserve FP if this function should have a dedicated frame pointer register.
+  if (MF.getTarget().getFrameLowering()->hasFP(MF)) {
+    Reserved.set(Mips::FP);
+    Reserved.set(Mips::FP_64);
   }
 
   // Reserve hardware registers.
@@ -134,6 +139,11 @@ getReservedRegs(const MachineFunction &MF) const {
 
 bool
 MipsRegisterInfo::requiresRegisterScavenging(const MachineFunction &MF) const {
+  return true;
+}
+
+bool
+MipsRegisterInfo::trackLivenessAfterRegAlloc(const MachineFunction &MF) const {
   return true;
 }
 

@@ -76,9 +76,9 @@ PPCTargetLowering::PPCTargetLowering(PPCTargetMachine &TM)
   setMinStackArgumentAlignment(TM.getSubtarget<PPCSubtarget>().isPPC64() ? 8:4);
 
   // Set up the register classes.
-  addRegisterClass(MVT::i32, PPC::GPRCRegisterClass);
-  addRegisterClass(MVT::f32, PPC::F4RCRegisterClass);
-  addRegisterClass(MVT::f64, PPC::F8RCRegisterClass);
+  addRegisterClass(MVT::i32, &PPC::GPRCRegClass);
+  addRegisterClass(MVT::f32, &PPC::F4RCRegClass);
+  addRegisterClass(MVT::f64, &PPC::F8RCRegClass);
 
   // PowerPC has an i16 but no i8 (or i1) SEXTLOAD
   setLoadExtAction(ISD::SEXTLOAD, MVT::i1, Promote);
@@ -292,7 +292,7 @@ PPCTargetLowering::PPCTargetLowering(PPCTargetMachine &TM)
 
   if (TM.getSubtarget<PPCSubtarget>().use64BitRegs()) {
     // 64-bit PowerPC implementations can support i64 types directly
-    addRegisterClass(MVT::i64, PPC::G8RCRegisterClass);
+    addRegisterClass(MVT::i64, &PPC::G8RCRegClass);
     // BUILD_PAIR can't be handled natively, and should be expanded to shl/or
     setOperationAction(ISD::BUILD_PAIR, MVT::i64, Expand);
     // 64-bit PowerPC wants to expand i128 shifts itself.
@@ -370,10 +370,10 @@ PPCTargetLowering::PPCTargetLowering(PPCTargetMachine &TM)
     setOperationAction(ISD::SELECT, MVT::v4i32, Expand);
     setOperationAction(ISD::STORE , MVT::v4i32, Legal);
 
-    addRegisterClass(MVT::v4f32, PPC::VRRCRegisterClass);
-    addRegisterClass(MVT::v4i32, PPC::VRRCRegisterClass);
-    addRegisterClass(MVT::v8i16, PPC::VRRCRegisterClass);
-    addRegisterClass(MVT::v16i8, PPC::VRRCRegisterClass);
+    addRegisterClass(MVT::v4f32, &PPC::VRRCRegClass);
+    addRegisterClass(MVT::v4i32, &PPC::VRRCRegClass);
+    addRegisterClass(MVT::v8i16, &PPC::VRRCRegClass);
+    addRegisterClass(MVT::v16i8, &PPC::VRRCRegClass);
 
     setOperationAction(ISD::MUL, MVT::v4f32, Legal);
     setOperationAction(ISD::MUL, MVT::v4i32, Custom);
@@ -902,7 +902,7 @@ bool PPCTargetLowering::SelectAddressRegImm(SDValue N, SDValue &Disp,
       return true; // [r+i]
     } else if (N.getOperand(1).getOpcode() == PPCISD::Lo) {
       // Match LOAD (ADD (X, Lo(G))).
-     assert(!cast<ConstantSDNode>(N.getOperand(1).getOperand(1))->getZExtValue()
+      assert(!cast<ConstantSDNode>(N.getOperand(1).getOperand(1))->getZExtValue()
              && "Cannot handle constant offsets yet!");
       Disp = N.getOperand(1).getOperand(0);  // The global address.
       assert(Disp.getOpcode() == ISD::TargetGlobalAddress ||
@@ -1006,7 +1006,7 @@ bool PPCTargetLowering::SelectAddressRegImmShift(SDValue N, SDValue &Disp,
   if (N.getOpcode() == ISD::ADD) {
     short imm = 0;
     if (isIntS16Immediate(N.getOperand(1), imm) && (imm & 3) == 0) {
-      Disp =  DAG.getTargetConstant(((int)imm & 0xFFFF) >> 2, MVT::i32);
+      Disp = DAG.getTargetConstant(((int)imm & 0xFFFF) >> 2, MVT::i32);
       if (FrameIndexSDNode *FI = dyn_cast<FrameIndexSDNode>(N.getOperand(0))) {
         Base = DAG.getTargetFrameIndex(FI->getIndex(), N.getValueType());
       } else {
@@ -1015,7 +1015,7 @@ bool PPCTargetLowering::SelectAddressRegImmShift(SDValue N, SDValue &Disp,
       return true; // [r+i]
     } else if (N.getOperand(1).getOpcode() == PPCISD::Lo) {
       // Match LOAD (ADD (X, Lo(G))).
-     assert(!cast<ConstantSDNode>(N.getOperand(1).getOperand(1))->getZExtValue()
+      assert(!cast<ConstantSDNode>(N.getOperand(1).getOperand(1))->getZExtValue()
              && "Cannot handle constant offsets yet!");
       Disp = N.getOperand(1).getOperand(0);  // The global address.
       assert(Disp.getOpcode() == ISD::TargetGlobalAddress ||
@@ -1702,7 +1702,7 @@ PPCTargetLowering::LowerFormalArguments_SVR4(
   // Assign locations to all of the incoming arguments.
   SmallVector<CCValAssign, 16> ArgLocs;
   CCState CCInfo(CallConv, isVarArg, DAG.getMachineFunction(),
-		 getTargetMachine(), ArgLocs, *DAG.getContext());
+                 getTargetMachine(), ArgLocs, *DAG.getContext());
 
   // Reserve space for the linkage area on the stack.
   CCInfo.AllocateStack(PPCFrameLowering::getLinkageSize(false, false), PtrByteSize);
@@ -1721,19 +1721,19 @@ PPCTargetLowering::LowerFormalArguments_SVR4(
         default:
           llvm_unreachable("ValVT not supported by formal arguments Lowering");
         case MVT::i32:
-          RC = PPC::GPRCRegisterClass;
+          RC = &PPC::GPRCRegClass;
           break;
         case MVT::f32:
-          RC = PPC::F4RCRegisterClass;
+          RC = &PPC::F4RCRegClass;
           break;
         case MVT::f64:
-          RC = PPC::F8RCRegisterClass;
+          RC = &PPC::F8RCRegClass;
           break;
         case MVT::v16i8:
         case MVT::v8i16:
         case MVT::v4i32:
         case MVT::v4f32:
-          RC = PPC::VRRCRegisterClass;
+          RC = &PPC::VRRCRegClass;
           break;
       }
 
@@ -1763,7 +1763,7 @@ PPCTargetLowering::LowerFormalArguments_SVR4(
   // caller's stack frame, right above the parameter list area.
   SmallVector<CCValAssign, 16> ByValArgLocs;
   CCState CCByValInfo(CallConv, isVarArg, DAG.getMachineFunction(),
-		      getTargetMachine(), ByValArgLocs, *DAG.getContext());
+                      getTargetMachine(), ByValArgLocs, *DAG.getContext());
 
   // Reserve stack space for the allocations in CCInfo.
   CCByValInfo.AllocateStack(CCInfo.getNextStackOffset(), PtrByteSize);
@@ -2743,7 +2743,7 @@ PPCTargetLowering::LowerCallResult(SDValue Chain, SDValue InFlag,
 
   SmallVector<CCValAssign, 16> RVLocs;
   CCState CCRetInfo(CallConv, isVarArg, DAG.getMachineFunction(),
-		    getTargetMachine(), RVLocs, *DAG.getContext());
+                    getTargetMachine(), RVLocs, *DAG.getContext());
   CCRetInfo.AnalyzeCallResult(Ins, RetCC_PPC);
 
   // Copy all of the result registers out of their specified physreg.
@@ -2800,7 +2800,7 @@ PPCTargetLowering::FinishCall(CallingConv::ID CallConv, DebugLoc dl,
     if (DAG.getMachineFunction().getRegInfo().liveout_empty()) {
       SmallVector<CCValAssign, 16> RVLocs;
       CCState CCInfo(CallConv, isVarArg, DAG.getMachineFunction(),
-		     getTargetMachine(), RVLocs, *DAG.getContext());
+                     getTargetMachine(), RVLocs, *DAG.getContext());
       CCInfo.AnalyzeCallResult(Ins, RetCC_PPC);
       for (unsigned i = 0; i != RVLocs.size(); ++i)
         DAG.getMachineFunction().getRegInfo().addLiveOut(RVLocs[i].getLocReg());
@@ -2921,7 +2921,7 @@ PPCTargetLowering::LowerCall_SVR4(SDValue Chain, SDValue Callee,
   // Assign locations to all of the outgoing arguments.
   SmallVector<CCValAssign, 16> ArgLocs;
   CCState CCInfo(CallConv, isVarArg, DAG.getMachineFunction(),
-		 getTargetMachine(), ArgLocs, *DAG.getContext());
+                 getTargetMachine(), ArgLocs, *DAG.getContext());
 
   // Reserve space for the linkage area on the stack.
   CCInfo.AllocateStack(PPCFrameLowering::getLinkageSize(false, false), PtrByteSize);
@@ -2961,7 +2961,7 @@ PPCTargetLowering::LowerCall_SVR4(SDValue Chain, SDValue Callee,
   // Assign locations to all of the outgoing aggregate by value arguments.
   SmallVector<CCValAssign, 16> ByValArgLocs;
   CCState CCByValInfo(CallConv, isVarArg, DAG.getMachineFunction(),
-		      getTargetMachine(), ByValArgLocs, *DAG.getContext());
+                      getTargetMachine(), ByValArgLocs, *DAG.getContext());
 
   // Reserve stack space for the allocations in CCInfo.
   CCByValInfo.AllocateStack(CCInfo.getNextStackOffset(), PtrByteSize);
@@ -3485,7 +3485,7 @@ PPCTargetLowering::LowerReturn(SDValue Chain,
 
   SmallVector<CCValAssign, 16> RVLocs;
   CCState CCInfo(CallConv, isVarArg, DAG.getMachineFunction(),
-		 getTargetMachine(), RVLocs, *DAG.getContext());
+                 getTargetMachine(), RVLocs, *DAG.getContext());
   CCInfo.AnalyzeReturn(Outs, RetCC_PPC);
 
   // If this is the first return lowered for this function, add the regs to the
@@ -5612,18 +5612,18 @@ PPCTargetLowering::getRegForInlineAsmConstraint(const std::string &Constraint,
     case 'b':   // R1-R31
     case 'r':   // R0-R31
       if (VT == MVT::i64 && PPCSubTarget.isPPC64())
-        return std::make_pair(0U, PPC::G8RCRegisterClass);
-      return std::make_pair(0U, PPC::GPRCRegisterClass);
+        return std::make_pair(0U, &PPC::G8RCRegClass);
+      return std::make_pair(0U, &PPC::GPRCRegClass);
     case 'f':
       if (VT == MVT::f32)
-        return std::make_pair(0U, PPC::F4RCRegisterClass);
-      else if (VT == MVT::f64)
-        return std::make_pair(0U, PPC::F8RCRegisterClass);
+        return std::make_pair(0U, &PPC::F4RCRegClass);
+      if (VT == MVT::f64)
+        return std::make_pair(0U, &PPC::F8RCRegClass);
       break;
     case 'v':
-      return std::make_pair(0U, PPC::VRRCRegisterClass);
+      return std::make_pair(0U, &PPC::VRRCRegClass);
     case 'y':   // crrc
-      return std::make_pair(0U, PPC::CRRCRegisterClass);
+      return std::make_pair(0U, &PPC::CRRCRegClass);
     }
   }
 

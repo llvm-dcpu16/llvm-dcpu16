@@ -150,6 +150,12 @@ public:
   /// that should be avoided.
   bool isJumpExpensive() const { return JumpIsExpensive; }
 
+  /// isPredictableSelectExpensive - Return true if selects are only cheaper
+  /// than branches if the branch is unlikely to be predicted right.
+  bool isPredictableSelectExpensive() const {
+    return predictableSelectIsExpensive;
+  }
+
   /// getSetCCResultType - Return the ValueType of the result of SETCC
   /// operations.  Also used to obtain the target's preferred type for
   /// the condition operand of SELECT and BRCOND nodes.  In the case of
@@ -1274,9 +1280,11 @@ public:
   }
 
   /// isUsedByReturnOnly - Return true if result of the specified node is used
-  /// by a return node only. This is used to determine whether it is possible
+  /// by a return node only. It also compute and return the input chain for the
+  /// tail call.
+  /// This is used to determine whether it is possible
   /// to codegen a libcall as tail call at legalization time.
-  virtual bool isUsedByReturnOnly(SDNode *) const {
+  virtual bool isUsedByReturnOnly(SDNode *, SDValue &Chain) const {
     return false;
   }
 
@@ -2026,14 +2034,14 @@ protected:
   /// optimization.
   bool benefitFromCodePlacementOpt;
 
+  /// predictableSelectIsExpensive - Tells the code generator that select is
+  /// more expensive than a branch if the branch is usually predicted right.
+  bool predictableSelectIsExpensive;
+
 private:
   /// isLegalRC - Return true if the value types that can be represented by the
   /// specified register class are all legal.
   bool isLegalRC(const TargetRegisterClass *RC) const;
-
-  /// hasLegalSuperRegRegClasses - Return true if the specified register class
-  /// has one or more super-reg register classes that are legal.
-  bool hasLegalSuperRegRegClasses(const TargetRegisterClass *RC) const;
 };
 
 /// GetReturnInfo - Given an LLVM IR type and return type attributes,

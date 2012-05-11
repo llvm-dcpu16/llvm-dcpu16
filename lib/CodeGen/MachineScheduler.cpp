@@ -14,6 +14,8 @@
 
 #define DEBUG_TYPE "misched"
 
+#include "RegisterClassInfo.h"
+#include "RegisterPressure.h"
 #include "llvm/CodeGen/LiveIntervalAnalysis.h"
 #include "llvm/CodeGen/MachineScheduler.h"
 #include "llvm/CodeGen/Passes.h"
@@ -49,6 +51,15 @@ static bool ViewMISchedDAGs = false;
 //===----------------------------------------------------------------------===//
 // Machine Instruction Scheduling Pass and Registry
 //===----------------------------------------------------------------------===//
+
+MachineSchedContext::MachineSchedContext():
+    MF(0), MLI(0), MDT(0), PassConfig(0), AA(0), LIS(0) {
+  RegClassInfo = new RegisterClassInfo();
+}
+
+MachineSchedContext::~MachineSchedContext() {
+  delete RegClassInfo;
+}
 
 namespace {
 /// MachineScheduler runs after coalescing and before register allocation.
@@ -122,6 +133,29 @@ DefaultSchedRegistry("default", "Use the target's default scheduler choice.",
 /// default scheduler if the target does not set a default.
 static ScheduleDAGInstrs *createConvergingSched(MachineSchedContext *C);
 
+
+/// Decrement this iterator until reaching the top or a non-debug instr.
+static MachineBasicBlock::iterator
+priorNonDebug(MachineBasicBlock::iterator I, MachineBasicBlock::iterator Beg) {
+  assert(I != Beg && "reached the top of the region, cannot decrement");
+  while (--I != Beg) {
+    if (!I->isDebugValue())
+      break;
+  }
+  return I;
+}
+
+/// If this iterator is a debug value, increment until reaching the End or a
+/// non-debug instruction.
+static MachineBasicBlock::iterator
+nextIfDebug(MachineBasicBlock::iterator I, MachineBasicBlock::iterator End) {
+  while(I != End) {
+    if (!I->isDebugValue())
+      break;
+  }
+  return I;
+}
+
 /// Top-level MachineScheduler pass driver.
 ///
 /// Visit blocks in function order. Divide each block into scheduling regions
@@ -139,6 +173,8 @@ static ScheduleDAGInstrs *createConvergingSched(MachineSchedContext *C);
 /// design would be to split blocks at scheduling boundaries, but LLVM has a
 /// general bias against block splitting purely for implementation simplicity.
 bool MachineScheduler::runOnMachineFunction(MachineFunction &mf) {
+  DEBUG(dbgs() << "Before MISsched:\n"; mf.print(dbgs()));
+
   // Initialize the context of the pass.
   MF = &mf;
   MLI = &getAnalysis<MachineLoopInfo>();
@@ -148,6 +184,8 @@ bool MachineScheduler::runOnMachineFunction(MachineFunction &mf) {
 
   LIS = &getAnalysis<LiveIntervals>();
   const TargetInstrInfo *TII = MF->getTarget().getInstrInfo();
+
+  RegClassInfo->runOnMachineFunction(*MF);
 
   // Select the scheduler, or set the default.
   MachineSchedRegistry::ScheduleDAGCtor Ctor = MachineSchedOpt;
@@ -163,6 +201,9 @@ bool MachineScheduler::runOnMachineFunction(MachineFunction &mf) {
   OwningPtr<ScheduleDAGInstrs> Scheduler(Ctor(this));
 
   // Visit all machine basic blocks.
+  //
+  // TODO: Visit blocks in global postorder or postorder within the bottom-up
+  // loop tree. Then we can optionally compute global RegPressure.
   for (MachineFunction::iterator MBB = MF->begin(), MBBEnd = MF->end();
        MBB != MBBEnd; ++MBB) {
 
@@ -181,6 +222,7 @@ bool MachineScheduler::runOnMachineFunction(MachineFunction &mf) {
     unsigned RemainingCount = MBB->size();
     for(MachineBasicBlock::iterator RegionEnd = MBB->end();
         RegionEnd != MBB->begin(); RegionEnd = Scheduler->begin()) {
+
       // Avoid decrementing RegionEnd for blocks with no terminator.
       if (RegionEnd != MBB->end()
           || TII->isSchedulingBoundary(llvm::prior(RegionEnd), MBB, *MF)) {
@@ -279,13 +321,24 @@ namespace {
 /// machine instructions while updating LiveIntervals.
 class ScheduleDAGMI : public ScheduleDAGInstrs {
   AliasAnalysis *AA;
+  RegisterClassInfo *RegClassInfo;
   MachineSchedStrategy *SchedImpl;
+
+  MachineBasicBlock::iterator LiveRegionEnd;
+
+  // Register pressure in this region computed by buildSchedGraph.
+  IntervalPressure RegPressure;
+  RegPressureTracker RPTracker;
 
   /// The top of the unscheduled zone.
   MachineBasicBlock::iterator CurrentTop;
+  IntervalPressure TopPressure;
+  RegPressureTracker TopRPTracker;
 
   /// The bottom of the unscheduled zone.
   MachineBasicBlock::iterator CurrentBottom;
+  IntervalPressure BotPressure;
+  RegPressureTracker BotRPTracker;
 
   /// The number of instructions scheduled so far. Used to cut off the
   /// scheduler at the point determined by misched-cutoff.
@@ -293,8 +346,9 @@ class ScheduleDAGMI : public ScheduleDAGInstrs {
 public:
   ScheduleDAGMI(MachineSchedContext *C, MachineSchedStrategy *S):
     ScheduleDAGInstrs(*C->MF, *C->MLI, *C->MDT, /*IsPostRA=*/false, C->LIS),
-    AA(C->AA), SchedImpl(S), CurrentTop(), CurrentBottom(),
-    NumInstrsScheduled(0) {}
+    AA(C->AA), RegClassInfo(C->RegClassInfo), SchedImpl(S),
+    RPTracker(RegPressure), CurrentTop(), TopRPTracker(TopPressure),
+    CurrentBottom(), BotRPTracker(BotPressure), NumInstrsScheduled(0) {}
 
   ~ScheduleDAGMI() {
     delete SchedImpl;
@@ -303,10 +357,32 @@ public:
   MachineBasicBlock::iterator top() const { return CurrentTop; }
   MachineBasicBlock::iterator bottom() const { return CurrentBottom; }
 
-  /// Implement ScheduleDAGInstrs interface.
+  /// Implement the ScheduleDAGInstrs interface for handling the next scheduling
+  /// region. This covers all instructions in a block, while schedule() may only
+  /// cover a subset.
+  void enterRegion(MachineBasicBlock *bb,
+                   MachineBasicBlock::iterator begin,
+                   MachineBasicBlock::iterator end,
+                   unsigned endcount);
+
+  /// Implement ScheduleDAGInstrs interface for scheduling a sequence of
+  /// reorderable instructions.
   void schedule();
 
+  /// Get current register pressure for the top scheduled instructions.
+  const IntervalPressure &getTopPressure() const { return TopPressure; }
+  const RegPressureTracker &getTopRPTracker() const { return TopRPTracker; }
+
+  /// Get current register pressure for the bottom scheduled instructions.
+  const IntervalPressure &getBotPressure() const { return BotPressure; }
+  const RegPressureTracker &getBotRPTracker() const { return BotRPTracker; }
+
+  /// Get register pressure for the entire scheduling region before scheduling.
+  const IntervalPressure &getRegPressure() const { return RegPressure; }
+
 protected:
+  void initRegPressure();
+
   void moveInstruction(MachineInstr *MI, MachineBasicBlock::iterator InsertPos);
   bool checkSchedLimit();
 
@@ -314,6 +390,8 @@ protected:
   void releaseSuccessors(SUnit *SU);
   void releasePred(SUnit *SU, SDep *PredEdge);
   void releasePredecessors(SUnit *SU);
+
+  void placeDebugValues();
 };
 } // namespace
 
@@ -379,6 +457,9 @@ void ScheduleDAGMI::moveInstruction(MachineInstr *MI,
   // Fix RegionBegin if another instruction moves above the first instruction.
   if (RegionBegin == InsertPos)
     RegionBegin = MI;
+  // Fix TopRPTracker if we move something above CurrentTop.
+  if (CurrentTop == InsertPos)
+    TopRPTracker.setPos(MI);
 }
 
 bool ScheduleDAGMI::checkSchedLimit() {
@@ -392,10 +473,64 @@ bool ScheduleDAGMI::checkSchedLimit() {
   return true;
 }
 
+/// enterRegion - Called back from MachineScheduler::runOnMachineFunction after
+/// crossing a scheduling boundary. [begin, end) includes all instructions in
+/// the region, including the boundary itself and single-instruction regions
+/// that don't get scheduled.
+void ScheduleDAGMI::enterRegion(MachineBasicBlock *bb,
+                                MachineBasicBlock::iterator begin,
+                                MachineBasicBlock::iterator end,
+                                unsigned endcount)
+{
+  ScheduleDAGInstrs::enterRegion(bb, begin, end, endcount);
+
+  // For convenience remember the end of the liveness region.
+  LiveRegionEnd =
+    (RegionEnd == bb->end()) ? RegionEnd : llvm::next(RegionEnd);
+}
+
+// Setup the register pressure trackers for the top scheduled top and bottom
+// scheduled regions.
+void ScheduleDAGMI::initRegPressure() {
+  TopRPTracker.init(&MF, RegClassInfo, LIS, BB, RegionBegin);
+  BotRPTracker.init(&MF, RegClassInfo, LIS, BB, LiveRegionEnd);
+
+  // Close the RPTracker to finalize live ins.
+  RPTracker.closeRegion();
+
+  // Initialize the live ins and live outs.
+  TopRPTracker.addLiveRegs(RPTracker.getPressure().LiveInRegs);
+  BotRPTracker.addLiveRegs(RPTracker.getPressure().LiveOutRegs);
+
+  // Close one end of the tracker so we can call
+  // getMaxUpward/DownwardPressureDelta before advancing across any
+  // instructions. This converts currently live regs into live ins/outs.
+  TopRPTracker.closeTop();
+  BotRPTracker.closeBottom();
+
+  // Account for liveness generated by the region boundary.
+  if (LiveRegionEnd != RegionEnd)
+    BotRPTracker.recede();
+
+  assert(BotRPTracker.getPos() == RegionEnd && "Can't find the region bottom");
+}
+
 /// schedule - Called back from MachineScheduler::runOnMachineFunction
-/// after setting up the current scheduling region.
+/// after setting up the current scheduling region. [RegionBegin, RegionEnd)
+/// only includes instructions that have DAG nodes, not scheduling boundaries.
 void ScheduleDAGMI::schedule() {
-  buildSchedGraph(AA);
+  // Initialize the register pressure tracker used by buildSchedGraph.
+  RPTracker.init(&MF, RegClassInfo, LIS, BB, LiveRegionEnd);
+
+  // Account for liveness generate by the region boundary.
+  if (LiveRegionEnd != RegionEnd)
+    RPTracker.recede();
+
+  // Build the DAG, and compute current register pressure.
+  buildSchedGraph(AA, &RPTracker);
+
+  // Initialize top/bottom trackers after computing region pressure.
+  initRegPressure();
 
   DEBUG(dbgs() << "********** MI Scheduling **********\n");
   DEBUG(for (unsigned su = 0, e = SUnits.size(); su != e; ++su)
@@ -420,7 +555,7 @@ void ScheduleDAGMI::schedule() {
       SchedImpl->releaseBottomNode(&(*I));
   }
 
-  CurrentTop = RegionBegin;
+  CurrentTop = nextIfDebug(RegionBegin, RegionEnd);
   CurrentBottom = RegionEnd;
   bool IsTopNode = false;
   while (SUnit *SU = SchedImpl->pickNode(IsTopNode)) {
@@ -435,28 +570,62 @@ void ScheduleDAGMI::schedule() {
     if (IsTopNode) {
       assert(SU->isTopReady() && "node still has unscheduled dependencies");
       if (&*CurrentTop == MI)
-        ++CurrentTop;
+        CurrentTop = nextIfDebug(++CurrentTop, CurrentBottom);
       else
         moveInstruction(MI, CurrentTop);
+
+      // Update top scheduled pressure.
+      TopRPTracker.advance();
+      assert(TopRPTracker.getPos() == CurrentTop && "out of sync");
+
       // Release dependent instructions for scheduling.
       releaseSuccessors(SU);
     }
     else {
       assert(SU->isBottomReady() && "node still has unscheduled dependencies");
-      if (&*llvm::prior(CurrentBottom) == MI)
-        --CurrentBottom;
+      MachineBasicBlock::iterator priorII =
+        priorNonDebug(CurrentBottom, CurrentTop);
+      if (&*priorII == MI)
+        CurrentBottom = priorII;
       else {
         if (&*CurrentTop == MI)
-          CurrentTop = llvm::next(CurrentTop);
+          CurrentTop = nextIfDebug(++CurrentTop, CurrentBottom);
         moveInstruction(MI, CurrentBottom);
         CurrentBottom = MI;
       }
+      // Update bottom scheduled pressure.
+      BotRPTracker.recede();
+      assert(BotRPTracker.getPos() == CurrentBottom && "out of sync");
+
       // Release dependent instructions for scheduling.
       releasePredecessors(SU);
     }
     SU->isScheduled = true;
   }
   assert(CurrentTop == CurrentBottom && "Nonempty unscheduled zone.");
+
+  placeDebugValues();
+}
+
+/// Reinsert any remaining debug_values, just like the PostRA scheduler.
+void ScheduleDAGMI::placeDebugValues() {
+  // If first instruction was a DBG_VALUE then put it back.
+  if (FirstDbgValue) {
+    BB->splice(RegionBegin, BB, FirstDbgValue);
+    RegionBegin = FirstDbgValue;
+  }
+
+  for (std::vector<std::pair<MachineInstr *, MachineInstr *> >::iterator
+         DI = DbgValues.end(), DE = DbgValues.begin(); DI != DE; --DI) {
+    std::pair<MachineInstr *, MachineInstr *> P = *prior(DI);
+    MachineInstr *DbgValue = P.first;
+    MachineBasicBlock::iterator OrigPrevMI = P.second;
+    BB->splice(++OrigPrevMI, BB, DbgValue);
+    if (OrigPrevMI == llvm::prior(RegionEnd))
+      RegionEnd = DbgValue;
+  }
+  DbgValues.clear();
+  FirstDbgValue = NULL;
 }
 
 //===----------------------------------------------------------------------===//
@@ -464,56 +633,215 @@ void ScheduleDAGMI::schedule() {
 //===----------------------------------------------------------------------===//
 
 namespace {
+/// Wrapper around a vector of SUnits with some basic convenience methods.
+struct ReadyQ {
+  typedef std::vector<SUnit*>::iterator iterator;
+
+  unsigned ID;
+  std::vector<SUnit*> Queue;
+
+  ReadyQ(unsigned id): ID(id) {}
+
+  bool isInQueue(SUnit *SU) const {
+    return SU->NodeQueueId & ID;
+  }
+
+  bool empty() const { return Queue.empty(); }
+
+  iterator begin() { return Queue.begin(); }
+
+  iterator end() { return Queue.end(); }
+
+  iterator find(SUnit *SU) {
+    return std::find(Queue.begin(), Queue.end(), SU);
+  }
+
+  void push(SUnit *SU) {
+    Queue.push_back(SU);
+    SU->NodeQueueId |= ID;
+  }
+
+  void remove(iterator I) {
+    (*I)->NodeQueueId &= ~ID;
+    *I = Queue.back();
+    Queue.pop_back();
+  }
+};
+
 /// ConvergingScheduler shrinks the unscheduled zone using heuristics to balance
 /// the schedule.
 class ConvergingScheduler : public MachineSchedStrategy {
-  ScheduleDAGMI *DAG;
 
-  unsigned NumTopReady;
-  unsigned NumBottomReady;
+  /// Store the state used by ConvergingScheduler heuristics, required for the
+  /// lifetime of one invocation of pickNode().
+  struct SchedCandidate {
+    // The best SUnit candidate.
+    SUnit *SU;
+
+    // Register pressure values for the best candidate.
+    RegPressureDelta RPDelta;
+
+    SchedCandidate(): SU(NULL) {}
+  };
+
+  ScheduleDAGMI *DAG;
+  const TargetRegisterInfo *TRI;
+
+  ReadyQ TopQueue;
+  ReadyQ BotQueue;
 
 public:
+  /// SUnit::NodeQueueId = 0 (none), = 1 (top), = 2 (bottom), = 3 (both)
+  enum {
+    TopQID = 1,
+    BotQID = 2
+  };
+
+  ConvergingScheduler(): DAG(0), TRI(0), TopQueue(TopQID), BotQueue(BotQID) {}
+
+  static const char *getQName(unsigned ID) {
+    switch(ID) {
+    default: return "NoQ";
+    case TopQID: return "TopQ";
+    case BotQID: return "BotQ";
+    };
+  }
+
   virtual void initialize(ScheduleDAGMI *dag) {
     DAG = dag;
+    TRI = DAG->TRI;
 
     assert((!ForceTopDown || !ForceBottomUp) &&
            "-misched-topdown incompatible with -misched-bottomup");
   }
 
-  virtual SUnit *pickNode(bool &IsTopNode) {
-    if (DAG->top() == DAG->bottom())
-      return NULL;
-
-    // As an initial placeholder heuristic, schedule in the direction that has
-    // the fewest choices.
-    SUnit *SU;
-    if (ForceTopDown || (!ForceBottomUp && NumTopReady <= NumBottomReady)) {
-      SU = DAG->getSUnit(DAG->top());
-      IsTopNode = true;
-    }
-    else {
-      SU = DAG->getSUnit(llvm::prior(DAG->bottom()));
-      IsTopNode = false;
-    }
-    if (SU->isTopReady()) {
-      assert(NumTopReady > 0 && "bad ready count");
-      --NumTopReady;
-    }
-    if (SU->isBottomReady()) {
-      assert(NumBottomReady > 0 && "bad ready count");
-      --NumBottomReady;
-    }
-    return SU;
-  }
+  virtual SUnit *pickNode(bool &IsTopNode);
 
   virtual void releaseTopNode(SUnit *SU) {
-    ++NumTopReady;
+    if (!SU->isScheduled)
+      TopQueue.push(SU);
   }
   virtual void releaseBottomNode(SUnit *SU) {
-    ++NumBottomReady;
+    if (!SU->isScheduled)
+      BotQueue.push(SU);
   }
+protected:
+#ifndef NDEBUG
+  void traceCandidate(const char *Label, unsigned QID, SUnit *SU,
+                      int RPDiff, unsigned PSetID);
+#endif
+  bool pickNodeFromQueue(ReadyQ &Q, const RegPressureTracker &RPTracker,
+                         SchedCandidate &Candidate);
 };
 } // namespace
+
+#ifndef NDEBUG
+void ConvergingScheduler::
+traceCandidate(const char *Label, unsigned QID, SUnit *SU,
+               int RPDiff, unsigned PSetID) {
+  dbgs() << Label << getQName(QID) << " ";
+  if (RPDiff)
+    dbgs() << TRI->getRegPressureSetName(PSetID) << ":" << RPDiff << " ";
+  else
+    dbgs() << "     ";
+  SU->dump(DAG);
+}
+#endif
+
+/// Pick the best candidate from the top queue.
+///
+/// TODO: getMaxPressureDelta results can be mostly cached for each SUnit during
+/// DAG building. To adjust for the current scheduling location we need to
+/// maintain the number of vreg uses remaining to be top-scheduled.
+bool ConvergingScheduler::pickNodeFromQueue(ReadyQ &Q,
+                                            const RegPressureTracker &RPTracker,
+                                            SchedCandidate &Candidate) {
+  // getMaxPressureDelta temporarily modifies the tracker.
+  RegPressureTracker &TempTracker = const_cast<RegPressureTracker&>(RPTracker);
+
+  // BestSU remains NULL if no top candidates beat the best existing candidate.
+  bool FoundCandidate = false;
+  for (ReadyQ::iterator I = Q.begin(), E = Q.end(); I != E; ++I) {
+
+    RegPressureDelta RPDelta;
+    TempTracker.getMaxPressureDelta((*I)->getInstr(), RPDelta);
+
+    // Avoid exceeding the target's limit.
+    if (!Candidate.SU || RPDelta.ExcessUnits < Candidate.RPDelta.ExcessUnits) {
+      DEBUG(traceCandidate(Candidate.SU ? "PCAND" : "ACAND", Q.ID, *I,
+                           RPDelta.ExcessUnits, RPDelta.ExcessSetID));
+      Candidate.SU = *I;
+      Candidate.RPDelta = RPDelta;
+      FoundCandidate = true;
+      continue;
+    }
+    if (RPDelta.ExcessUnits > Candidate.RPDelta.ExcessUnits)
+      continue;
+
+    // Avoid increasing the max pressure.
+    if (RPDelta.MaxUnitIncrease < Candidate.RPDelta.MaxUnitIncrease) {
+      DEBUG(traceCandidate("MCAND", Q.ID, *I,
+                           RPDelta.ExcessUnits, RPDelta.ExcessSetID));
+      Candidate.SU = *I;
+      Candidate.RPDelta = RPDelta;
+      FoundCandidate = true;
+      continue;
+    }
+    if (RPDelta.MaxUnitIncrease > Candidate.RPDelta.MaxUnitIncrease)
+      continue;
+
+    // Fall through to original instruction order.
+    // Only consider node order if BestSU was chosen from this Q.
+    if (!FoundCandidate)
+      continue;
+
+    if ((Q.ID == TopQID && (*I)->NodeNum < Candidate.SU->NodeNum)
+        || (Q.ID == BotQID && (*I)->NodeNum > Candidate.SU->NodeNum)) {
+      DEBUG(traceCandidate("NCAND", Q.ID, *I, 0, 0));
+      Candidate.SU = *I;
+      Candidate.RPDelta = RPDelta;
+      FoundCandidate = true;
+    }
+  }
+  return FoundCandidate;
+}
+
+/// Pick the best node from either the top or bottom queue to balance the
+/// schedule.
+SUnit *ConvergingScheduler::pickNode(bool &IsTopNode) {
+  if (DAG->top() == DAG->bottom()) {
+    assert(TopQueue.empty() && BotQueue.empty() && "ReadyQ garbage");
+    return NULL;
+  }
+  // As an initial placeholder heuristic, schedule in the direction that has
+  // the fewest choices.
+  SUnit *SU;
+  if (ForceTopDown) {
+    SU = DAG->getSUnit(DAG->top());
+    IsTopNode = true;
+  }
+  else if (ForceBottomUp) {
+    SU = DAG->getSUnit(priorNonDebug(DAG->bottom(), DAG->top()));
+    IsTopNode = false;
+  }
+  else {
+    SchedCandidate Candidate;
+    // Prefer picking from the bottom.
+    pickNodeFromQueue(BotQueue, DAG->getBotRPTracker(), Candidate);
+    IsTopNode =
+      pickNodeFromQueue(TopQueue, DAG->getTopRPTracker(), Candidate);
+    SU = Candidate.SU;
+  }
+  if (SU->isTopReady()) {
+    assert(!TopQueue.empty() && "bad ready count");
+    TopQueue.remove(TopQueue.find(SU));
+  }
+  if (SU->isBottomReady()) {
+    assert(!BotQueue.empty() && "bad ready count");
+    BotQueue.remove(BotQueue.find(SU));
+  }
+  return SU;
+}
 
 /// Create the standard converging machine scheduler. This will be used as the
 /// default scheduler if the target does not set a default.

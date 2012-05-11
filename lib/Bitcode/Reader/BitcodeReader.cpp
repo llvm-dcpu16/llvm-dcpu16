@@ -458,12 +458,6 @@ bool BitcodeReader::ParseAttributeBlock() {
       if (Record.size() & 1)
         return Error("Invalid ENTRY record");
 
-      // FIXME : Remove this autoupgrade code in LLVM 3.0.
-      // If Function attributes are using index 0 then transfer them
-      // to index ~0. Index 0 is used for return value attributes but used to be
-      // used for function attributes.
-      Attributes RetAttribute;
-      Attributes FnAttribute;
       for (unsigned i = 0, e = Record.size(); i != e; i += 2) {
         // FIXME: remove in LLVM 3.0
         // The alignment is stored as a 16-bit raw value from bits 31--16.
@@ -480,34 +474,10 @@ bool BitcodeReader::ParseAttributeBlock() {
             Attributes((Record[i+1] & (0xffffull << 32)) >> 11);
 
         Record[i+1] = ReconstitutedAttr.Raw();
-        if (Record[i] == 0)
-          RetAttribute = ReconstitutedAttr;
-        else if (Record[i] == ~0U)
-          FnAttribute = ReconstitutedAttr;
-      }
-
-      Attributes OldRetAttrs = (Attribute::NoUnwind|Attribute::NoReturn|
-                              Attribute::ReadOnly|Attribute::ReadNone);
-
-      if (FnAttribute == Attribute::None && RetAttribute != Attribute::None &&
-          (RetAttribute & OldRetAttrs)) {
-        if (FnAttribute == Attribute::None) { // add a slot so they get added.
-          Record.push_back(~0U);
-          Record.push_back(0);
-        }
-
-        FnAttribute  |= RetAttribute & OldRetAttrs;
-        RetAttribute &= ~OldRetAttrs;
       }
 
       for (unsigned i = 0, e = Record.size(); i != e; i += 2) {
-        if (Record[i] == 0) {
-          if (RetAttribute != Attribute::None)
-            Attrs.push_back(AttributeWithIndex::get(0, RetAttribute));
-        } else if (Record[i] == ~0U) {
-          if (FnAttribute != Attribute::None)
-            Attrs.push_back(AttributeWithIndex::get(~0U, FnAttribute));
-        } else if (Attributes(Record[i+1]) != Attribute::None)
+        if (Attributes(Record[i+1]) != Attribute::None)
           Attrs.push_back(AttributeWithIndex::get(Record[i],
                                                   Attributes(Record[i+1])));
       }
@@ -618,26 +588,6 @@ bool BitcodeReader::ParseTypeTableBody() {
       ResultTy = getTypeByID(Record[0]);
       if (ResultTy == 0) return Error("invalid element type in pointer type");
       ResultTy = PointerType::get(ResultTy, AddressSpace);
-      break;
-    }
-    case bitc::TYPE_CODE_FUNCTION_OLD: {
-      // FIXME: attrid is dead, remove it in LLVM 3.0
-      // FUNCTION: [vararg, attrid, retty, paramty x N]
-      if (Record.size() < 3)
-        return Error("Invalid FUNCTION type record");
-      SmallVector<Type*, 8> ArgTys;
-      for (unsigned i = 3, e = Record.size(); i != e; ++i) {
-        if (Type *T = getTypeByID(Record[i]))
-          ArgTys.push_back(T);
-        else
-          break;
-      }
-      
-      ResultTy = getTypeByID(Record[2]);
-      if (ResultTy == 0 || ArgTys.size() < Record.size()-3)
-        return Error("invalid type in function type");
-
-      ResultTy = FunctionType::get(ResultTy, ArgTys, Record[0]);
       break;
     }
     case bitc::TYPE_CODE_FUNCTION: {

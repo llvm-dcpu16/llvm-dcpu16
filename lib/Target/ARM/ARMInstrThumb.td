@@ -258,16 +258,20 @@ def tNOP : T1pI<(outs), (ins), NoItinerary, "nop", "", []>,
         Requires<[IsThumb2]>;
 
 def tYIELD : T1pI<(outs), (ins), NoItinerary, "yield", "", []>,
-           T1SystemEncoding<0x10>; // A8.6.410
+           T1SystemEncoding<0x10>, // A8.6.410
+           Requires<[IsThumb2]>;
 
 def tWFE : T1pI<(outs), (ins), NoItinerary, "wfe", "", []>,
-           T1SystemEncoding<0x20>; // A8.6.408
+           T1SystemEncoding<0x20>, // A8.6.408
+           Requires<[IsThumb2]>;
 
 def tWFI : T1pI<(outs), (ins), NoItinerary, "wfi", "", []>,
-           T1SystemEncoding<0x30>; // A8.6.409
+           T1SystemEncoding<0x30>, // A8.6.409
+           Requires<[IsThumb2]>;
 
 def tSEV : T1pI<(outs), (ins), NoItinerary, "sev", "", []>,
-           T1SystemEncoding<0x40>; // A8.6.157
+           T1SystemEncoding<0x40>, // A8.6.157
+           Requires<[IsThumb2]>;
 
 // The imm operand $val can be used by a debugger to store more information
 // about the breakpoint.
@@ -363,8 +367,8 @@ def : tInstAlias<"sub${p} sp, sp, $imm",
                  (tSUBspi SP, t_imm0_508s4:$imm, pred:$p)>;
 
 // ADD <Rm>, sp
-def tADDrSP : T1pIt<(outs GPR:$Rdn), (ins GPR:$Rn, GPRsp:$sp), IIC_iALUr,
-                  "add", "\t$Rdn, $sp, $Rn", []>,
+def tADDrSP : T1pI<(outs GPR:$Rdn), (ins GPRsp:$sp, GPR:$Rn), IIC_iALUr,
+                   "add", "\t$Rdn, $sp, $Rn", []>,
               T1Special<{0,0,?,?}> {
   // A8.6.9 Encoding T1
   bits<4> Rdn;
@@ -423,11 +427,11 @@ let isCall = 1,
                   "bl${p}\t$func",
                   [(ARMtcall tglobaladdr:$func)]>,
              Requires<[IsThumb]> {
-    bits<22> func;
-    let Inst{26} = func{21};
+    bits<24> func;
+    let Inst{26} = func{23};
     let Inst{25-16} = func{20-11};
-    let Inst{13} = 1;
-    let Inst{11} = 1;
+    let Inst{13} = func{22};
+    let Inst{11} = func{21};
     let Inst{10-0} = func{10-0};
   }
 
@@ -437,10 +441,11 @@ let isCall = 1,
                    "blx${p}\t$func",
                    [(ARMcall tglobaladdr:$func)]>,
               Requires<[IsThumb, HasV5T]> {
-    bits<21> func;
+    bits<24> func;
+    let Inst{26} = func{23};
     let Inst{25-16} = func{20-11};
-    let Inst{13} = 1;
-    let Inst{11} = 1;
+    let Inst{13} = func{22};
+    let Inst{11} = func{21};
     let Inst{10-1} = func{10-1};
     let Inst{0} = 0; // func{0} is assumed zero
   }
@@ -1407,3 +1412,11 @@ def : tInstAlias<"cps$imod", (tCPS imod_op:$imod, 0)>;
 def : tInstAlias<"neg${s}${p} $Rd, $Rm",
                  (tRSB tGPR:$Rd, s_cc_out:$s, tGPR:$Rm, pred:$p)>;
 
+
+// Implied destination operand forms for shifts.
+def : tInstAlias<"lsl${s}${p} $Rdm, $imm",
+             (tLSLri tGPR:$Rdm, cc_out:$s, tGPR:$Rdm, imm0_31:$imm, pred:$p)>;
+def : tInstAlias<"lsr${s}${p} $Rdm, $imm",
+             (tLSRri tGPR:$Rdm, cc_out:$s, tGPR:$Rdm, imm_sr:$imm, pred:$p)>;
+def : tInstAlias<"asr${s}${p} $Rdm, $imm",
+             (tASRri tGPR:$Rdm, cc_out:$s, tGPR:$Rdm, imm_sr:$imm, pred:$p)>;

@@ -128,6 +128,13 @@ namespace X86II {
     ///    SYMBOL_LABEL @NTPOFF
     MO_NTPOFF,
 
+    /// MO_GOTNTPOFF - On a symbol operand this indicates that the immediate is
+    /// some TLS offset.
+    ///
+    /// See 'ELF Handling for Thread-Local Storage' for more details.
+    ///    SYMBOL_LABEL @GOTNTPOFF
+    MO_GOTNTPOFF,
+
     /// MO_DLLIMPORT - On a symbol operand "FOO", this indicates that the
     /// reference is actually to the "__imp_FOO" symbol.  This is used for
     /// dllimport linkage on windows.
@@ -488,7 +495,9 @@ namespace X86II {
   ///
   static inline int getMemoryOperandNo(uint64_t TSFlags, unsigned Opcode) {
     switch (TSFlags & X86II::FormMask) {
-    case X86II::MRMInitReg:  llvm_unreachable("FIXME: Remove this form");
+    case X86II::MRMInitReg:
+        // FIXME: Remove this form.
+        return -1;
     default: llvm_unreachable("Unknown FormMask value in getMemoryOperandNo!");
     case X86II::Pseudo:
     case X86II::RawFrm:

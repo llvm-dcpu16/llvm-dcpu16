@@ -1653,6 +1653,20 @@ void Verifier::visitInstruction(Instruction &I) {
     }
   }
 
+  if (MDNode *MD = I.getMetadata(LLVMContext::MD_fpmath)) {
+    Assert1(I.getType()->isFPOrFPVectorTy(),
+            "fpmath requires a floating point result!", &I);
+    Assert1(MD->getNumOperands() == 1, "fpmath takes one operand!", &I);
+    Value *Op0 = MD->getOperand(0);
+    if (ConstantFP *CFP0 = dyn_cast_or_null<ConstantFP>(Op0)) {
+      APFloat Accuracy = CFP0->getValueAPF();
+      Assert1(Accuracy.isNormal() && !Accuracy.isNegative(),
+              "fpmath accuracy not a positive number!", &I);
+    } else {
+      Assert1(false, "invalid fpmath accuracy!", &I);
+    }
+  }
+
   MDNode *MD = I.getMetadata(LLVMContext::MD_range);
   Assert1(!MD || isa<LoadInst>(I), "Ranges are only for loads!", &I);
 

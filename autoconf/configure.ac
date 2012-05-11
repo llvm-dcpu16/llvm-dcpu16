@@ -31,9 +31,9 @@ dnl===
 dnl===-----------------------------------------------------------------------===
 dnl Initialize autoconf and define the package name, version number and
 dnl address for reporting bugs.
-AC_INIT([LLVM],[3.1svn],[http://llvm.org/bugs/])
+AC_INIT([LLVM],[3.2svn],[http://llvm.org/bugs/])
 AC_DEFINE([LLVM_VERSION_MAJOR], [3], [Major version of the LLVM API])
-AC_DEFINE([LLVM_VERSION_MINOR], [1], [Minor version of the LLVM API])
+AC_DEFINE([LLVM_VERSION_MINOR], [2], [Minor version of the LLVM API])
 
 dnl Provide a copyright substitution and ensure the copyright notice is included
 dnl in the output of --version option of the generated configure script.
@@ -371,6 +371,7 @@ AC_CACHE_CHECK([target architecture],[llvm_cv_target_arch],
   hexagon-*)              llvm_cv_target_arch="Hexagon" ;;
   mblaze-*)               llvm_cv_target_arch="MBlaze" ;;
   ptx-*)                  llvm_cv_target_arch="PTX" ;;
+  nvptx-*)                llvm_cv_target_arch="NVPTX" ;;
   *)                      llvm_cv_target_arch="Unknown" ;;
 esac])
 
@@ -519,6 +520,7 @@ else
     Hexagon)     AC_SUBST(TARGET_HAS_JIT,0) ;;
     MBlaze)      AC_SUBST(TARGET_HAS_JIT,0) ;;
     PTX)         AC_SUBST(TARGET_HAS_JIT,0) ;;
+    NVPTX)       AC_SUBST(TARGET_HAS_JIT,0) ;;
     *)           AC_SUBST(TARGET_HAS_JIT,0) ;;
   esac
 fi
@@ -630,13 +632,13 @@ TARGETS_TO_BUILD=""
 AC_ARG_ENABLE([targets],AS_HELP_STRING([--enable-targets],
     [Build specific host targets: all or target1,target2,... Valid targets are:
      host, x86, x86_64, sparc, powerpc, arm, mips, spu, hexagon,
-     xcore, msp430, dcpu16, ptx, cbe, and cpp (default=all)]),,
+     xcore, msp430, dcpu16, ptx, nvptx, cbe, and cpp (default=all)]),,
     enableval=all)
 if test "$enableval" = host-only ; then
   enableval=host
 fi
 case "$enableval" in
-  all) TARGETS_TO_BUILD="X86 Sparc PowerPC ARM Mips CellSPU XCore MSP430 DCPU16 CppBackend MBlaze PTX Hexagon" ;;
+  all) TARGETS_TO_BUILD="X86 Sparc PowerPC ARM Mips CellSPU XCore MSP430 DCPU16 CppBackend MBlaze PTX NVPTX Hexagon" ;;
   *)for a_target in `echo $enableval|sed -e 's/,/ /g' ` ; do
       case "$a_target" in
         x86)      TARGETS_TO_BUILD="X86 $TARGETS_TO_BUILD" ;;
@@ -654,6 +656,7 @@ case "$enableval" in
         hexagon)  TARGETS_TO_BUILD="Hexagon $TARGETS_TO_BUILD" ;;
         mblaze)   TARGETS_TO_BUILD="MBlaze $TARGETS_TO_BUILD" ;;
         ptx)      TARGETS_TO_BUILD="PTX $TARGETS_TO_BUILD" ;;
+        nvptx)    TARGETS_TO_BUILD="NVPTX $TARGETS_TO_BUILD" ;;
         host) case "$llvm_cv_target_arch" in
             x86)         TARGETS_TO_BUILD="X86 $TARGETS_TO_BUILD" ;;
             x86_64)      TARGETS_TO_BUILD="X86 $TARGETS_TO_BUILD" ;;
@@ -668,6 +671,7 @@ case "$enableval" in
             DCPU16)      TARGETS_TO_BUILD="DCPU16 $TARGETS_TO_BUILD" ;;
             Hexagon)     TARGETS_TO_BUILD="Hexagon $TARGETS_TO_BUILD" ;;
             PTX)         TARGETS_TO_BUILD="PTX $TARGETS_TO_BUILD" ;;
+            NVPTX)       TARGETS_TO_BUILD="NVPTX $TARGETS_TO_BUILD" ;;
             *)       AC_MSG_ERROR([Can not set target to build]) ;;
           esac ;;
         *) AC_MSG_ERROR([Unrecognized target $a_target]) ;;
@@ -841,6 +845,13 @@ AC_ARG_WITH(gcc-toolchain,
     withval="")
 AC_DEFINE_UNQUOTED(GCC_INSTALL_PREFIX,"$withval",
                    [Directory where gcc is installed.])
+
+AC_ARG_WITH(default-sysroot,
+  AS_HELP_STRING([--with-default-sysroot],
+    [Add --sysroot=<path> to all compiler invocations.]),,
+    withval="")
+AC_DEFINE_UNQUOTED(DEFAULT_SYSROOT,"$withval",
+                   [Default <path> to all compiler invocations for --sysroot=<path>.])
 
 dnl Allow linking of LLVM with GPLv3 binutils code.
 AC_ARG_WITH(binutils-include,
@@ -1021,8 +1032,6 @@ AC_PATH_PROG(CAT, [cat])
 AC_PATH_PROG(DOXYGEN, [doxygen])
 AC_PATH_PROG(GROFF, [groff])
 AC_PATH_PROG(GZIPBIN, [gzip])
-AC_PATH_PROG(POD2HTML, [pod2html])
-AC_PATH_PROG(POD2MAN, [pod2man])
 AC_PATH_PROG(PDFROFF, [pdfroff])
 AC_PATH_PROG(RUNTEST, [runtest])
 DJ_AC_PATH_TCLSH
@@ -1339,7 +1348,7 @@ AC_CHECK_FUNCS([powf fmodf strtof round ])
 AC_CHECK_FUNCS([getpagesize getrusage getrlimit setrlimit gettimeofday ])
 AC_CHECK_FUNCS([isatty mkdtemp mkstemp ])
 AC_CHECK_FUNCS([mktemp posix_spawn pread realpath sbrk setrlimit strdup ])
-AC_CHECK_FUNCS([strerror strerror_r setenv ])
+AC_CHECK_FUNCS([strerror strerror_r setenv arc4random ])
 AC_CHECK_FUNCS([strtoll strtoq sysconf malloc_zone_statistics ])
 AC_CHECK_FUNCS([setjmp longjmp sigsetjmp siglongjmp writev])
 AC_C_PRINTF_A

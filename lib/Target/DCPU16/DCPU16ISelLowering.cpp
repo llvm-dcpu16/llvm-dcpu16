@@ -45,7 +45,7 @@ DCPU16TargetLowering::DCPU16TargetLowering(DCPU16TargetMachine &tm) :
   TD = getTargetData();
 
   // Set up the register classes.
-  addRegisterClass(MVT::i16, DCPU16::GR16RegisterClass);
+  addRegisterClass(MVT::i16, &DCPU16::GR16RegClass);
 
   // Compute derived properties from the register classes
   computeRegisterProperties();
@@ -149,7 +149,7 @@ getRegForInlineAsmConstraint(const std::string &Constraint,
     switch (Constraint[0]) {
     default: break;
     case 'r':   // GENERAL_REGS
-      return std::make_pair(0U, DCPU16::GR16RegisterClass);
+      return std::make_pair(0U, &DCPU16::GR16RegClass);
     }
   }
 
@@ -186,7 +186,7 @@ DCPU16TargetLowering::LowerFormalArguments(SDValue Chain,
     // Copy to virtual register from A
     MachineRegisterInfo &RegInfo = DAG.getMachineFunction().getRegInfo();
     unsigned VReg =
-      RegInfo.createVirtualRegister(DCPU16::GR16RegisterClass);
+      RegInfo.createVirtualRegister(&DCPU16::GR16RegClass);
     RegInfo.addLiveIn(DCPU16::A, VReg);
     SDValue ArgValue = DAG.getCopyFromReg(Chain, dl, VReg, MVT::i16);
     InVals.push_back(ArgValue);
@@ -262,7 +262,7 @@ DCPU16TargetLowering::LowerCCCArguments(SDValue Chain,
         }
       case MVT::i16:
         unsigned VReg =
-          RegInfo.createVirtualRegister(DCPU16::GR16RegisterClass);
+          RegInfo.createVirtualRegister(&DCPU16::GR16RegClass);
         RegInfo.addLiveIn(VA.getLocReg(), VReg);
         SDValue ArgValue = DAG.getCopyFromReg(Chain, dl, VReg, RegVT);
 

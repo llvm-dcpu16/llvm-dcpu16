@@ -38,9 +38,6 @@ def FeatureVFP4 : SubtargetFeature<"vfp4", "HasVFPv4", "true",
 def FeatureNEON : SubtargetFeature<"neon", "HasNEON", "true",
                                    "Enable NEON instructions",
                                    [FeatureVFP3]>;
-def FeatureNEON2 : SubtargetFeature<"neon2", "HasNEON2", "true",
-                                   "Enable Advanced SIMD2 instructions",
-                                   [FeatureNEON]>;
 def FeatureThumb2 : SubtargetFeature<"thumb2", "HasThumb2", "true",
                                      "Enable Thumb2 instructions">;
 def FeatureNoARM  : SubtargetFeature<"noarm", "NoARM", "true",
@@ -76,8 +73,6 @@ def FeatureVMLxForwarding : SubtargetFeature<"vmlx-forwarding",
 def FeatureNEONForFP : SubtargetFeature<"neonfp", "UseNEONForSinglePrecisionFP",
                                         "true",
                                         "Use NEON for single precision FP">;
-// Allow more precision in FP computation
-def FPContractions : Predicate<"!TM.Options.NoExcessFPPrecision">;
 
 // Disable 32-bit to 16-bit narrowing for experimentation.
 def FeaturePref32BitThumb : SubtargetFeature<"32bit", "Pref32BitThumb", "true",

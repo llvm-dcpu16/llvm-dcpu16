@@ -46,9 +46,6 @@
 #include "llvm/ADT/StringExtras.h"
 using namespace llvm;
 
-static cl::opt<bool> EnableInternalizing("enable-internalizing", cl::init(false),
-  cl::desc("Internalize functions during LTO"));
-
 static cl::opt<bool> DisableInline("disable-inlining", cl::init(false),
   cl::desc("Do not run the inliner pass"));
 
@@ -278,14 +275,6 @@ static void findUsedValues(GlobalVariable *LLVMUsed,
 }
 
 void LTOCodeGenerator::applyScopeRestrictions() {
-  // Internalize only if specifically asked for. Otherwise, global symbols which
-  // exist in the final image, but which are used outside of that image
-  // (e.g. bundling) may be removed. This also happens when a function is used
-  // only in inline asm. LLVM doesn't recognize that as a "use", so it could be
-  // stripped.
-  if (!EnableInternalizing)
-    return;
-
   if (_scopeRestrictionsDone) return;
   Module *mergedModule = _linker.getModule();
 
@@ -347,15 +336,15 @@ bool LTOCodeGenerator::generateObjectFile(raw_ostream &out,
   if ( this->determineTarget(errMsg) )
     return true;
 
-  // mark which symbols can not be internalized
-  this->applyScopeRestrictions();
-
   Module* mergedModule = _linker.getModule();
 
   // if options were requested, set them
   if ( !_codegenOptions.empty() )
     cl::ParseCommandLineOptions(_codegenOptions.size(),
                                 const_cast<char **>(&_codegenOptions[0]));
+
+  // mark which symbols can not be internalized
+  this->applyScopeRestrictions();
 
   // Instantiate the pass manager to organize the passes.
   PassManager passes;
@@ -366,7 +355,10 @@ bool LTOCodeGenerator::generateObjectFile(raw_ostream &out,
   // Add an appropriate TargetData instance for this module...
   passes.add(new TargetData(*_target->getTargetData()));
 
-  PassManagerBuilder().populateLTOPassManager(passes, /*Internalize=*/ false,
+  // Enabling internalize here would use its AllButMain variant. It
+  // keeps only main if it exists and does nothing for libraries. Instead
+  // we create the pass ourselves with the symbol list provided by the linker.
+  PassManagerBuilder().populateLTOPassManager(passes, /*Internalize=*/false,
                                               !DisableInline,
                                               DisableGVNLoadPRE);
 

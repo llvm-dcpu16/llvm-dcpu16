@@ -99,8 +99,8 @@ struct space_info {
 class file_status
 {
   #if defined(LLVM_ON_UNIX)
-  dev_t st_dev;
-  ino_t st_ino;
+  dev_t fs_st_dev;
+  ino_t fs_st_ino;
   #elif defined (LLVM_ON_WIN32)
   uint32_t LastWriteTimeHigh;
   uint32_t LastWriteTimeLow;
@@ -422,8 +422,8 @@ error_code status_known(const Twine &path, bool &result);
 /// @results errc::success if result_{fd,path} have been successfully set,
 ///          otherwise a platform specific error_code.
 error_code unique_file(const Twine &model, int &result_fd,
-                             SmallVectorImpl<char> &result_path,
-                             bool makeAbsolute = true);
+                       SmallVectorImpl<char> &result_path,
+                       bool makeAbsolute = true, unsigned mode = 0600);
 
 /// @brief Canonicalize path.
 ///

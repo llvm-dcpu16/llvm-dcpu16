@@ -90,6 +90,12 @@ int X86RegisterInfo::getCompactUnwindRegNum(unsigned RegNum, bool isEH) const {
   return -1;
 }
 
+bool
+X86RegisterInfo::trackLivenessAfterRegAlloc(const MachineFunction &MF) const {
+  // Only enable when post-RA scheduling is enabled and this is needed.
+  return TM.getSubtargetImpl()->postRAScheduler();
+}
+
 int
 X86RegisterInfo::getSEHRegNum(unsigned i) const {
   int reg = X86_MC::getX86RegNum(i);
@@ -146,7 +152,7 @@ X86RegisterInfo::getLargestLegalSuperClass(const TargetRegisterClass *RC) const{
   // The GR8_NOREX class is always used in a way that won't be constrained to a
   // sub-class, so sub-classes like GR8_ABCD_L are allowed to expand to the
   // full GR8 class.
-  if (RC == X86::GR8_NOREXRegisterClass)
+  if (RC == &X86::GR8_NOREXRegClass)
     return RC;
 
   const TargetRegisterClass *Super = RC;
@@ -175,7 +181,8 @@ X86RegisterInfo::getLargestLegalSuperClass(const TargetRegisterClass *RC) const{
 }
 
 const TargetRegisterClass *
-X86RegisterInfo::getPointerRegClass(unsigned Kind) const {
+X86RegisterInfo::getPointerRegClass(const MachineFunction &MF, unsigned Kind)
+                                                                         const {
   switch (Kind) {
   default: llvm_unreachable("Unexpected Kind in getPointerRegClass!");
   case 0: // Normal GPRs.
@@ -238,7 +245,7 @@ X86RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
   }
 
   if (ghcCall)
-    return CSR_Ghc_SaveList;
+    return CSR_NoRegs_SaveList;
   if (Is64Bit) {
     if (IsWin64)
       return CSR_Win64_SaveList;
@@ -254,7 +261,7 @@ X86RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
 const uint32_t*
 X86RegisterInfo::getCallPreservedMask(CallingConv::ID CC) const {
   if (CC == CallingConv::GHC)
-    return CSR_Ghc_RegMask;
+    return CSR_NoRegs_RegMask;
   if (!Is64Bit)
     return CSR_32_RegMask;
   if (IsWin64)
@@ -292,6 +299,16 @@ BitVector X86RegisterInfo::getReservedRegs(const MachineFunction &MF) const {
   Reserved.set(X86::ES);
   Reserved.set(X86::FS);
   Reserved.set(X86::GS);
+
+  // Mark the floating point stack registers as reserved.
+  Reserved.set(X86::ST0);
+  Reserved.set(X86::ST1);
+  Reserved.set(X86::ST2);
+  Reserved.set(X86::ST3);
+  Reserved.set(X86::ST4);
+  Reserved.set(X86::ST5);
+  Reserved.set(X86::ST6);
+  Reserved.set(X86::ST7);
 
   // Reserve the registers that only exist in 64-bit mode.
   if (!Is64Bit) {

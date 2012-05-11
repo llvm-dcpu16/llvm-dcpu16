@@ -7,7 +7,7 @@
   <meta name="author" content="Chris Lattner">
   <meta name="description"
   content="LLVM Assembly Language Reference Manual.">
-  <link rel="stylesheet" href="llvm.css" type="text/css">
+  <link rel="stylesheet" href="_static/llvm.css" type="text/css">
 </head>
 
 <body>
@@ -103,7 +103,7 @@
       <li><a href="#metadata">Metadata Nodes and Metadata Strings</a>
         <ol>
           <li><a href="#tbaa">'<tt>tbaa</tt>' Metadata</a></li>
-          <li><a href="#fpaccuracy">'<tt>fpaccuracy</tt>' Metadata</a></li>
+          <li><a href="#fpmath">'<tt>fpmath</tt>' Metadata</a></li>
           <li><a href="#range">'<tt>range</tt>' Metadata</a></li>
         </ol>
       </li>
@@ -307,6 +307,8 @@
             '<tt>llvm.annotation.*</tt>' Intrinsic</a></li>
           <li><a href="#int_trap">
             '<tt>llvm.trap</tt>' Intrinsic</a></li>
+          <li><a href="#int_debugger">
+            '<tt>llvm.debugger</tt>' Intrinsic</a></li>
           <li><a href="#int_stackprotector">
             '<tt>llvm.stackprotector</tt>' Intrinsic</a></li>
 	  <li><a href="#int_objectsize">
@@ -3000,14 +3002,16 @@ call void @llvm.dbg.value(metadata !24, i64 0, metadata !25)
 
 <!-- _______________________________________________________________________ -->
 <h4>
-  <a name="fpaccuracy">'<tt>fpaccuracy</tt>' Metadata</a>
+  <a name="fpmath">'<tt>fpmath</tt>' Metadata</a>
 </h4>
  
 <div>
 
-<p><tt>fpaccuracy</tt> metadata may be attached to any instruction of floating
-   point type.  It expresses the maximum relative error of the result of
-   that instruction, in ULPs. ULP is defined as follows:</p>
+<p><tt>fpmath</tt> metadata may be attached to any instruction of floating point
+  type.  It can be used to express the maximum acceptable error in the result of
+  that instruction, in ULPs, thus potentially allowing the compiler to use a
+  more efficient but less accurate method of computing it.  ULP is defined as
+  follows:</p>
 
 <blockquote>
 
@@ -3019,13 +3023,12 @@ call void @llvm.dbg.value(metadata !24, i64 0, metadata !25)
 
 </blockquote>
 
-<p>The maximum relative error may be any rational number.  The metadata node
-   shall consist of a pair of unsigned integers respectively representing
-   the numerator and denominator.  For example, 2.5 ULP:</p>
+<p>The metadata node shall consist of a single positive floating point number
+   representing the maximum relative error, for example:</p>
 
 <div class="doc_code">
 <pre>
-!0 = metadata !{ i32 5, i32 2 }
+!0 = metadata !{ float 2.5 } ; maximum acceptable inaccuracy is 2.5 ULPs
 </pre>
 </div>
 
@@ -8399,6 +8402,30 @@ LLVM</a>.</p>
 
 <!-- _______________________________________________________________________ -->
 <h4>
+  <a name="int_debugger">'<tt>llvm.debugger</tt>' Intrinsic</a>
+</h4>
+
+<div>
+
+<h5>Syntax:</h5>
+<pre>
+  declare void @llvm.debugger()
+</pre>
+
+<h5>Overview:</h5>
+<p>The '<tt>llvm.debugger</tt>' intrinsic.</p>
+
+<h5>Arguments:</h5>
+<p>None.</p>
+
+<h5>Semantics:</h5>
+<p>This intrinsic is lowered to code which is intended to cause an execution
+   trap with the intention of requesting the attention of a debugger.</p>
+
+</div>
+
+<!-- _______________________________________________________________________ -->
+<h4>
   <a name="int_stackprotector">'<tt>llvm.stackprotector</tt>' Intrinsic</a>
 </h4>
 
@@ -8440,8 +8467,8 @@ LLVM</a>.</p>
 
 <h5>Syntax:</h5>
 <pre>
-  declare i32 @llvm.objectsize.i32(i8* &lt;object&gt;, i1 &lt;type&gt;)
-  declare i64 @llvm.objectsize.i64(i8* &lt;object&gt;, i1 &lt;type&gt;)
+  declare i32 @llvm.objectsize.i32(i8* &lt;object&gt;, i1 &lt;min&gt;, i32 &lt;runtime&gt;)
+  declare i64 @llvm.objectsize.i64(i8* &lt;object&gt;, i1 &lt;min&gt;, i32 &lt;runtime&gt;)
 </pre>
 
 <h5>Overview:</h5>
@@ -8452,17 +8479,21 @@ LLVM</a>.</p>
    an allocation of a specific class, structure, array, or other object.</p>
 
 <h5>Arguments:</h5>
-<p>The <tt>llvm.objectsize</tt> intrinsic takes two arguments. The first
+<p>The <tt>llvm.objectsize</tt> intrinsic takes three arguments. The first
    argument is a pointer to or into the <tt>object</tt>. The second argument
-   is a boolean 0 or 1. This argument determines whether you want the 
-   maximum (0) or minimum (1) bytes remaining. This needs to be a literal 0 or
-   1, variables are not allowed.</p>
+   is a boolean and determines whether <tt>llvm.objectsize</tt> returns 0 (if true)
+   or -1 (if false) when the object size is unknown.
+   The third argument, <tt>runtime</tt>, indicates whether the compiler is allowed
+   to return a non-constant value. The higher the value, the higher the potential
+   run-time performance impact.
+   The second and third arguments only accepts constants.</p>
    
 <h5>Semantics:</h5>
-<p>The <tt>llvm.objectsize</tt> intrinsic is lowered to either a constant
-   representing the size of the object concerned, or <tt>i32/i64 -1 or 0</tt>,
-   depending on the <tt>type</tt> argument, if the size cannot be determined at
-   compile time.</p>
+<p>The <tt>llvm.objectsize</tt> intrinsic is lowered to a constant representing
+   the size of the object concerned. If the size cannot be determined at compile
+   time, <tt>llvm.objectsize</tt> either returns <tt>i32/i64 -1 or 0</tt>
+   (depending on the <tt>min</tt> argument) if <tt>runtime</tt> is 0, or a run-time
+   value (if <tt>runtime</tt> &gt; 0 and an expression could be generated).</p>
 
 </div>
 <!-- _______________________________________________________________________ -->

@@ -138,3 +138,28 @@ declare i32 @a(i32)
 declare i32 @b(i32)
 
 declare i32 @c(i32)
+
+; PR12419
+; rdar://11195178
+; Use the correct input chain for the tailcall node or else the call to
+; _ZN9MutexLockD1Ev would be lost.
+%class.MutexLock = type { i8 }
+
+@x = external global i32, align 4
+
+define i32 @t9() nounwind {
+; CHECKT2D: t9:
+; CHECKT2D: blx __ZN9MutexLockC1Ev
+; CHECKT2D: blx __ZN9MutexLockD1Ev
+; CHECKT2D: b.w ___divsi3
+  %lock = alloca %class.MutexLock, align 1
+  %1 = call %class.MutexLock* @_ZN9MutexLockC1Ev(%class.MutexLock* %lock)
+  %2 = load i32* @x, align 4
+  %3 = sdiv i32 1000, %2
+  %4 = call %class.MutexLock* @_ZN9MutexLockD1Ev(%class.MutexLock* %lock)
+  ret i32 %3
+}
+
+declare %class.MutexLock* @_ZN9MutexLockC1Ev(%class.MutexLock*) unnamed_addr nounwind align 2
+
+declare %class.MutexLock* @_ZN9MutexLockD1Ev(%class.MutexLock*) unnamed_addr nounwind align 2

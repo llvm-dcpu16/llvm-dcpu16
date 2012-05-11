@@ -268,7 +268,8 @@ def int_sigsetjmp  : Intrinsic<[llvm_i32_ty] , [llvm_ptr_ty, llvm_i32_ty]>;
 def int_siglongjmp : Intrinsic<[], [llvm_ptr_ty, llvm_i32_ty]>;
 
 // Internal interface for object size checking
-def int_objectsize : Intrinsic<[llvm_anyint_ty], [llvm_ptr_ty, llvm_i1_ty],
+def int_objectsize : Intrinsic<[llvm_anyint_ty],
+                               [llvm_ptr_ty, llvm_i1_ty, llvm_i32_ty],
                                [IntrNoMem]>,
                                GCCBuiltin<"__builtin_object_size">;
 
@@ -398,6 +399,8 @@ def int_flt_rounds : Intrinsic<[llvm_i32_ty]>,
                      GCCBuiltin<"__builtin_flt_rounds">;
 def int_trap : Intrinsic<[]>,
                GCCBuiltin<"__builtin_trap">;
+def int_debugger : Intrinsic<[]>,
+                   GCCBuiltin<"__builtin_debugger">;
 
 // Intrisics to support half precision floating point format
 let Properties = [IntrNoMem] in {
@@ -441,3 +444,4 @@ include "llvm/IntrinsicsCellSPU.td"
 include "llvm/IntrinsicsXCore.td"
 include "llvm/IntrinsicsPTX.td"
 include "llvm/IntrinsicsHexagon.td"
+include "llvm/IntrinsicsNVVM.td"

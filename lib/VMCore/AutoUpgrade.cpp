@@ -18,9 +18,6 @@
 #include "llvm/LLVMContext.h"
 #include "llvm/Module.h"
 #include "llvm/IntrinsicInst.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/CallSite.h"
 #include "llvm/Support/CFG.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -55,11 +52,29 @@ static bool UpgradeIntrinsicFunction1(Function *F, Function *&NewFn) {
     }
     break;
   }
+  case 'o': {
+    // FIXME: remove in LLVM 3.3
+    if (Name.startswith("objectsize.") && F->arg_size() == 2) {
+      Type *Tys[] = {F->getReturnType(),
+                     F->arg_begin()->getType(),
+                     Type::getInt1Ty(F->getContext()),
+                     Type::getInt32Ty(F->getContext())};
+      NewFn = Intrinsic::getDeclaration(F->getParent(), Intrinsic::objectsize,
+                                        Tys);
+      NewFn->takeName(F);
+      return true;
+    }
+    break;
+  }
   case 'x': {
     if (Name.startswith("x86.sse2.pcmpeq.") ||
         Name.startswith("x86.sse2.pcmpgt.") ||
         Name.startswith("x86.avx2.pcmpeq.") ||
-        Name.startswith("x86.avx2.pcmpgt.")) {
+        Name.startswith("x86.avx2.pcmpgt.") ||
+        Name.startswith("x86.avx.vpermil.") ||
+        Name == "x86.avx.movnt.dq.256" ||
+        Name == "x86.avx.movnt.pd.256" ||
+        Name == "x86.avx.movnt.ps.256") {
       NewFn = 0;
       return true;
     }
@@ -120,8 +135,68 @@ void llvm::UpgradeIntrinsicCall(CallInst *CI, Function *NewFn) {
                                   "pcmpgt");
       // need to sign extend since icmp returns vector of i1
       Rep = Builder.CreateSExt(Rep, CI->getType(), "");
+    } else if (Name == "llvm.x86.avx.movnt.dq.256" ||
+               Name == "llvm.x86.avx.movnt.ps.256" ||
+               Name == "llvm.x86.avx.movnt.pd.256") {
+      IRBuilder<> Builder(C);
+      Builder.SetInsertPoint(CI->getParent(), CI);
+
+      Module *M = F->getParent();
+      SmallVector<Value *, 1> Elts;
+      Elts.push_back(ConstantInt::get(Type::getInt32Ty(C), 1));
+      MDNode *Node = MDNode::get(C, Elts);
+
+      Value *Arg0 = CI->getArgOperand(0);
+      Value *Arg1 = CI->getArgOperand(1);
+
+      // Convert the type of the pointer to a pointer to the stored type.
+      Value *BC = Builder.CreateBitCast(Arg0,
+                                        PointerType::getUnqual(Arg1->getType()),
+                                        "cast");
+      StoreInst *SI = Builder.CreateStore(Arg1, BC);
+      SI->setMetadata(M->getMDKindID("nontemporal"), Node);
+      SI->setAlignment(16);
+
+      // Remove intrinsic.
+      CI->eraseFromParent();
+      return;
     } else {
-      llvm_unreachable("Unknown function for CallInst upgrade.");
+      bool PD128 = false, PD256 = false, PS128 = false, PS256 = false;
+      if (Name == "llvm.x86.avx.vpermil.pd.256")
+        PD256 = true;
+      else if (Name == "llvm.x86.avx.vpermil.pd")
+        PD128 = true;
+      else if (Name == "llvm.x86.avx.vpermil.ps.256")
+        PS256 = true;
+      else if (Name == "llvm.x86.avx.vpermil.ps")
+        PS128 = true;
+
+      if (PD256 || PD128 || PS256 || PS128) {
+        Value *Op0 = CI->getArgOperand(0);
+        unsigned Imm = cast<ConstantInt>(CI->getArgOperand(1))->getZExtValue();
+        SmallVector<Constant*, 8> Idxs;
+
+        if (PD128)
+          for (unsigned i = 0; i != 2; ++i)
+            Idxs.push_back(Builder.getInt32((Imm >> i) & 0x1));
+        else if (PD256)
+          for (unsigned l = 0; l != 4; l+=2)
+            for (unsigned i = 0; i != 2; ++i)
+              Idxs.push_back(Builder.getInt32(((Imm >> (l+i)) & 0x1) + l));
+        else if (PS128)
+          for (unsigned i = 0; i != 4; ++i)
+            Idxs.push_back(Builder.getInt32((Imm >> (2 * i)) & 0x3));
+        else if (PS256)
+          for (unsigned l = 0; l != 8; l+=4)
+            for (unsigned i = 0; i != 4; ++i)
+              Idxs.push_back(Builder.getInt32(((Imm >> (2 * i)) & 0x3) + l));
+        else
+          llvm_unreachable("Unexpected function");
+
+        Rep = Builder.CreateShuffleVector(Op0, Op0, ConstantVector::get(Idxs));
+      } else {
+        llvm_unreachable("Unknown function for CallInst upgrade.");
+      }
     }
 
     CI->replaceAllUsesWith(Rep);
@@ -134,7 +209,7 @@ void llvm::UpgradeIntrinsicCall(CallInst *CI, Function *NewFn) {
     llvm_unreachable("Unknown function for CallInst upgrade.");
 
   case Intrinsic::ctlz:
-  case Intrinsic::cttz:
+  case Intrinsic::cttz: {
     assert(CI->getNumArgOperands() == 1 &&
            "Mismatch between function args and call args");
     StringRef Name = CI->getName();
@@ -143,6 +218,16 @@ void llvm::UpgradeIntrinsicCall(CallInst *CI, Function *NewFn) {
                                                Builder.getFalse(), Name));
     CI->eraseFromParent();
     return;
+  }
+  case Intrinsic::objectsize: {
+    StringRef Name = CI->getName();
+    CI->setName(Name + ".old");
+    CI->replaceAllUsesWith(Builder.CreateCall3(NewFn, CI->getArgOperand(0),
+                                               CI->getArgOperand(1),
+                                               Builder.getInt32(0), Name));
+    CI->eraseFromParent();
+    return;
+  }
   }
 }
 
