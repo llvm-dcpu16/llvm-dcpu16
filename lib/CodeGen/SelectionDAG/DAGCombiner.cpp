@@ -5020,7 +5020,7 @@ SDValue DAGCombiner::ReduceLoadWidth(SDNode *N) {
     ShAmt = LVTStoreBits - EVTStoreBits - ShAmt;
   }
 
-  uint64_t PtrOff = ShAmt / 8;
+  uint64_t PtrOff = ShAmt / TLI.getTargetData()->getBitsPerByte();
   unsigned NewAlign = MinAlign(LN0->getAlignment(), PtrOff);
   SDValue NewPtr = DAG.getNode(ISD::ADD, LN0->getDebugLoc(),
                                PtrType, LN0->getBasePtr(),
@@ -5290,7 +5290,9 @@ SDValue DAGCombiner::CombineConsecutiveLoads(SDNode *N, EVT VT) {
       // If one is volatile it might be ok, but play conservative and bail out.
       !LD1->isVolatile() &&
       !LD2->isVolatile() &&
-      DAG.isConsecutiveLoad(LD2, LD1, LD1VT.getSizeInBits()/8, 1)) {
+      DAG.isConsecutiveLoad(LD2, LD1,
+                            LD1VT.getSizeInBits()/TLI.getTargetData()->getBitsPerByte(),
+                            1)) {
     unsigned Align = LD1->getAlignment();
     unsigned NewAlign = TLI.getTargetData()->
       getABITypeAlignment(VT.getTypeForEVT(*DAG.getContext()));
@@ -6727,7 +6729,8 @@ SDValue DAGCombiner::visitLOAD(SDNode *N) {
 /// load is having specific bytes cleared out.  If so, return the byte size
 /// being masked out and the shift amount.
 static std::pair<unsigned, unsigned>
-CheckForMaskedLoad(SDValue V, SDValue Ptr, SDValue Chain) {
+CheckForMaskedLoad(SDValue V, SDValue Ptr, SDValue Chain,
+                   unsigned BitsPerByte) {
   std::pair<unsigned, unsigned> Result(0, 0);
 
   // Check for the structure we're looking for.
@@ -6767,9 +6770,9 @@ CheckForMaskedLoad(SDValue V, SDValue Ptr, SDValue Chain) {
   // follow the sign bit for uniformity.
   uint64_t NotMask = ~cast<ConstantSDNode>(V->getOperand(1))->getSExtValue();
   unsigned NotMaskLZ = CountLeadingZeros_64(NotMask);
-  if (NotMaskLZ & 7) return Result;  // Must be multiple of a byte.
+  if (NotMaskLZ & (BitsPerByte-1)) return Result;  // Must be multiple of a byte.
   unsigned NotMaskTZ = CountTrailingZeros_64(NotMask);
-  if (NotMaskTZ & 7) return Result;  // Must be multiple of a byte.
+  if (NotMaskTZ & (BitsPerByte-1)) return Result;  // Must be multiple of a byte.
   if (NotMaskLZ == 64) return Result;  // All zero mask.
 
   // See if we have a continuous run of bits.  If so, we have 0*1+0*
@@ -6780,7 +6783,8 @@ CheckForMaskedLoad(SDValue V, SDValue Ptr, SDValue Chain) {
   if (V.getValueType() != MVT::i64 && NotMaskLZ)
     NotMaskLZ -= 64-V.getValueSizeInBits();
 
-  unsigned MaskedBytes = (V.getValueSizeInBits()-NotMaskLZ-NotMaskTZ)/8;
+  unsigned MaskedBytes = (V.getValueSizeInBits()-NotMaskLZ-NotMaskTZ) /
+      BitsPerByte;
   switch (MaskedBytes) {
   case 1:
   case 2:
@@ -6790,10 +6794,10 @@ CheckForMaskedLoad(SDValue V, SDValue Ptr, SDValue Chain) {
 
   // Verify that the first bit starts at a multiple of mask so that the access
   // is aligned the same as the access width.
-  if (NotMaskTZ && NotMaskTZ/8 % MaskedBytes) return Result;
+  if (NotMaskTZ && NotMaskTZ/BitsPerByte % MaskedBytes) return Result;
 
   Result.first = MaskedBytes;
-  Result.second = NotMaskTZ/8;
+  Result.second = NotMaskTZ/BitsPerByte;
   return Result;
 }
 
@@ -6812,13 +6816,13 @@ ShrinkLoadReplaceStoreWithStore(const std::pair<unsigned, unsigned> &MaskInfo,
   // Check to see if IVal is all zeros in the part being masked in by the 'or'
   // that uses this.  If not, this is not a replacement.
   APInt Mask = ~APInt::getBitsSet(IVal.getValueSizeInBits(),
-                                  ByteShift*8, (ByteShift+NumBytes)*8);
+                                  ByteShift*BitsPerByte, (ByteShift+NumBytes)*BitsPerByte);
   if (!DAG.MaskedValueIsZero(IVal, Mask)) return 0;
 
   // Check that it is legal on the target to do this.  It is legal if the new
   // VT we're shrinking to (i8/i16/i32) is legal or we're still before type
   // legalization.
-  MVT VT = MVT::getIntegerVT(NumBytes*8);
+  MVT VT = MVT::getIntegerVT(NumBytes*BitsPerByte);
   if (!DC->isTypeLegal(VT))
     return 0;
 
@@ -6826,7 +6830,7 @@ ShrinkLoadReplaceStoreWithStore(const std::pair<unsigned, unsigned> &MaskInfo,
   // shifted by ByteShift and truncated down to NumBytes.
   if (ByteShift)
     IVal = DAG.getNode(ISD::SRL, IVal->getDebugLoc(), IVal.getValueType(), IVal,
-                       DAG.getConstant(ByteShift*8,
+                       DAG.getConstant(ByteShift*BitsPerByte,
                                     DC->getShiftAmountTy(IVal.getValueType())));
 
   // Figure out the offset for the store and the alignment of the access.
@@ -6874,6 +6878,7 @@ SDValue DAGCombiner::ReduceLoadOpStoreWidth(SDNode *N) {
     return SDValue();
 
   unsigned Opc = Value.getOpcode();
+  unsigned BitsPerByte = TLI.getTargetData()->getBitsPerByte();
 
   // If this is "store (or X, Y), P" and X is "(and (load P), cst)", where cst
   // is a byte mask indicating a consecutive number of bytes, check to see if
@@ -6882,8 +6887,7 @@ SDValue DAGCombiner::ReduceLoadOpStoreWidth(SDNode *N) {
   // the load dead.
   if (Opc == ISD::OR) {
     std::pair<unsigned, unsigned> MaskedLoad;
-    MaskedLoad = CheckForMaskedLoad(Value.getOperand(0), Ptr, Chain);
-    unsigned BitsPerByte = TLI.getTargetData()->getBitsPerByte();
+    MaskedLoad = CheckForMaskedLoad(Value.getOperand(0), Ptr, Chain, BitsPerByte);
     if (MaskedLoad.first)
       if (SDNode *NewST = ShrinkLoadReplaceStoreWithStore(MaskedLoad,
                                                           Value.getOperand(1),
@@ -6892,7 +6896,7 @@ SDValue DAGCombiner::ReduceLoadOpStoreWidth(SDNode *N) {
         return SDValue(NewST, 0);
 
     // Or is commutative, so try swapping X and Y.
-    MaskedLoad = CheckForMaskedLoad(Value.getOperand(1), Ptr, Chain);
+    MaskedLoad = CheckForMaskedLoad(Value.getOperand(1), Ptr, Chain, BitsPerByte);
     if (MaskedLoad.first)
       if (SDNode *NewST = ShrinkLoadReplaceStoreWithStore(MaskedLoad,
                                                           Value.getOperand(0),
@@ -6944,11 +6948,11 @@ SDValue DAGCombiner::ReduceLoadOpStoreWidth(SDNode *N) {
       APInt NewImm = (Imm & Mask).lshr(ShAmt).trunc(NewBW);
       if (Opc == ISD::AND)
         NewImm ^= APInt::getAllOnesValue(NewBW);
-      uint64_t PtrOff = ShAmt / 8;
+      uint64_t PtrOff = ShAmt / BitsPerByte;
       // For big endian targets, we need to adjust the offset to the pointer to
       // load the correct bytes.
       if (TLI.isBigEndian())
-        PtrOff = (BitWidth + 7 - NewBW) / 8 - PtrOff;
+        PtrOff = (BitWidth + BitsPerByte-1 - NewBW) / BitsPerByte - PtrOff;
 
       unsigned NewAlign = MinAlign(LD->getAlignment(), PtrOff);
       Type *NewVTTy = NewVT.getTypeForEVT(*DAG.getContext());
@@ -7451,10 +7455,11 @@ SDValue DAGCombiner::visitEXTRACT_VECTOR_ELT(SDNode *N) {
     unsigned PtrOff = 0;
 
     if (Elt) {
-      PtrOff = LVT.getSizeInBits() * Elt / 8;
+      unsigned BitsPerByte = TLI.getTargetData()->getBitsPerByte();
+      PtrOff = LVT.getSizeInBits() * Elt / BitsPerByte;
       EVT PtrType = NewPtr.getValueType();
       if (TLI.isBigEndian())
-        PtrOff = VT.getSizeInBits() / 8 - PtrOff;
+        PtrOff = VT.getSizeInBits() / BitsPerByte - PtrOff;
       NewPtr = DAG.getNode(ISD::ADD, N->getDebugLoc(), PtrType, NewPtr,
                            DAG.getConstant(PtrOff, PtrType));
     }

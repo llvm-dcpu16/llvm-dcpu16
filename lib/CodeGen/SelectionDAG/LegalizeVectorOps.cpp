@@ -28,6 +28,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/CodeGen/SelectionDAG.h"
+#include "llvm/Target/TargetData.h"
 #include "llvm/Target/TargetLowering.h"
 using namespace llvm;
 
@@ -305,7 +306,7 @@ SDValue VectorLegalizer::ExpandLoad(SDValue Op) {
   SmallVector<SDValue, 8> LoadVals;
   SmallVector<SDValue, 8> LoadChains;
   unsigned NumElem = SrcVT.getVectorNumElements();
-  unsigned Stride = SrcVT.getScalarType().getSizeInBits()/8;
+  unsigned Stride = SrcVT.getScalarType().getSizeInBits()/TLI.getTargetData()->getBitsPerByte();
 
   for (unsigned Idx=0; Idx<NumElem; Idx++) {
     SDValue ScalarLoad = DAG.getExtLoad(ExtType, dl,
@@ -360,7 +361,7 @@ SDValue VectorLegalizer::ExpandStore(SDValue Op) {
     ScalarSize = NextPowerOf2(ScalarSize);
 
   // Store Stride in bytes
-  unsigned Stride = ScalarSize/8;
+  unsigned Stride = ScalarSize/TLI.getTargetData()->getBitsPerByte();
   // Extract each of the elements from the original vector
   // and save them into memory individually.
   SmallVector<SDValue, 8> Stores;
