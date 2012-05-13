@@ -89,7 +89,7 @@ BitVector DCPU16RegisterInfo::getReservedRegs(const MachineFunction &MF) const {
   BitVector Reserved(getNumRegs());
   const TargetFrameLowering *TFI = MF.getTarget().getFrameLowering();
 
-  // Mark 3 special registers as reserved.
+  // Mark 2 special registers as reserved.
   Reserved.set(DCPU16::EX);
   Reserved.set(DCPU16::SP);
 
@@ -222,20 +222,6 @@ DCPU16RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
 
   MI.getOperand(i).ChangeToRegister(BasePtr, false);
   MI.getOperand(i+1).ChangeToImmediate(Offset);
-}
-
-void
-DCPU16RegisterInfo::processFunctionBeforeFrameFinalized(MachineFunction &MF)
-                                                                         const {
-  const TargetFrameLowering *TFI = MF.getTarget().getFrameLowering();
-
-  // Create a frame entry for the J register that must be saved.
-  if (TFI->hasFP(MF)) {
-    int FrameIdx = MF.getFrameInfo()->CreateFixedObject(2, -4, true);
-    (void)FrameIdx;
-    assert(FrameIdx == MF.getFrameInfo()->getObjectIndexBegin() &&
-           "Slot for J register must be last in order to be found!");
-  }
 }
 
 unsigned DCPU16RegisterInfo::getFrameRegister(const MachineFunction &MF) const {

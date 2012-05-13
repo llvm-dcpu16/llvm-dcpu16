@@ -221,3 +221,15 @@ DCPU16FrameLowering::restoreCalleeSavedRegisters(MachineBasicBlock &MBB,
 
   return true;
 }
+
+void
+DCPU16FrameLowering::processFunctionBeforeFrameFinalized(MachineFunction &MF)
+                                                                         const {
+  // Create a frame entry for the J register that must be saved.
+  if (hasFP(MF)) {
+    int FrameIdx = MF.getFrameInfo()->CreateFixedObject(1, -1, true);
+    (void)FrameIdx;
+    assert(FrameIdx == MF.getFrameInfo()->getObjectIndexBegin() &&
+           "Slot for J register must be last in order to be found!");
+  }
+}
