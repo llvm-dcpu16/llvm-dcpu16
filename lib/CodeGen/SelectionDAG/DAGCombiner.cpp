@@ -2681,8 +2681,9 @@ SDValue DAGCombiner::visitAND(SDNode *N) {
           // to load the correct bytes.  For little endian systems, we merely
           // need to read fewer bytes from the same pointer.
           if (TLI.isBigEndian()) {
-            unsigned LVTStoreBytes = LoadedVT.getStoreSize();
-            unsigned EVTStoreBytes = ExtVT.getStoreSize();
+            unsigned BitsPerByte = TLI.getTargetData()->getBitsPerByte();
+            unsigned LVTStoreBytes = LoadedVT.getStoreSize(BitsPerByte);
+            unsigned EVTStoreBytes = ExtVT.getStoreSize(BitsPerByte);
             unsigned PtrOff = LVTStoreBytes - EVTStoreBytes;
             NewPtr = DAG.getNode(ISD::ADD, LN0->getDebugLoc(), PtrType,
                                  NewPtr, DAG.getConstant(PtrOff, PtrType));
@@ -5013,8 +5014,9 @@ SDValue DAGCombiner::ReduceLoadWidth(SDNode *N) {
   // For big endian targets, we need to adjust the offset to the pointer to
   // load the correct bytes.
   if (TLI.isBigEndian()) {
-    unsigned LVTStoreBits = LN0->getMemoryVT().getStoreSizeInBits();
-    unsigned EVTStoreBits = ExtVT.getStoreSizeInBits();
+    unsigned BitsPerByte = TLI.getTargetData()->getBitsPerByte();
+    unsigned LVTStoreBits = LN0->getMemoryVT().getStoreSizeInBits(BitsPerByte);
+    unsigned EVTStoreBits = ExtVT.getStoreSizeInBits(BitsPerByte);
     ShAmt = LVTStoreBits - EVTStoreBits - ShAmt;
   }
 
@@ -6802,7 +6804,7 @@ CheckForMaskedLoad(SDValue V, SDValue Ptr, SDValue Chain) {
 static SDNode *
 ShrinkLoadReplaceStoreWithStore(const std::pair<unsigned, unsigned> &MaskInfo,
                                 SDValue IVal, StoreSDNode *St,
-                                DAGCombiner *DC) {
+                                DAGCombiner *DC, unsigned BitsPerByte) {
   unsigned NumBytes = MaskInfo.first;
   unsigned ByteShift = MaskInfo.second;
   SelectionDAG &DAG = DC->getDAG();
@@ -6833,8 +6835,9 @@ ShrinkLoadReplaceStoreWithStore(const std::pair<unsigned, unsigned> &MaskInfo,
 
   if (DAG.getTargetLoweringInfo().isLittleEndian())
     StOffset = ByteShift;
-  else
-    StOffset = IVal.getValueType().getStoreSize() - ByteShift - NumBytes;
+  else {
+    StOffset = IVal.getValueType().getStoreSize(BitsPerByte) - ByteShift - NumBytes;
+  }
 
   SDValue Ptr = St->getBasePtr();
   if (StOffset) {
@@ -6880,16 +6883,21 @@ SDValue DAGCombiner::ReduceLoadOpStoreWidth(SDNode *N) {
   if (Opc == ISD::OR) {
     std::pair<unsigned, unsigned> MaskedLoad;
     MaskedLoad = CheckForMaskedLoad(Value.getOperand(0), Ptr, Chain);
+    unsigned BitsPerByte = TLI.getTargetData()->getBitsPerByte();
     if (MaskedLoad.first)
       if (SDNode *NewST = ShrinkLoadReplaceStoreWithStore(MaskedLoad,
-                                                  Value.getOperand(1), ST,this))
+                                                          Value.getOperand(1),
+                                                          ST, this,
+                                                          BitsPerByte))
         return SDValue(NewST, 0);
 
     // Or is commutative, so try swapping X and Y.
     MaskedLoad = CheckForMaskedLoad(Value.getOperand(1), Ptr, Chain);
     if (MaskedLoad.first)
       if (SDNode *NewST = ShrinkLoadReplaceStoreWithStore(MaskedLoad,
-                                                  Value.getOperand(0), ST,this))
+                                                          Value.getOperand(0),
+                                                          ST, this,
+                                                          BitsPerByte))
         return SDValue(NewST, 0);
   }
 

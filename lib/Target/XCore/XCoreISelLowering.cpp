@@ -1489,7 +1489,7 @@ SDValue XCoreTargetLowering::PerformDAGCombine(SDNode *N,
     }
     SDValue Chain = ST->getChain();
 
-    unsigned StoreBits = ST->getMemoryVT().getStoreSizeInBits();
+    unsigned StoreBits = ST->getMemoryVT().getStoreSizeInBits(8);
     if (StoreBits % 8) {
       break;
     }
