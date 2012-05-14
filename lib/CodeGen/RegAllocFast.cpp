@@ -191,8 +191,8 @@ int RAFast::getStackSpaceFor(unsigned VirtReg, const TargetRegisterClass *RC) {
 
   // Allocate a new stack object for this spill location...
   unsigned BitsPerByte = MF->getTarget().getTargetData()->getBitsPerByte();
-  int FrameIdx = MF->getFrameInfo()->CreateSpillStackObject(RC->getSize() / (BitsPerByte/8),
-                                                            RC->getAlignment() / (BitsPerByte/8));
+  int FrameIdx = MF->getFrameInfo()->CreateSpillStackObject(RC->getSize() / BitsPerByte,
+                                                            RC->getAlignment() / BitsPerByte);
 
   // Assign the slot.
   StackSlotForVirtReg[VirtReg] = FrameIdx;

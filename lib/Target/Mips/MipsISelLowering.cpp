@@ -2945,7 +2945,7 @@ MipsTargetLowering::LowerFormalArguments(SDValue Chain,
     const TargetRegisterClass *RC = IsO32 ?
       (const TargetRegisterClass*)&Mips::CPURegsRegClass :
       (const TargetRegisterClass*)&Mips::CPU64RegsRegClass;
-    unsigned RegSize = RC->getSize();
+    unsigned RegSize = RC->getSize() / 8;
     int RegSlotOffset = FirstRegSlotOffset + Idx * RegSize;
 
     // Offset of the first variable argument from stack pointer.

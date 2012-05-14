@@ -81,12 +81,12 @@ public:
     return MC->contains(Reg1, Reg2);
   }
 
-  /// getSize - Return the size of the register in bytes, which is also the size
+  /// getSize - Return the size of the register in bits, which is also the size
   /// of a stack slot allocated to hold a spilled copy of this register.
   unsigned getSize() const { return MC->getSize(); }
 
-  /// getAlignment - Return the minimum required alignment for a register of
-  /// this class.
+  /// getAlignment - Return the minimum required alignment in bits for a
+  /// register of this class.
   unsigned getAlignment() const { return MC->getAlignment(); }
 
   /// getCopyCost - Return the cost of copying a value between two registers in

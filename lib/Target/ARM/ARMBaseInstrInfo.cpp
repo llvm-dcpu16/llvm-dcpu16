@@ -757,7 +757,7 @@ storeRegToStackSlot(MachineBasicBlock &MBB, MachineBasicBlock::iterator I,
                             MFI.getObjectSize(FI),
                             Align);
 
-  switch (RC->getSize()) {
+  switch (RC->getSize() / 8) {
     case 4:
       if (ARM::GPRRegClass.hasSubClassEq(RC)) {
         AddDefaultPred(BuildMI(MBB, I, DL, get(ARM::STRi12))
@@ -909,7 +909,7 @@ loadRegFromStackSlot(MachineBasicBlock &MBB, MachineBasicBlock::iterator I,
                             MFI.getObjectSize(FI),
                             Align);
 
-  switch (RC->getSize()) {
+  switch (RC->getSize() / 8) {
   case 4:
     if (ARM::GPRRegClass.hasSubClassEq(RC)) {
       AddDefaultPred(BuildMI(MBB, I, DL, get(ARM::LDRi12), DestReg)

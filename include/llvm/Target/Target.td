@@ -129,9 +129,8 @@ class RegisterClass<string namespace, list<ValueType> regTypes, int alignment,
   // zero lets tablgen pick an appropriate size.
   int Size = 0;
 
-  // Alignment - Specify the alignment required of the registers when they are
-  // stored or loaded to memory.
-  //
+  // Alignment - Specify the alignment in bits required of the registers when
+  // they are stored or loaded to memory.
   int Alignment = alignment;
 
   // CopyCost - This value is used to specify the cost of copying a value

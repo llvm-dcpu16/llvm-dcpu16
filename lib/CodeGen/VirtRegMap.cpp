@@ -71,8 +71,8 @@ void VirtRegMap::grow() {
 
 unsigned VirtRegMap::createSpillSlot(const TargetRegisterClass *RC) {
   unsigned BitsPerByte = MF->getTarget().getTargetData()->getBitsPerByte();
-  int SS = MF->getFrameInfo()->CreateSpillStackObject(RC->getSize() / (BitsPerByte/8),
-                                                      RC->getAlignment() / (BitsPerByte/8));
+  int SS = MF->getFrameInfo()->CreateSpillStackObject(RC->getSize() / BitsPerByte,
+                                                      RC->getAlignment() / BitsPerByte);
   ++NumSpillSlots;
   return SS;
 }
