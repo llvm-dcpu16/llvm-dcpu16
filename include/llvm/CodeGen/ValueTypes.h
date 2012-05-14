@@ -305,7 +305,7 @@ namespace llvm {
     /// getStoreSize - Return the number of bytes overwritten by a store
     /// of the specified value type.
     unsigned getStoreSize(unsigned BitsPerByte) const {
-      return (getSizeInBits() + BitsPerByte) / BitsPerByte;
+      return (getSizeInBits() + BitsPerByte - 1) / BitsPerByte;
     }
 
     /// getStoreSizeInBits - Return the number of bits overwritten by a store
