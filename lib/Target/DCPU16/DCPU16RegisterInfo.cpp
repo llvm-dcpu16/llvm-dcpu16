@@ -46,10 +46,6 @@ DCPU16RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
     DCPU16::X, DCPU16::Y, DCPU16::Z, DCPU16::I, DCPU16::J,
     0
   };
-  static const uint16_t CalleeSavedRegsFP[] = {
-    DCPU16::X, DCPU16::Y, DCPU16::Z, DCPU16::I,
-    0
-  };
   // In interrupt handlers, the caller has to save all registers except A.
   // This includes EX.
   static const uint16_t CalleeSavedRegsIntr[] = {
@@ -58,20 +54,9 @@ DCPU16RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
     DCPU16::X, DCPU16::Y, DCPU16::Z, DCPU16::I, DCPU16::J,
     0
   };
-  static const uint16_t CalleeSavedRegsIntrFP[] = {
-    DCPU16::EX,
-    DCPU16::B, DCPU16::C,
-    DCPU16::X, DCPU16::Y, DCPU16::Z, DCPU16::I,
-    0
-  };
 
-  if (TFI->hasFP(*MF))
-    return (F->getCallingConv() == CallingConv::DCPU16_INTR ?
-            CalleeSavedRegsIntrFP : CalleeSavedRegsFP);
-  else
-    return (F->getCallingConv() == CallingConv::DCPU16_INTR ?
-            CalleeSavedRegsIntr : CalleeSavedRegs);
-
+  return (F->getCallingConv() == CallingConv::DCPU16_INTR ?
+          CalleeSavedRegsIntr : CalleeSavedRegs);
 }
 
 const uint32_t*
@@ -187,12 +172,10 @@ DCPU16RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   int Offset = MF.getFrameInfo()->getObjectOffset(FrameIndex);
 
   // Skip the saved PC
-  Offset += 2;
+  Offset += 1;
 
   if (!TFI->hasFP(MF))
     Offset += MF.getFrameInfo()->getStackSize();
-  else
-    Offset += 2; // Skip the saved J
 
   // Fold imm into offset
   Offset += MI.getOperand(i+1).getImm();

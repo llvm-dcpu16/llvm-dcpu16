@@ -27,7 +27,7 @@ protected:
 
 public:
   explicit DCPU16FrameLowering(const DCPU16Subtarget &sti)
-    : TargetFrameLowering(TargetFrameLowering::StackGrowsDown, 2, -2), STI(sti) {
+    : TargetFrameLowering(TargetFrameLowering::StackGrowsDown, 1, -1), STI(sti) {
   }
 
   /// emitProlog/emitEpilog - These methods insert prolog and epilog code into
