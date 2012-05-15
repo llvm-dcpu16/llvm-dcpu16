@@ -250,7 +250,7 @@ void SPUFrameLowering::processFunctionBeforeCalleeSavedScan(MachineFunction &MF,
 
   MachineFrameInfo *MFI = MF.getFrameInfo();
   const TargetRegisterClass *RC = &SPU::R32CRegClass;
-  RS->setScavengingFrameIndex(MFI->CreateStackObject(RC->getSize(),
-                                                     RC->getAlignment(),
+  RS->setScavengingFrameIndex(MFI->CreateStackObject(RC->getSize() / 8,
+                                                     RC->getAlignment() / 8,
                                                      false));
 }

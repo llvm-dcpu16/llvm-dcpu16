@@ -964,8 +964,9 @@ void SelectionDAGLegalize::LegalizeOp(SDNode *Node) {
     unsigned Alignment = LD->getAlignment();
     bool isVolatile = LD->isVolatile();
     bool isNonTemporal = LD->isNonTemporal();
+    unsigned BitsPerByte = TLI.getTargetData()->getBitsPerByte();
 
-    if (SrcWidth != SrcVT.getStoreSizeInBits() &&
+    if (SrcWidth != SrcVT.getStoreSizeInBits(BitsPerByte) &&
         // Some targets pretend to have an i1 loading operation, and actually
         // load an i8.  This trick is correct for ZEXTLOAD because the top 7
         // bits are guaranteed to be zero; it helps the optimizers understand
@@ -977,7 +978,7 @@ void SelectionDAGLegalize::LegalizeOp(SDNode *Node) {
          TLI.getLoadExtAction(ExtType, MVT::i1) == TargetLowering::Promote)) {
       // Promote to a byte-sized load if not loading an integral number of
       // bytes.  For example, promote EXTLOAD:i20 -> EXTLOAD:i24.
-      unsigned NewWidth = SrcVT.getStoreSizeInBits();
+      unsigned NewWidth = SrcVT.getStoreSizeInBits(BitsPerByte);
       EVT NVT = EVT::getIntegerVT(*DAG.getContext(), NewWidth);
       SDValue Ch;
 
@@ -1227,13 +1228,14 @@ void SelectionDAGLegalize::LegalizeOp(SDNode *Node) {
 
       EVT StVT = ST->getMemoryVT();
       unsigned StWidth = StVT.getSizeInBits();
+      unsigned BitsPerByte = TLI.getTargetData()->getBitsPerByte();
 
-      if (StWidth != StVT.getStoreSizeInBits()) {
+      if (StWidth != StVT.getStoreSizeInBits(BitsPerByte)) {
         // Promote to a byte-sized store with upper bits zero if not
         // storing an integral number of bytes.  For example, promote
         // TRUNCSTORE:i1 X -> TRUNCSTORE:i8 (and X, 1)
         EVT NVT = EVT::getIntegerVT(*DAG.getContext(),
-                                    StVT.getStoreSizeInBits());
+                                    StVT.getStoreSizeInBits(BitsPerByte));
         Tmp3 = DAG.getZeroExtendInReg(Tmp3, dl, StVT);
         SDValue Result =
           DAG.getTruncStore(Tmp1, dl, Tmp3, Tmp2, ST->getPointerInfo(),

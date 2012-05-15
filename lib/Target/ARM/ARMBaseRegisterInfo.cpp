@@ -127,7 +127,7 @@ ARMBaseRegisterInfo::canCombineSubRegIndices(const TargetRegisterClass *RC,
                                           SmallVectorImpl<unsigned> &SubIndices,
                                           unsigned &NewSubIdx) const {
 
-  unsigned Size = RC->getSize() * 8;
+  unsigned Size = RC->getSize();
   if (Size < 6)
     return 0;
 

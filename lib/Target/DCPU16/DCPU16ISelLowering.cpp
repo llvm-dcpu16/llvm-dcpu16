@@ -285,8 +285,8 @@ DCPU16TargetLowering::LowerCCCArguments(SDValue Chain,
       // Sanity check
       assert(VA.isMemLoc());
       // Load the argument to a virtual register
-      unsigned ObjSize = VA.getLocVT().getSizeInBits()/8;
-      if (ObjSize > 2) {
+      unsigned ObjSize = VA.getLocVT().getSizeInBits()/16;
+      if (ObjSize != 1) {
         errs() << "LowerFormalArguments Unhandled argument type: "
              << EVT(VA.getLocVT()).getEVTString()
              << "\n";
@@ -686,9 +686,7 @@ DCPU16TargetLowering::getReturnAddressFrameIndex(SelectionDAG &DAG) const {
 
   if (ReturnAddrIndex == 0) {
     // Set up a frame object for the return address.
-    uint64_t SlotSize = TD->getPointerSize();
-    ReturnAddrIndex = MF.getFrameInfo()->CreateFixedObject(SlotSize, -SlotSize,
-                                                           true);
+    ReturnAddrIndex = MF.getFrameInfo()->CreateFixedObject(1, -1, true);
     FuncInfo->setRAIndex(ReturnAddrIndex);
   }
 

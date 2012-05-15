@@ -28,6 +28,7 @@
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/RegisterScavenging.h"
+#include "llvm/Target/TargetData.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
 #include "llvm/Target/TargetRegisterInfo.h"
@@ -260,21 +261,24 @@ void PEI::calculateCalleeSavedRegisters(MachineFunction &Fn) {
            FixedSlot->Reg != Reg)
       ++FixedSlot;
 
+    unsigned BitsPerByte = Fn.getTarget().getTargetData()->getBitsPerByte();
     if (FixedSlot == FixedSpillSlots + NumFixedSpillSlots) {
       // Nope, just spill it anywhere convenient.
-      unsigned Align = RC->getAlignment();
+      unsigned Align = RC->getAlignment() / BitsPerByte;
       unsigned StackAlign = TFI->getStackAlignment();
 
       // We may not be able to satisfy the desired alignment specification of
       // the TargetRegisterClass if the stack alignment is smaller. Use the
       // min.
       Align = std::min(Align, StackAlign);
-      FrameIdx = MFI->CreateStackObject(RC->getSize(), Align, true);
+      FrameIdx = MFI->CreateStackObject(RC->getSize() / BitsPerByte,
+                                        Align, true);
       if ((unsigned)FrameIdx < MinCSFrameIndex) MinCSFrameIndex = FrameIdx;
       if ((unsigned)FrameIdx > MaxCSFrameIndex) MaxCSFrameIndex = FrameIdx;
     } else {
       // Spill it to the stack where we must.
-      FrameIdx = MFI->CreateFixedObject(RC->getSize(), FixedSlot->Offset, true);
+      FrameIdx = MFI->CreateFixedObject(RC->getSize() / BitsPerByte,
+                                        FixedSlot->Offset, true);
     }
 
     I->setFrameIdx(FrameIdx);

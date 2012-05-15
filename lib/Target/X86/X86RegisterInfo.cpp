@@ -749,7 +749,7 @@ namespace {
       // will be spilled and thus require dynamic stack realignment.
       for (unsigned i = 0, e = RI.getNumVirtRegs(); i != e; ++i) {
         unsigned Reg = TargetRegisterInfo::index2VirtReg(i);
-        if (RI.getRegClass(Reg)->getAlignment() > StackAlignment) {
+        if ((RI.getRegClass(Reg)->getAlignment() / 8) > StackAlignment) {
           FuncInfo->setForceFramePointer(true);
           return true;
         }

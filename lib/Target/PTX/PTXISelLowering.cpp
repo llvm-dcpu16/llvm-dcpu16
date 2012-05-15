@@ -238,7 +238,7 @@ SDValue PTXTargetLowering::
       assert((!MFI->isKernel() || Ins[i].VT != MVT::i1) &&
              "Kernels cannot take pred operands");
 
-      unsigned ParamSize = Ins[i].VT.getStoreSizeInBits();
+      unsigned ParamSize = Ins[i].VT.getStoreSizeInBits(8);
       unsigned Param = PM.addArgumentParam(ParamSize);
       const std::string &ParamName = PM.getParamName(Param);
       SDValue ParamValue = DAG.getTargetExternalSymbol(ParamName.c_str(),
@@ -485,7 +485,7 @@ PTXTargetLowering::LowerCall(SDValue Chain, SDValue Callee,
   // Generate list of .param variables to hold the return value(s).
   Ops[1] = DAG.getTargetConstant(Ins.size(), MVT::i32);
   for (unsigned i = 0; i < Ins.size(); ++i) {
-    unsigned Size = Ins[i].VT.getStoreSizeInBits();
+    unsigned Size = Ins[i].VT.getStoreSizeInBits(8);
     unsigned Param = PM.addLocalParam(Size);
     const std::string &ParamName = PM.getParamName(Param);
     SDValue ParamValue = DAG.getTargetExternalSymbol(ParamName.c_str(),
