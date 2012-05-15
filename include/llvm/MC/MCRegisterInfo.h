@@ -34,7 +34,7 @@ public:
   const uint16_t RegsSize;
   const uint16_t RegSetSize;
   const uint16_t ID;
-  const uint16_t RegSize, Alignment; // Size & Alignment of register in bytes
+  const uint16_t RegSize, Alignment; // Size & Alignment of register in bits
   const int8_t CopyCost;
   const bool Allocatable;
 
@@ -77,12 +77,12 @@ public:
     return contains(Reg1) && contains(Reg2);
   }
 
-  /// getSize - Return the size of the register in bytes, which is also the size
+  /// getSize - Return the size of the register in bits, which is also the size
   /// of a stack slot allocated to hold a spilled copy of this register.
   unsigned getSize() const { return RegSize; }
 
-  /// getAlignment - Return the minimum required alignment for a register of
-  /// this class.
+  /// getAlignment - Return the minimum required alignment in bits for a register
+  /// of this class.
   unsigned getAlignment() const { return Alignment; }
 
   /// getCopyCost - Return the cost of copying a value between two registers in

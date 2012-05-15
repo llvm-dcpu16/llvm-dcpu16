@@ -1796,6 +1796,7 @@ void DAGTypeLegalizer::ExpandIntRes_LOAD(LoadSDNode *N,
   bool isNonTemporal = N->isNonTemporal();
   bool isInvariant = N->isInvariant();
   DebugLoc dl = N->getDebugLoc();
+  unsigned BitsPerByte = TLI.getTargetData()->getBitsPerByte();
 
   assert(NVT.isByteSized() && "Expanded type not byte sized!");
 
@@ -1832,7 +1833,7 @@ void DAGTypeLegalizer::ExpandIntRes_LOAD(LoadSDNode *N,
     EVT NEVT = EVT::getIntegerVT(*DAG.getContext(), ExcessBits);
 
     // Increment the pointer to the other half.
-    unsigned IncrementSize = NVT.getSizeInBits()/TLI.getTargetData()->getBitsPerByte();
+    unsigned IncrementSize = NVT.getSizeInBits()/BitsPerByte;
     Ptr = DAG.getNode(ISD::ADD, dl, Ptr.getValueType(), Ptr,
                       DAG.getIntPtrConstant(IncrementSize));
     Hi = DAG.getExtLoad(ExtType, dl, NVT, Ch, Ptr,
@@ -1848,9 +1849,9 @@ void DAGTypeLegalizer::ExpandIntRes_LOAD(LoadSDNode *N,
     // Big-endian - high bits are at low addresses.  Favor aligned loads at
     // the cost of some bit-fiddling.
     EVT MemVT = N->getMemoryVT();
-    unsigned EBytes = MemVT.getStoreSize();
-    unsigned IncrementSize = NVT.getSizeInBits()/TLI.getTargetData()->getBitsPerByte();
-    unsigned ExcessBits = (EBytes - IncrementSize)*TLI.getTargetData()->getBitsPerByte();
+    unsigned EBytes = MemVT.getStoreSize(BitsPerByte);
+    unsigned IncrementSize = NVT.getSizeInBits()/BitsPerByte;
+    unsigned ExcessBits = (EBytes - IncrementSize)*BitsPerByte;
 
     // Load both the high bits and maybe some of the low bits.
     Hi = DAG.getExtLoad(ExtType, dl, NVT, Ch, Ptr, N->getPointerInfo(),
@@ -2717,9 +2718,10 @@ SDValue DAGTypeLegalizer::ExpandIntOp_STORE(StoreSDNode *N, unsigned OpNo) {
   GetExpandedInteger(N->getValue(), Lo, Hi);
 
   EVT ExtVT = N->getMemoryVT();
-  unsigned EBytes = ExtVT.getStoreSize();
-  unsigned IncrementSize = NVT.getSizeInBits()/TLI.getTargetData()->getBitsPerByte();
-  unsigned ExcessBits = (EBytes - IncrementSize)*TLI.getTargetData()->getBitsPerByte();
+  unsigned BitsPerByte = TLI.getTargetData()->getBitsPerByte();
+  unsigned EBytes = ExtVT.getStoreSize(BitsPerByte);
+  unsigned IncrementSize = NVT.getSizeInBits()/BitsPerByte;
+  unsigned ExcessBits = (EBytes - IncrementSize)*BitsPerByte;
   EVT HiVT = EVT::getIntegerVT(*DAG.getContext(),
                                ExtVT.getSizeInBits() - ExcessBits);
 

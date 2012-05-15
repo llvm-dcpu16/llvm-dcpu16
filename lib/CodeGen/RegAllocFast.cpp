@@ -22,6 +22,7 @@
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/Passes.h"
 #include "llvm/CodeGen/RegAllocRegistry.h"
+#include "llvm/Target/TargetData.h"
 #include "llvm/Target/TargetInstrInfo.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Support/CommandLine.h"
@@ -189,8 +190,9 @@ int RAFast::getStackSpaceFor(unsigned VirtReg, const TargetRegisterClass *RC) {
     return SS;          // Already has space allocated?
 
   // Allocate a new stack object for this spill location...
-  int FrameIdx = MF->getFrameInfo()->CreateSpillStackObject(RC->getSize(),
-                                                            RC->getAlignment());
+  unsigned BitsPerByte = MF->getTarget().getTargetData()->getBitsPerByte();
+  int FrameIdx = MF->getFrameInfo()->CreateSpillStackObject(RC->getSize() / BitsPerByte,
+                                                            RC->getAlignment() / BitsPerByte);
 
   // Assign the slot.
   StackSlotForVirtReg[VirtReg] = FrameIdx;

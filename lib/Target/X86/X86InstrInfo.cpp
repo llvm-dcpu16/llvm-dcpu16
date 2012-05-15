@@ -2493,7 +2493,7 @@ static unsigned getLoadStoreRegOpcode(unsigned Reg,
                                       const TargetMachine &TM,
                                       bool load) {
   bool HasAVX = TM.getSubtarget<X86Subtarget>().hasAVX();
-  switch (RC->getSize()) {
+  switch (RC->getSize() / 8) {
   default:
     llvm_unreachable("Unknown spill size");
   case 1:
@@ -2575,9 +2575,9 @@ void X86InstrInfo::storeRegToStackSlot(MachineBasicBlock &MBB,
                                        const TargetRegisterClass *RC,
                                        const TargetRegisterInfo *TRI) const {
   const MachineFunction &MF = *MBB.getParent();
-  assert(MF.getFrameInfo()->getObjectSize(FrameIdx) >= RC->getSize() &&
+  assert(MF.getFrameInfo()->getObjectSize(FrameIdx) >= (RC->getSize() / 8) &&
          "Stack slot too small for store");
-  unsigned Alignment = RC->getSize() == 32 ? 32 : 16;
+  unsigned Alignment = (RC->getSize() / 8) == 32 ? 32 : 16;
   bool isAligned = (TM.getFrameLowering()->getStackAlignment() >= Alignment) ||
     RI.canRealignStack(MF);
   unsigned Opc = getStoreRegOpcode(SrcReg, RC, isAligned, TM);
@@ -2593,7 +2593,7 @@ void X86InstrInfo::storeRegToAddr(MachineFunction &MF, unsigned SrcReg,
                                   MachineInstr::mmo_iterator MMOBegin,
                                   MachineInstr::mmo_iterator MMOEnd,
                                   SmallVectorImpl<MachineInstr*> &NewMIs) const {
-  unsigned Alignment = RC->getSize() == 32 ? 32 : 16;
+  unsigned Alignment = (RC->getSize() / 8) == 32 ? 32 : 16;
   bool isAligned = MMOBegin != MMOEnd &&
                    (*MMOBegin)->getAlignment() >= Alignment;
   unsigned Opc = getStoreRegOpcode(SrcReg, RC, isAligned, TM);
@@ -2613,7 +2613,7 @@ void X86InstrInfo::loadRegFromStackSlot(MachineBasicBlock &MBB,
                                         const TargetRegisterClass *RC,
                                         const TargetRegisterInfo *TRI) const {
   const MachineFunction &MF = *MBB.getParent();
-  unsigned Alignment = RC->getSize() == 32 ? 32 : 16;
+  unsigned Alignment = (RC->getSize() / 8) == 32 ? 32 : 16;
   bool isAligned = (TM.getFrameLowering()->getStackAlignment() >= Alignment) ||
     RI.canRealignStack(MF);
   unsigned Opc = getLoadRegOpcode(DestReg, RC, isAligned, TM);
@@ -2627,7 +2627,7 @@ void X86InstrInfo::loadRegFromAddr(MachineFunction &MF, unsigned DestReg,
                                  MachineInstr::mmo_iterator MMOBegin,
                                  MachineInstr::mmo_iterator MMOEnd,
                                  SmallVectorImpl<MachineInstr*> &NewMIs) const {
-  unsigned Alignment = RC->getSize() == 32 ? 32 : 16;
+  unsigned Alignment = (RC->getSize() / 8) == 32 ? 32 : 16;
   bool isAligned = MMOBegin != MMOEnd &&
                    (*MMOBegin)->getAlignment() >= Alignment;
   unsigned Opc = getLoadRegOpcode(DestReg, RC, isAligned, TM);
@@ -2811,7 +2811,7 @@ X86InstrInfo::foldMemoryOperandImpl(MachineFunction &MF,
         return NULL;
       bool NarrowToMOV32rm = false;
       if (Size) {
-        unsigned RCSize = getRegClass(MI->getDesc(), i, &RI, MF)->getSize();
+        unsigned RCSize = getRegClass(MI->getDesc(), i, &RI, MF)->getSize() / 8;
         if (Size < RCSize) {
           // Check if it's safe to fold the load. If the size of the object is
           // narrower than the load width, then it's not.
@@ -3358,7 +3358,7 @@ X86InstrInfo::unfoldMemoryOperand(SelectionDAG &DAG, SDNode *N,
         !TM.getSubtarget<X86Subtarget>().isUnalignedMemAccessFast())
       // Do not introduce a slow unaligned load.
       return false;
-    unsigned Alignment = RC->getSize() == 32 ? 32 : 16;
+    unsigned Alignment = (RC->getSize() / 8) == 32 ? 32 : 16;
     bool isAligned = (*MMOs.first) &&
                      (*MMOs.first)->getAlignment() >= Alignment;
     Load = DAG.getMachineNode(getLoadRegOpcode(0, RC, isAligned, TM), dl,
@@ -3402,7 +3402,7 @@ X86InstrInfo::unfoldMemoryOperand(SelectionDAG &DAG, SDNode *N,
         !TM.getSubtarget<X86Subtarget>().isUnalignedMemAccessFast())
       // Do not introduce a slow unaligned store.
       return false;
-    unsigned Alignment = RC->getSize() == 32 ? 32 : 16;
+    unsigned Alignment = (RC->getSize() / 8) == 32 ? 32 : 16;
     bool isAligned = (*MMOs.first) &&
                      (*MMOs.first)->getAlignment() >= Alignment;
     SDNode *Store = DAG.getMachineNode(getStoreRegOpcode(0, DstRC,

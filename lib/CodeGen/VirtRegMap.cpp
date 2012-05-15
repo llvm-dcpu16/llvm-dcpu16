@@ -24,6 +24,7 @@
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/SlotIndexes.h"
+#include "llvm/Target/TargetData.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetInstrInfo.h"
 #include "llvm/Target/TargetRegisterInfo.h"
@@ -69,8 +70,9 @@ void VirtRegMap::grow() {
 }
 
 unsigned VirtRegMap::createSpillSlot(const TargetRegisterClass *RC) {
-  int SS = MF->getFrameInfo()->CreateSpillStackObject(RC->getSize(),
-                                                      RC->getAlignment());
+  unsigned BitsPerByte = MF->getTarget().getTargetData()->getBitsPerByte();
+  int SS = MF->getFrameInfo()->CreateSpillStackObject(RC->getSize() / BitsPerByte,
+                                                      RC->getAlignment() / BitsPerByte);
   ++NumSpillSlots;
   return SS;
 }

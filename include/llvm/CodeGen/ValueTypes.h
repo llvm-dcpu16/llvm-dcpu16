@@ -304,14 +304,14 @@ namespace llvm {
 
     /// getStoreSize - Return the number of bytes overwritten by a store
     /// of the specified value type.
-    unsigned getStoreSize() const {
-      return (getSizeInBits() + 7) / 8;
+    unsigned getStoreSize(unsigned BitsPerByte) const {
+      return (getSizeInBits() + BitsPerByte - 1) / BitsPerByte;
     }
 
     /// getStoreSizeInBits - Return the number of bits overwritten by a store
     /// of the specified value type.
-    unsigned getStoreSizeInBits() const {
-      return getStoreSize() * 8;
+    unsigned getStoreSizeInBits(unsigned BitsPerByte) const {
+      return getStoreSize(BitsPerByte) * BitsPerByte;
     }
 
     static MVT getFloatingPointVT(unsigned BitWidth) {
@@ -605,14 +605,14 @@ namespace llvm {
 
     /// getStoreSize - Return the number of bytes overwritten by a store
     /// of the specified value type.
-    unsigned getStoreSize() const {
-      return (getSizeInBits() + 7) / 8;
+    unsigned getStoreSize(unsigned BitsPerByte) const {
+      return (getSizeInBits() + BitsPerByte - 1) / BitsPerByte;
     }
 
     /// getStoreSizeInBits - Return the number of bits overwritten by a store
     /// of the specified value type.
-    unsigned getStoreSizeInBits() const {
-      return getStoreSize() * 8;
+    unsigned getStoreSizeInBits(unsigned BitsPerByte) const {
+      return getStoreSize(BitsPerByte) * BitsPerByte;
     }
 
     /// getRoundIntegerType - Rounds the bit-width of the given integer EVT up

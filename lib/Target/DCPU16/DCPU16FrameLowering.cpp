@@ -51,12 +51,8 @@ void DCPU16FrameLowering::emitPrologue(MachineFunction &MF) const {
   // Get the number of bytes to allocate from the FrameInfo.
   uint64_t StackSize = MFI->getStackSize();
 
-  uint64_t NumBytes = 0;
+  uint64_t NumBytes = StackSize - DCPU16FI->getCalleeSavedFrameSize();
   if (hasFP(MF)) {
-    // Calculate required stack adjustment
-    uint64_t FrameSize = StackSize - 2;
-    NumBytes = FrameSize - DCPU16FI->getCalleeSavedFrameSize();
-
     // Get the offset of the stack slot for the EBP register... which is
     // guaranteed to be the last slot by processFunctionBeforeFrameFinalized.
     // Update the frame offset adjustment.
@@ -74,9 +70,7 @@ void DCPU16FrameLowering::emitPrologue(MachineFunction &MF) const {
     for (MachineFunction::iterator I = llvm::next(MF.begin()), E = MF.end();
          I != E; ++I)
       I->addLiveIn(DCPU16::J);
-
-  } else
-    NumBytes = StackSize - DCPU16FI->getCalleeSavedFrameSize();
+  }
 
   // Skip the callee-saved push instructions.
   while (MBBI != MBB.end() && (MBBI->getOpcode() == DCPU16::PUSH16r))
@@ -121,20 +115,15 @@ void DCPU16FrameLowering::emitEpilogue(MachineFunction &MF,
     llvm_unreachable("Can only insert epilog into returning blocks");
   }
 
-  // Get the number of bytes to allocate from the FrameInfo
+  // Get the number of bytes to allocate from the FrameInfo.
   uint64_t StackSize = MFI->getStackSize();
   unsigned CSSize = DCPU16FI->getCalleeSavedFrameSize();
-  uint64_t NumBytes = 0;
+  uint64_t NumBytes = StackSize - CSSize;
 
   if (hasFP(MF)) {
-    // Calculate required stack adjustment
-    uint64_t FrameSize = StackSize - 2;
-    NumBytes = FrameSize - CSSize;
-
     // pop J.
     BuildMI(MBB, MBBI, DL, TII.get(DCPU16::POP16r), DCPU16::J);
-  } else
-    NumBytes = StackSize - CSSize;
+  }
 
   // Skip the callee-saved pop instructions.
   while (MBBI != MBB.begin()) {
@@ -220,4 +209,16 @@ DCPU16FrameLowering::restoreCalleeSavedRegisters(MachineBasicBlock &MBB,
     BuildMI(MBB, MI, DL, TII.get(DCPU16::POP16r), CSI[i].getReg());
 
   return true;
+}
+
+void
+DCPU16FrameLowering::processFunctionBeforeFrameFinalized(MachineFunction &MF)
+                                                                         const {
+  // Create a frame entry for the J register that must be saved.
+  if (hasFP(MF)) {
+    int FrameIdx = MF.getFrameInfo()->CreateFixedObject(1, -1, true);
+    (void)FrameIdx;
+    assert(FrameIdx == MF.getFrameInfo()->getObjectIndexBegin() &&
+           "Slot for J register must be last in order to be found!");
+  }
 }

@@ -1029,7 +1029,7 @@ NVPTXTargetLowering::LowerFormalArguments(SDValue Chain,
       ComputeValueVTs(*this, elemType, vtparts, &offsets, 0);
       unsigned totalsize = 0;
       for (unsigned j=0, je=vtparts.size(); j!=je; ++j)
-        totalsize += vtparts[j].getStoreSizeInBits();
+        totalsize += vtparts[j].getStoreSizeInBits(8);
       SDValue localcopy =  DAG.getFrameIndex(MF.getFrameInfo()->
                                       CreateStackObject(totalsize/8, 16, false),
                                              getPointerTy());
@@ -1047,7 +1047,7 @@ NVPTXTargetLowering::LowerFormalArguments(SDValue Chain,
                                     DAG.getConstant(sizesofar, getPointerTy()));
           theChains.push_back(DAG.getStore(Chain, dl, arg, addr,
                                         MachinePointerInfo(), false, false, 0));
-          sizesofar += tmpvt.getStoreSizeInBits()/8;
+          sizesofar += tmpvt.getStoreSize(8);
           ++idx;
         }
       }
@@ -1101,9 +1101,9 @@ NVPTXTargetLowering::LowerReturn(SDValue Chain, CallingConv::ID CallConv,
           DAG.getConstant(isABI ? sizesofar : idx, MVT::i32),
           tmpval);
       if (theValType.isVector())
-        sizesofar += theValType.getVectorElementType().getStoreSizeInBits()/8;
+        sizesofar += theValType.getVectorElementType().getStoreSize(8);
       else
-        sizesofar += theValType.getStoreSizeInBits()/8;
+        sizesofar += theValType.getStoreSize(8);
       ++idx;
     }
   }

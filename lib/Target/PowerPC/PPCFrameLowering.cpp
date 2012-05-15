@@ -777,8 +777,8 @@ PPCFrameLowering::processFunctionBeforeCalleeSavedScan(MachineFunction &MF,
       const TargetRegisterClass *GPRC = &PPC::GPRCRegClass;
       const TargetRegisterClass *G8RC = &PPC::G8RCRegClass;
       const TargetRegisterClass *RC = isPPC64 ? G8RC : GPRC;
-      RS->setScavengingFrameIndex(MFI->CreateStackObject(RC->getSize(),
-                                                         RC->getAlignment(),
+      RS->setScavengingFrameIndex(MFI->CreateStackObject(RC->getSize() / 8,
+                                                         RC->getAlignment() / 8,
                                                          false));
     }
 }
