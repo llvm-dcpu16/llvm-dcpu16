@@ -61,7 +61,7 @@ Now, let's translate C to DCPU16 assembly:
 
     bin/clang -ccc-host-triple dcpu16 -S fib.c -o fib.s
 
-We generate DCPU16 v1.7 ASM and generate GAS compatible syntax. Most online
+We generate DCPU16 v1.7 ASM with GAS compatible syntax. Most online
 assemblers won't work. Please use the [binutils port](https://github.com/frot/binutils-dcpu16) for DCPU16 to assemble and
 link your program and then use an DCPU16 v1.7 compatible emulator to test your
 program.
