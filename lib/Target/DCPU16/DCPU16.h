@@ -48,6 +48,9 @@ namespace llvm {
 
   FunctionPass *createDCPU16ISelDag(DCPU16TargetMachine &TM, CodeGenOpt::Level OptLevel);
   FunctionPass *createDCPU16Peephole();
+  FunctionPass *createDCPU16DuplicateBranch();
+
+  bool isBR_CC(unsigned Opcode);
 
 } // end namespace llvm;
 
