@@ -11,7 +11,7 @@ You can download a simple C SDK, which includes clang with the [binutils port fo
 It is Makefile based and contains a very simple C test program to demonstrate how you can develop your own program.
 
 ####Download####
-You can find different precompiled packages for linux [here](https://github.com/llvm-dcpu16/llvm-dcpu16/downloads)
+You can find different precompiled packages for linux [here](https://github.com/llvm-dcpu16/llvm-dcpu16/downloads).
 
 There is also a very simple [build script](https://github.com/downloads/llvm-dcpu16/llvm-dcpu16/build-sdk.sh), which will assemble all needed parts for building the SDK yourself.
 
