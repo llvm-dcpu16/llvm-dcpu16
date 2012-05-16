@@ -39,7 +39,7 @@
 using namespace llvm;
 
 DCPU16TargetLowering::DCPU16TargetLowering(DCPU16TargetMachine &tm) :
-  TargetLowering(tm, new TargetLoweringObjectFileELF()),
+  TargetLowering(tm, new TargetLoweringObjectFileCOFF()),
   Subtarget(*tm.getSubtargetImpl()), TM(tm) {
 
   TD = getTargetData();
