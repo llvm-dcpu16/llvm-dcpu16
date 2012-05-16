@@ -70,15 +70,17 @@ static cl::opt<bool> DisableDCPU16Peephole(
 
 static cl::opt<bool> DisableOptBrcc(
   "disable-dcpu16-brcc",
-  cl::Hidden, cl::ZeroOrMore, cl::init(false),
+  cl::Hidden,
+  cl::ZeroOrMore,
+  cl::init(false),
   cl::desc("Disable Conditional Branch Optimization")
 );
 
 namespace {
   struct DCPU16Peephole : public MachineFunctionPass {
-    const DCPU16InstrInfo    *QII;
+    const DCPU16InstrInfo     *QII;
     const DCPU16RegisterInfo  *QRI;
-    const MachineRegisterInfo  *MRI;
+    const MachineRegisterInfo *MRI;
 
   public:
     static char ID;
@@ -107,12 +109,40 @@ bool DCPU16Peephole::swapOptBrcc(MachineInstr *brInstr, MachineInstr *andInstr) 
   MachineOperand &andB = andInstr->getOperand(2);
   
   if(brA.isReg() && andA.isReg() && brB.isReg() && andB.isReg()) {
-    brA.setReg(andA.getReg());
-    brB.setReg(andB.getReg());
+    brA.ChangeToRegister(
+      andA.getReg(),
+      andA.isDef(),
+      andA.isImplicit(),
+      true,
+      true,
+      andA.isUndef(),
+      andA.isDebug()
+    );
+    
+    brB.ChangeToRegister(
+      andB.getReg(),
+      andB.isDef(),
+      andB.isImplicit(),
+      andB.isKill(),
+      andB.isDead(),
+      andB.isUndef(),
+      andB.isDebug()
+    );
+    
     return true;
   } else if(brA.isReg() && andA.isReg() && brB.isImm() && andB.isImm()) {
-    brA.setReg(andA.getReg());
+    brA.ChangeToRegister(
+      andA.getReg(),
+      andA.isDef(),
+      andA.isImplicit(),
+      true,
+      true,
+      andA.isUndef(),
+      andA.isDebug()
+    );
+    
     brB.setImm(andB.getImm());
+    
     return true;
   } else {
     assert("Encountered unexpected combination in swapOptBrcc");
@@ -120,19 +150,17 @@ bool DCPU16Peephole::swapOptBrcc(MachineInstr *brInstr, MachineInstr *andInstr) 
   }
 }
 
-void DCPU16Peephole::runOptBrcc(MachineBasicBlock *mbb) {
-  // Dump the block (remove when done)
+void DCPU16Peephole::runOptBrcc(MachineBasicBlock *mbb) {  
+  DenseMap<unsigned, MachineInstr *> peepholeMap;
+  
   mbb->dump();
   std::cout << std::endl;
-  
-  DenseMap<unsigned, MachineInstr *> peepholeMap;
   
   for(MachineBasicBlock::iterator miiIter = mbb->begin(); miiIter != mbb->end(); ++miiIter) {
     MachineInstr *instruction = miiIter;  
     
     switch(instruction->getOpcode()) {
       // And instructions
-      case DCPU16::AND16rr:
       case DCPU16::AND16ri: {
         assert(instruction->getNumOperands() == 4);
         
@@ -147,64 +175,25 @@ void DCPU16Peephole::runOptBrcc(MachineBasicBlock *mbb) {
       
       // Branch instructions
       case DCPU16::BR_CCri: {
-        switch(instruction->getOperand(0).getImm()) {
-          case DCPU16CC::COND_NE: {
-            assert(instruction->getNumOperands() == 4);
-            
-            if(instruction->getOperand(2).getImm() != 0) break; // Only works if comparing to 0
-            
-            unsigned activeReg = instruction->getOperand(1).getReg();
-            
-            if(MachineInstr *peepholeSource = peepholeMap.lookup(activeReg)) {
-              std::cout << "--------------------------------------------------------" << std::endl;
-              std::cout << "Optimisation opportunity:" << std::endl;
-              peepholeSource->dump();
-              instruction->dump();
-              std::cout << std::endl;
-              
-              // Change the IFN to IFB and swap the operands
-              instruction->getOperand(0).setImm(DCPU16CC::COND_B);
-              swapOptBrcc(instruction, peepholeSource);
-              
-              // Remove the AND from the block
-              peepholeSource->eraseFromParent();
-              
-              std::cout << "Changed to:" << std::endl;
-              instruction->dump();
-              std::cout << "--------------------------------------------------------" << std::endl << std::endl;;
-            }
-            
-            break;
-          }
+        assert(instruction->getNumOperands() == 4);
+        
+        if(instruction->getOperand(2).getImm() != 0) break; // Only works if comparing to 0
+        
+        MachineOperand &activeOperand = instruction->getOperand(1);
+        unsigned activeReg = activeOperand.getReg();
+        
+        if(MachineInstr *peepholeSource = peepholeMap.lookup(activeReg)) {              
+          // Change the branch instruction
+          if(instruction->getOperand(0).getImm() == DCPU16CC::COND_NE) {
+            instruction->getOperand(0).setImm(DCPU16CC::COND_B);
+          } else if(instruction->getOperand(0).getImm() == DCPU16CC::COND_E) {
+            instruction->getOperand(0).setImm(DCPU16CC::COND_C);
+          } else { break; }
           
-          case DCPU16CC::COND_E: {
-            assert(instruction->getNumOperands() == 4);
-            
-            if(instruction->getOperand(2).getImm() != 0) break; // Only works if comparing to 0
-            
-            unsigned activeReg = instruction->getOperand(1).getReg();
-            
-            if(MachineInstr *peepholeSource = peepholeMap.lookup(activeReg)) {
-              std::cout << "--------------------------------------------------------" << std::endl;
-              std::cout << "Optimisation opportunity:" << std::endl;
-              peepholeSource->dump();
-              instruction->dump();
-              std::cout << std::endl;
-              
-              // Change the IFN to IFB and swap the operands
-              instruction->getOperand(0).setImm(DCPU16CC::COND_C);
-              swapOptBrcc(instruction, peepholeSource);
-              
-              // Remove the AND from the block
-              peepholeSource->eraseFromParent();
-              
-              std::cout << "Changed to:" << std::endl;
-              instruction->dump();
-              std::cout << "--------------------------------------------------------" << std::endl << std::endl;;
-            }
-            
-            break;
-          }
+          swapOptBrcc(instruction, peepholeSource);
+          
+          // Remove the AND from the block
+          peepholeSource->eraseFromParent();
         }
       }
     }
