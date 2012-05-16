@@ -113,8 +113,8 @@ bool DCPU16Peephole::swapOptBrcc(MachineInstr *brInstr, MachineInstr *andInstr) 
       andA.getReg(),
       andA.isDef(),
       andA.isImplicit(),
-      true,
-      true,
+      andA.isKill(),
+      andA.isDead(),
       andA.isUndef(),
       andA.isDebug()
     );
@@ -135,8 +135,8 @@ bool DCPU16Peephole::swapOptBrcc(MachineInstr *brInstr, MachineInstr *andInstr) 
       andA.getReg(),
       andA.isDef(),
       andA.isImplicit(),
-      true,
-      true,
+      andA.isKill(),
+      andA.isDead(),
       andA.isUndef(),
       andA.isDebug()
     );
@@ -182,13 +182,16 @@ void DCPU16Peephole::runOptBrcc(MachineBasicBlock *mbb) {
         MachineOperand &activeOperand = instruction->getOperand(1);
         unsigned activeReg = activeOperand.getReg();
         
+		// Doesn't work if the variable is used after jumping
+        if(!activeOperand.isKill() && !activeOperand.isDead()) break;
+        
         if(MachineInstr *peepholeSource = peepholeMap.lookup(activeReg)) {              
           // Change the branch instruction
           if(instruction->getOperand(0).getImm() == DCPU16CC::COND_NE) {
             instruction->getOperand(0).setImm(DCPU16CC::COND_B);
           } else if(instruction->getOperand(0).getImm() == DCPU16CC::COND_E) {
             instruction->getOperand(0).setImm(DCPU16CC::COND_C);
-          } else { break; }
+          } else { peepholeMap.erase(activeReg); break; }
           
           swapOptBrcc(instruction, peepholeSource);
           
