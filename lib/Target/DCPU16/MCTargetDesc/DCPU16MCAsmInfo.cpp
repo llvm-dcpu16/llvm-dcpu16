@@ -32,6 +32,6 @@ DCPU16MCAsmInfo::DCPU16MCAsmInfo(const Target &T, StringRef TT) {
   // https://github.com/krasin/llvm-dcpu16/issues/52
   AlignDirective = "\t; .align\t";
   AllowNameToStartWithDigit = true;
-  UsesELFSectionDirectiveForBSS = true;
+  UsesELFSectionDirectiveForBSS = false;
   HasDotTypeDotSizeDirective = false;
 }
