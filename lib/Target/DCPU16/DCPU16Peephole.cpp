@@ -6,33 +6,8 @@
 // License. See LICENSE.TXT for details.
 //
 // This peephole pass optimizes in the following cases.
-// 1. Optimizes redundant sign extends for the following case
-//    Transform the following pattern
-//    %vreg170<def> = SXTW %vreg166
-//    ...
-//    %vreg176<def> = COPY %vreg170:subreg_loreg
+// 1. Optimises redundant AND+IFE/IFN patterns
 //
-//    Into
-//    %vreg176<def> = COPY vreg166
-//
-//  2. Optimizes redundant negation of predicates.
-//     %vreg15<def> = CMPGTrr %vreg6, %vreg2
-//     ...
-//     %vreg16<def> = NOT_p %vreg15<kill>
-//     ...
-//     JMP_c %vreg16<kill>, <BB#1>, %PC<imp-def,dead>
-//
-//     Into
-//     %vreg15<def> = CMPGTrr %vreg6, %vreg2;
-//     ...
-//     JMP_cNot %vreg15<kill>, <BB#1>, %PC<imp-def,dead>;
-//
-// Note: The peephole pass makes the instrucstions like
-// %vreg170<def> = SXTW %vreg166 or %vreg16<def> = NOT_p %vreg15<kill>
-// redundant and relies on some form of dead removal instrucions, like
-// DCE or DIE to actually eliminate them.
-
-
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "DCPU16-peephole"
@@ -152,9 +127,6 @@ bool DCPU16Peephole::swapOptBrcc(MachineInstr *brInstr, MachineInstr *andInstr) 
 
 void DCPU16Peephole::runOptBrcc(MachineBasicBlock *mbb) {  
   DenseMap<unsigned, MachineInstr *> peepholeMap;
-  
-  mbb->dump();
-  std::cout << std::endl;
   
   for(MachineBasicBlock::iterator miiIter = mbb->begin(); miiIter != mbb->end(); ++miiIter) {
     MachineInstr *instruction = miiIter;  
