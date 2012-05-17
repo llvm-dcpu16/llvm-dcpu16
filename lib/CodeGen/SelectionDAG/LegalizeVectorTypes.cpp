@@ -717,7 +717,7 @@ void DAGTypeLegalizer::SplitVecRes_INSERT_VECTOR_ELT(SDNode *N, SDValue &Lo,
                    false, false, false, 0);
 
   // Increment the pointer to the other part.
-  unsigned IncrementSize = Lo.getValueType().getSizeInBits() / 8;
+  unsigned IncrementSize = Lo.getValueType().getSizeInBits() / TLI.getTargetData()->getBitsPerByte();
   StackPtr = DAG.getNode(ISD::ADD, dl, StackPtr.getValueType(), StackPtr,
                          DAG.getIntPtrConstant(IncrementSize));
 
@@ -759,7 +759,7 @@ void DAGTypeLegalizer::SplitVecRes_LOAD(LoadSDNode *LD, SDValue &Lo,
                    LD->getPointerInfo(), LoMemVT, isVolatile, isNonTemporal,
                    isInvariant, Alignment);
 
-  unsigned IncrementSize = LoMemVT.getSizeInBits()/8;
+  unsigned IncrementSize = LoMemVT.getSizeInBits()/TLI.getTargetData()->getBitsPerByte();
   Ptr = DAG.getNode(ISD::ADD, dl, Ptr.getValueType(), Ptr,
                     DAG.getIntPtrConstant(IncrementSize));
   Hi = DAG.getLoad(ISD::UNINDEXED, ExtType, HiVT, dl, Ch, Ptr, Offset,
@@ -1127,7 +1127,7 @@ SDValue DAGTypeLegalizer::SplitVecOp_STORE(StoreSDNode *N, unsigned OpNo) {
   EVT LoMemVT, HiMemVT;
   GetSplitDestVTs(MemoryVT, LoMemVT, HiMemVT);
 
-  unsigned IncrementSize = LoMemVT.getSizeInBits()/8;
+  unsigned IncrementSize = LoMemVT.getSizeInBits()/TLI.getTargetData()->getBitsPerByte();
 
   if (isTruncating)
     Lo = DAG.getTruncStore(Ch, DL, Lo, Ptr, N->getPointerInfo(),
@@ -2223,7 +2223,7 @@ static EVT FindMemType(SelectionDAG& DAG, const TargetLowering &TLI,
   EVT WidenEltVT = WidenVT.getVectorElementType();
   unsigned WidenWidth = WidenVT.getSizeInBits();
   unsigned WidenEltWidth = WidenEltVT.getSizeInBits();
-  unsigned AlignInBits = Align*8;
+  unsigned AlignInBits = Align*TLI.getTargetData()->getBitsPerByte();
 
   // If we have one element to load/store, return it.
   EVT RetVT = WidenEltVT;
@@ -2360,7 +2360,7 @@ SDValue DAGTypeLegalizer::GenWidenVectorLoads(SmallVector<SDValue, 16> &LdChain,
   unsigned Offset = 0;
 
   while (LdWidth > 0) {
-    unsigned Increment = NewVTWidth / 8;
+    unsigned Increment = NewVTWidth / TLI.getTargetData()->getBitsPerByte();
     Offset += Increment;
     BasePtr = DAG.getNode(ISD::ADD, dl, BasePtr.getValueType(), BasePtr,
                           DAG.getIntPtrConstant(Increment));
@@ -2478,7 +2478,7 @@ DAGTypeLegalizer::GenWidenVectorExtLoads(SmallVector<SDValue, 16>& LdChain,
   // Load each element and widen
   unsigned WidenNumElts = WidenVT.getVectorNumElements();
   SmallVector<SDValue, 16> Ops(WidenNumElts);
-  unsigned Increment = LdEltVT.getSizeInBits() / 8;
+  unsigned Increment = LdEltVT.getSizeInBits() / TLI.getTargetData()->getBitsPerByte();
   Ops[0] = DAG.getExtLoad(ExtType, dl, EltVT, Chain, BasePtr,
                           LD->getPointerInfo(),
                           LdEltVT, isVolatile, isNonTemporal, Align);
@@ -2529,7 +2529,7 @@ void DAGTypeLegalizer::GenWidenVectorStores(SmallVector<SDValue, 16>& StChain,
     // Find the largest vector type we can store with
     EVT NewVT = FindMemType(DAG, TLI, StWidth, ValVT);
     unsigned NewVTWidth = NewVT.getSizeInBits();
-    unsigned Increment = NewVTWidth / 8;
+    unsigned Increment = NewVTWidth / TLI.getTargetData()->getBitsPerByte();
     if (NewVT.isVector()) {
       unsigned NumVTElts = NewVT.getVectorNumElements();
       do {
@@ -2596,7 +2596,7 @@ DAGTypeLegalizer::GenWidenVectorTruncStores(SmallVector<SDValue, 16>& StChain,
   // the store.
   EVT StEltVT  = StVT.getVectorElementType();
   EVT ValEltVT = ValVT.getVectorElementType();
-  unsigned Increment = ValEltVT.getSizeInBits() / 8;
+  unsigned Increment = ValEltVT.getSizeInBits() / TLI.getTargetData()->getBitsPerByte();
   unsigned NumElts = StVT.getVectorNumElements();
   SDValue EOp = DAG.getNode(ISD::EXTRACT_VECTOR_ELT, dl, ValEltVT, ValOp,
                             DAG.getIntPtrConstant(0));

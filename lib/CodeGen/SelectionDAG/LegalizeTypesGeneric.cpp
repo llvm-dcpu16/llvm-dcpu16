@@ -131,7 +131,7 @@ void DAGTypeLegalizer::ExpandRes_BITCAST(SDNode *N, SDValue &Lo, SDValue &Hi) {
                    false, false, false, 0);
 
   // Increment the pointer to the other half.
-  unsigned IncrementSize = NOutVT.getSizeInBits() / 8;
+  unsigned IncrementSize = NOutVT.getSizeInBits() / TLI.getTargetData()->getBitsPerByte();
   StackPtr = DAG.getNode(ISD::ADD, dl, StackPtr.getValueType(), StackPtr,
                          DAG.getIntPtrConstant(IncrementSize));
 
@@ -218,7 +218,7 @@ void DAGTypeLegalizer::ExpandRes_NormalLoad(SDNode *N, SDValue &Lo,
                    isVolatile, isNonTemporal, isInvariant, Alignment);
 
   // Increment the pointer to the other half.
-  unsigned IncrementSize = NVT.getSizeInBits() / 8;
+  unsigned IncrementSize = NVT.getSizeInBits() / TLI.getTargetData()->getBitsPerByte();
   Ptr = DAG.getNode(ISD::ADD, dl, Ptr.getValueType(), Ptr,
                     DAG.getIntPtrConstant(IncrementSize));
   Hi = DAG.getLoad(NVT, dl, Chain, Ptr,
@@ -398,7 +398,7 @@ SDValue DAGTypeLegalizer::ExpandOp_NormalStore(SDNode *N, unsigned OpNo) {
   bool isNonTemporal = St->isNonTemporal();
 
   assert(NVT.isByteSized() && "Expanded type not byte sized!");
-  unsigned IncrementSize = NVT.getSizeInBits() / 8;
+  unsigned IncrementSize = NVT.getSizeInBits() / TLI.getTargetData()->getBitsPerByte();
 
   SDValue Lo, Hi;
   GetExpandedOp(St->getValue(), Lo, Hi);
