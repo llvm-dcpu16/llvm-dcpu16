@@ -116,49 +116,49 @@ def ADJCALLSTACKUP   : Pseudo<(outs), (ins i16imm:$amt1, i16imm:$amt2),
 // $dst _can_ be $falseV
 let Constraints = "@earlyclobber $dst" in {
   // TODO: add more combinations, in particular memory access
-  def Select16rrrr : Pseudo<(outs GR16:$dst),
-                  (ins cc:$cc, GR16:$lhs, GR16:$rhs, GR16:$trueV, GR16:$falseV),
+  def Select16rrrr : Pseudo<(outs GEXR16:$dst),
+                  (ins cc:$cc, GEXR16:$lhs, GEXR16:$rhs, GEXR16:$trueV, GEXR16:$falseV),
                   "SET\t{$dst, $falseV}\n"
                   "\t$cc\t{$lhs, $rhs}\n"
                   "\tSET\t{$dst, $trueV}",
-                  [(set GR16:$dst,
-                    (DCPU16selectcc imm:$cc, GR16:$lhs, GR16:$rhs, GR16:$trueV, GR16:$falseV))]>;
-  def Select16rirr : Pseudo<(outs GR16:$dst),
-                  (ins cc:$cc, GR16:$lhs, i16imm:$rhs, GR16:$trueV, GR16:$falseV),
+                  [(set GEXR16:$dst,
+                    (DCPU16selectcc imm:$cc, GEXR16:$lhs, GEXR16:$rhs, GEXR16:$trueV, GEXR16:$falseV))]>;
+  def Select16rirr : Pseudo<(outs GEXR16:$dst),
+                  (ins cc:$cc, GEXR16:$lhs, i16imm:$rhs, GEXR16:$trueV, GEXR16:$falseV),
                   "SET\t{$dst, $falseV}\n"
                   "\t$cc\t{$lhs, $rhs}\n"
                   "\tSET\t{$dst, $trueV}",
-                  [(set GR16:$dst,
-                    (DCPU16selectcc imm:$cc, GR16:$lhs, imm:$rhs, GR16:$trueV, GR16:$falseV))]>;
-  def Select16irrr : Pseudo<(outs GR16:$dst),
-                  (ins cc:$cc, i16imm:$lhs, GR16:$rhs, GR16:$trueV, GR16:$falseV),
+                  [(set GEXR16:$dst,
+                    (DCPU16selectcc imm:$cc, GEXR16:$lhs, imm:$rhs, GEXR16:$trueV, GEXR16:$falseV))]>;
+  def Select16irrr : Pseudo<(outs GEXR16:$dst),
+                  (ins cc:$cc, i16imm:$lhs, GEXR16:$rhs, GEXR16:$trueV, GEXR16:$falseV),
                   "SET\t{$dst, $falseV}\n"
                   "\t$cc\t{$lhs, $rhs}\n"
                   "\tSET\t{$dst, $trueV}",
-                  [(set GR16:$dst,
-                    (DCPU16selectcc imm:$cc, imm:$lhs, GR16:$rhs, GR16:$trueV, GR16:$falseV))]>;
+                  [(set GEXR16:$dst,
+                    (DCPU16selectcc imm:$cc, imm:$lhs, GEXR16:$rhs, GEXR16:$trueV, GEXR16:$falseV))]>;
 
-  def Select16rrii : Pseudo<(outs GR16:$dst),
-                  (ins cc:$cc, GR16:$lhs, GR16:$rhs, i16imm:$trueV, i16imm:$falseV),
+  def Select16rrii : Pseudo<(outs GEXR16:$dst),
+                  (ins cc:$cc, GEXR16:$lhs, GEXR16:$rhs, i16imm:$trueV, i16imm:$falseV),
                   "SET\t{$dst, $falseV}\n"
                   "\t$cc\t{$lhs, $rhs}\n"
                   "\tSET\t{$dst, $trueV}",
-                  [(set GR16:$dst,
-                    (DCPU16selectcc imm:$cc, GR16:$lhs, GR16:$rhs, imm:$trueV, imm:$falseV))]>;
-  def Select16riii : Pseudo<(outs GR16:$dst),
-                  (ins cc:$cc, GR16:$lhs, i16imm:$rhs, i16imm:$trueV, i16imm:$falseV),
+                  [(set GEXR16:$dst,
+                    (DCPU16selectcc imm:$cc, GEXR16:$lhs, GEXR16:$rhs, imm:$trueV, imm:$falseV))]>;
+  def Select16riii : Pseudo<(outs GEXR16:$dst),
+                  (ins cc:$cc, GEXR16:$lhs, i16imm:$rhs, i16imm:$trueV, i16imm:$falseV),
                   "SET\t{$dst, $falseV}\n"
                   "\t$cc\t{$lhs, $rhs}\n"
                   "\tSET\t{$dst, $trueV}",
-                  [(set GR16:$dst,
-                    (DCPU16selectcc imm:$cc, GR16:$lhs, imm:$rhs, imm:$trueV, imm:$falseV))]>;
-  def Select16irii : Pseudo<(outs GR16:$dst),
-                  (ins cc:$cc, i16imm:$lhs, GR16:$rhs, i16imm:$trueV, i16imm:$falseV),
+                  [(set GEXR16:$dst,
+                    (DCPU16selectcc imm:$cc, GEXR16:$lhs, imm:$rhs, imm:$trueV, imm:$falseV))]>;
+  def Select16irii : Pseudo<(outs GEXR16:$dst),
+                  (ins cc:$cc, i16imm:$lhs, GEXR16:$rhs, i16imm:$trueV, i16imm:$falseV),
                   "SET\t{$dst, $falseV}\n"
                   "\t$cc\t{$lhs, $rhs}\n"
                   "\tSET\t{$dst, $trueV}",
-                  [(set GR16:$dst,
-                    (DCPU16selectcc imm:$cc, imm:$lhs, GR16:$rhs, imm:$trueV, imm:$falseV))]>;
+                  [(set GEXR16:$dst,
+                    (DCPU16selectcc imm:$cc, imm:$lhs, GEXR16:$rhs, imm:$trueV, imm:$falseV))]>;
 }
 
 let neverHasSideEffects = 1 in
@@ -190,9 +190,9 @@ let isBarrier = 1 in {
     def Bi  : I16ri<0, (outs), (ins i16imm:$brdst),
                     "br\t$brdst",
                     [(brind tblockaddress:$brdst)]>;
-    def Br  : I16rr<0, (outs), (ins GR16:$brdst),
+    def Br  : I16rr<0, (outs), (ins GEXR16:$brdst),
                     "SET\t{pc, $brdst}",
-                    [(brind GR16:$brdst)]>;
+                    [(brind GEXR16:$brdst)]>;
     def Bm  : I16rm<0, (outs), (ins memsrc:$brdst),
                     "SET\t{pc, $brdst}",
                     [(brind (load addr:$brdst))]>;
@@ -202,20 +202,20 @@ let isBarrier = 1 in {
 // Conditional branches
 // TODO: add memory versions
 def BR_CCrr : CJForm<0, 0,
-   (outs), (ins cc:$cc, GR16:$lhs, GR16:$rhs, jmptarget:$dst),
+   (outs), (ins cc:$cc, GEXR16:$lhs, GEXR16:$rhs, jmptarget:$dst),
    "$cc\t{$lhs, $rhs}\n"
    "\tSET\t{PC, $dst}",
-   [(DCPU16brcc imm:$cc, GR16:$lhs, GR16:$rhs, bb:$dst)]>;
+   [(DCPU16brcc imm:$cc, GEXR16:$lhs, GEXR16:$rhs, bb:$dst)]>;
 def BR_CCri : CJForm<0, 0,
-   (outs), (ins cc:$cc, GR16:$lhs, i16imm:$rhs, jmptarget:$dst),
+   (outs), (ins cc:$cc, GEXR16:$lhs, i16imm:$rhs, jmptarget:$dst),
    "$cc\t{$lhs, $rhs}\n"
    "\tSET\t{PC, $dst}",
-   [(DCPU16brcc imm:$cc, GR16:$lhs, imm:$rhs, bb:$dst)]>;
+   [(DCPU16brcc imm:$cc, GEXR16:$lhs, imm:$rhs, bb:$dst)]>;
 def BR_CCir : CJForm<0, 0,
-   (outs), (ins cc:$cc, i16imm:$lhs, GR16:$rhs, jmptarget:$dst),
+   (outs), (ins cc:$cc, i16imm:$lhs, GEXR16:$rhs, jmptarget:$dst),
    "$cc\t{$lhs, $rhs}\n"
    "\tSET\t{PC, $dst}",
-   [(DCPU16brcc imm:$cc, imm:$lhs, GR16:$rhs, bb:$dst)]>;
+   [(DCPU16brcc imm:$cc, imm:$lhs, GEXR16:$rhs, bb:$dst)]>;
 def BR_CCii : CJForm<0, 0,
    (outs), (ins cc:$cc, i16imm:$lhs, i16imm:$rhs, jmptarget:$dst),
    "$cc\t{$lhs, $rhs}\n"
@@ -237,8 +237,8 @@ let isCall = 1 in
                           (outs), (ins i16imm:$dst, variable_ops),
                           "JSR\t$dst", [(DCPU16call imm:$dst)]>;
     def CALLr     : II16r<0x0,
-                          (outs), (ins GR16:$dst, variable_ops),
-                          "JSR\t$dst", [(DCPU16call GR16:$dst)]>;
+                          (outs), (ins GEXR16:$dst, variable_ops),
+                          "JSR\t$dst", [(DCPU16call GEXR16:$dst)]>;
     def CALLm     : II16m<0x0,
                           (outs), (ins memsrc:$dst, variable_ops),
                           "JSR\t${dst:mem}", [(DCPU16call (load addr:$dst))]>;
@@ -251,11 +251,11 @@ let isCall = 1 in
 let Defs = [SP], Uses = [SP], neverHasSideEffects=1 in {
 let mayLoad = 1 in
 def POP16r   : IForm16<0x0, DstReg, SrcPostInc, Size2Bytes,
-                       (outs GR16:$reg), (ins), "SET\t{$reg, POP}", []>;
+                       (outs GEXR16:$reg), (ins), "SET\t{$reg, POP}", []>;
 
 let mayStore = 1 in
 def PUSH16r  : II16r<0x0,
-                     (outs), (ins GR16:$reg), "SET\t{PUSH, $reg}",[]>;
+                     (outs), (ins GEXR16:$reg), "SET\t{PUSH, $reg}",[]>;
 }
 
 //===----------------------------------------------------------------------===//
@@ -264,7 +264,7 @@ def PUSH16r  : II16r<0x0,
 // FIXME: Provide proper encoding!
 let neverHasSideEffects = 1 in {
 def MOV16rr : I16rr<0x0,
-                    (outs GR16:$dst), (ins GR16:$src),
+                    (outs GEXR16:$dst), (ins GEXR16:$src),
                     "SET\t{$dst, $src}",
                     []>;
 }
@@ -272,23 +272,23 @@ def MOV16rr : I16rr<0x0,
 // FIXME: Provide proper encoding!
 let isReMaterializable = 1, isAsCheapAsAMove = 1 in {
 def MOV16ri : I16ri<0x0,
-                    (outs GR16:$dst), (ins i16imm:$src),
+                    (outs GEXR16:$dst), (ins i16imm:$src),
                     "SET\t{$dst, $src}",
-                    [(set GR16:$dst, imm:$src)]>;
+                    [(set GEXR16:$dst, imm:$src)]>;
 }
 
 let canFoldAsLoad = 1, isReMaterializable = 1 in {
 def MOV16rm : I16rm<0x0,
-                    (outs GR16:$dst), (ins memsrc:$src),
+                    (outs GEXR16:$dst), (ins memsrc:$src),
                     "SET\t{$dst, $src}",
-                    [(set GR16:$dst, (load addr:$src))]>;
+                    [(set GEXR16:$dst, (load addr:$src))]>;
 }
 
 let canFoldAsLoad = 1, isReMaterializable = 1 in {
 def MOV16rmi8 : I16rm<0x0,
-                    (outs GR16:$dst), (ins memsrc:$src),
+                    (outs GEXR16:$dst), (ins memsrc:$src),
                     "SET\t{$dst, $src}",
-                    [(set GR16:$dst, (zextloadi8 addr:$src))]>;
+                    [(set GEXR16:$dst, (zextloadi8 addr:$src))]>;
 }
 
 def MOV16mi : I16mi<0x0,
@@ -297,9 +297,9 @@ def MOV16mi : I16mi<0x0,
                     [(store (i16 imm:$src), addr:$dst)]>;
 
 def MOV16mr : I16mr<0x0,
-                    (outs), (ins memdst:$dst, GR16:$src),
+                    (outs), (ins memdst:$dst, GEXR16:$src),
                     "SET\t{$dst, $src}",
-                    [(store GR16:$src, addr:$dst)]>;
+                    [(store GEXR16:$src, addr:$dst)]>;
 
 def MOV16mm : I16mm<0x0,
                     (outs), (ins memdst:$dst, memsrc:$src),
@@ -312,9 +312,9 @@ def MOV16mm : I16mm<0x0,
 multiclass BASIC_RR_IS_COM<bits<4> OpVal, string OpcStr, SDNode OpNode> {
   let Constraints = "$src = $dst", isCommutable = 1 in {
   def rr: I16rr<OpVal,
-                    (outs GR16:$dst), (ins GR16:$src, GR16:$src2),
+                    (outs GR16:$dst), (ins GR16:$src, GEXR16:$src2),
                     OpcStr#"\t{$dst, $src2}",
-                    [(set GR16:$dst, (OpNode GR16:$src, GR16:$src2)),
+                    [(set GR16:$dst, (OpNode GR16:$src, GEXR16:$src2)),
                      (implicit EX)]>;
   }
 }
@@ -322,9 +322,9 @@ multiclass BASIC_RR_IS_COM<bits<4> OpVal, string OpcStr, SDNode OpNode> {
 multiclass BASIC_RR_NON_COM<bits<4> OpVal, string OpcStr, SDNode OpNode> {
   let Constraints = "$src = $dst" in {
   def rr: I16rr<OpVal,
-                    (outs GR16:$dst), (ins GR16:$src, GR16:$src2),
+                    (outs GR16:$dst), (ins GR16:$src, GEXR16:$src2),
                     OpcStr#"\t{$dst, $src2}",
-                    [(set GR16:$dst, (OpNode GR16:$src, GR16:$src2)),
+                    [(set GR16:$dst, (OpNode GR16:$src, GEXR16:$src2)),
                      (implicit EX)]>;
   }
 }
@@ -344,9 +344,9 @@ multiclass BASIC_NORMAL<bits<4> OpVal, string OpcStr, SDNode OpNode> {
   }
   let Constraints = "" in {
   def mr: I16mr<OpVal,
-                    (outs), (ins memdst:$dst, GR16:$src),
+                    (outs), (ins memdst:$dst, GEXR16:$src),
                     OpcStr#"\t{$dst, $src}",
-                    [(store (OpNode (load addr:$dst), GR16:$src), addr:$dst),
+                    [(store (OpNode (load addr:$dst), GEXR16:$src), addr:$dst),
                      (implicit EX)]>;
   def mi: I16mi<OpVal,
                     (outs), (ins memdst:$dst, i16imm:$src),

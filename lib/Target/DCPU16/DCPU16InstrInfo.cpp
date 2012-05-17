@@ -47,7 +47,7 @@ void DCPU16InstrInfo::storeRegToStackSlot(MachineBasicBlock &MBB,
                             MFI.getObjectSize(FrameIdx),
                             MFI.getObjectAlignment(FrameIdx));
 
-  if (RC == &DCPU16::GR16RegClass)
+  if (RC == &DCPU16::GR16RegClass || RC == &DCPU16::GEXR16RegClass)
     BuildMI(MBB, MI, DL, get(DCPU16::MOV16mr))
       .addFrameIndex(FrameIdx).addImm(0)
       .addReg(SrcReg, getKillRegState(isKill)).addMemOperand(MMO);
@@ -71,7 +71,7 @@ void DCPU16InstrInfo::loadRegFromStackSlot(MachineBasicBlock &MBB,
                             MFI.getObjectSize(FrameIdx),
                             MFI.getObjectAlignment(FrameIdx));
 
-  if (RC == &DCPU16::GR16RegClass)
+  if (RC == &DCPU16::GR16RegClass || RC == &DCPU16::GEXR16RegClass)
     BuildMI(MBB, MI, DL, get(DCPU16::MOV16rm))
       .addReg(DestReg).addFrameIndex(FrameIdx).addImm(0).addMemOperand(MMO);
   else

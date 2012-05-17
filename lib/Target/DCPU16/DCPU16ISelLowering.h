@@ -30,12 +30,6 @@ namespace llvm {
       /// Same as RET_FLAG, but used for returning from ISRs.
       RETI_FLAG,
 
-      /// Y = R{R,L}A X, rotate right (left) arithmetically
-      RRA, RLA,
-
-      /// Y = RRC X, rotate right via carry
-      RRC,
-
       /// CALL - These operations represent an abstract call
       /// instruction, which includes a bunch of information.
       CALL,
@@ -81,6 +75,8 @@ namespace llvm {
     SDValue LowerSIGN_EXTEND(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerRETURNADDR(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerFRAMEADDR(SDValue Op, SelectionDAG &DAG) const;
+    SDValue LowerROTL(SDValue Op, SelectionDAG &DAG) const;
+    SDValue LowerROTR(SDValue Op, SelectionDAG &DAG) const;
     SDValue getReturnAddressFrameIndex(SelectionDAG &DAG) const;
 
     TargetLowering::ConstraintType

@@ -39,9 +39,11 @@ def GR16 : RegisterClass<"DCPU16", [i16], 16,
 // Stack pointer register
 def SPR16 : RegisterClass<"DCPU16", [i16], 16,
   (add SP)>;
-  
+
 // Overflow register
 def EXR16 : RegisterClass<"DCPU16", [i16], 16,
-  (add EX)> {
-   let isAllocatable = 0;
-}
+  (add EX)>;
+
+// Both volatile registers and EX
+def GEXR16 : RegisterClass<"DCPU16", [i16], 16,
+  (add GR16, EXR16)>;
