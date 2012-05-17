@@ -96,8 +96,8 @@ DCPU16TargetLowering::DCPU16TargetLowering(DCPU16TargetMachine &tm) :
   // FIXME: Implement efficiently multiplication by a constant
   setOperationAction(ISD::MULHS,            MVT::i16,   Expand);
   setOperationAction(ISD::MULHU,            MVT::i16,   Expand);
-  setOperationAction(ISD::SMUL_LOHI,        MVT::i16,   Expand);
-  setOperationAction(ISD::UMUL_LOHI,        MVT::i16,   Expand);
+  setOperationAction(ISD::SMUL_LOHI,        MVT::i16,   Custom);
+  setOperationAction(ISD::UMUL_LOHI,        MVT::i16,   Custom);
 
   setOperationAction(ISD::UDIVREM,          MVT::i16,   Expand);
   setOperationAction(ISD::SDIVREM,          MVT::i16,   Expand);
@@ -119,6 +119,8 @@ SDValue DCPU16TargetLowering::LowerOperation(SDValue Op,
   case ISD::FRAMEADDR:        return LowerFRAMEADDR(Op, DAG);
   case ISD::ROTL:             return LowerROTL(Op, DAG);
   case ISD::ROTR:             return LowerROTR(Op, DAG);
+  case ISD::SMUL_LOHI:        return LowerMUL_LOHI(Op, DAG, true);
+  case ISD::UMUL_LOHI:        return LowerMUL_LOHI(Op, DAG, false);
   default:
     llvm_unreachable("unimplemented operand");
   }
@@ -769,6 +771,25 @@ SDValue DCPU16TargetLowering::LowerROTR(SDValue Op,
   return DAG.getNode(ISD::OR, dl, VTs, Ops2, 2);
 }
 
+SDValue DCPU16TargetLowering::LowerMUL_LOHI(SDValue Op,
+                                            SelectionDAG &DAG,
+                                            bool Signed) const {
+  EVT VT = Op.getValueType();
+  DebugLoc dl = Op.getDebugLoc();
+
+  SDValue LHS    = Op.getOperand(0);
+  SDValue RHS    = Op.getOperand(1);
+
+  SDVTList VTs = DAG.getVTList(VT);
+  SDValue Ops[] = {LHS, RHS};
+  SDValue Lo = DAG.getNode(Signed ? DCPU16ISD::SMUL : ISD::MUL,
+                           dl, VTs, Ops, 2);
+  SDValue Hi = DAG.getCopyFromReg(Lo, dl, DCPU16::EX, VT);
+
+  SDValue Ops2[] = {Lo, Hi};
+  return DAG.getMergeValues(Ops2, 2, dl);
+}
+
 const char *DCPU16TargetLowering::getTargetNodeName(unsigned Opcode) const {
   switch (Opcode) {
   default: return NULL;
@@ -778,5 +799,6 @@ const char *DCPU16TargetLowering::getTargetNodeName(unsigned Opcode) const {
   case DCPU16ISD::Wrapper:            return "DCPU16ISD::Wrapper";
   case DCPU16ISD::BR_CC:              return "DCPU16ISD::BR_CC";
   case DCPU16ISD::SELECT_CC:          return "DCPU16ISD::SELECT_CC";
+  case DCPU16ISD::SMUL:               return "DCPU16ISD::SMUL";
   }
 }

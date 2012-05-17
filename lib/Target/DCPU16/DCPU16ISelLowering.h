@@ -46,7 +46,11 @@ namespace llvm {
       /// SELECT_CC - Operand 0 is the condition code, operand 1 is the LHS,
       /// operand 2 is the RHS, operand 3 is the value if the condition is true
       /// and operand 4 is the value when the condition is false.
-      SELECT_CC
+      SELECT_CC,
+
+      /// Special multiplication operator that produces signed overflow.
+      /// If unsigned overflow is desired, just use the normal ISD::MUL.
+      SMUL
     };
   }
 
@@ -77,6 +81,7 @@ namespace llvm {
     SDValue LowerFRAMEADDR(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerROTL(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerROTR(SDValue Op, SelectionDAG &DAG) const;
+    SDValue LowerMUL_LOHI(SDValue Op, SelectionDAG &DAG, bool Signed) const;
     SDValue getReturnAddressFrameIndex(SelectionDAG &DAG) const;
 
     TargetLowering::ConstraintType
