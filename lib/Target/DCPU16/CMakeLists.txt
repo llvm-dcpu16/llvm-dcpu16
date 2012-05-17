@@ -20,6 +20,7 @@ add_llvm_target(DCPU16CodeGen
   DCPU16SelectionDAGInfo.cpp
   DCPU16AsmPrinter.cpp
   DCPU16MCInstLower.cpp
+  DCPU16Peephole.cpp
   )
 
 add_subdirectory(InstPrinter)

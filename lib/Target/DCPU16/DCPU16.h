@@ -46,8 +46,8 @@ namespace llvm {
   class FunctionPass;
   class formatted_raw_ostream;
 
-  FunctionPass *createDCPU16ISelDag(DCPU16TargetMachine &TM,
-                                    CodeGenOpt::Level OptLevel);
+  FunctionPass *createDCPU16ISelDag(DCPU16TargetMachine &TM, CodeGenOpt::Level OptLevel);
+  FunctionPass *createDCPU16Peephole();
 
 } // end namespace llvm;
 
