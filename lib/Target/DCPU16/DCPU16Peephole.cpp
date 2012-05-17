@@ -83,7 +83,7 @@ bool DCPU16Peephole::swapOptBrcc(MachineInstr *brInstr, MachineInstr *andInstr) 
   MachineOperand &andA = andInstr->getOperand(1);
   MachineOperand &andB = andInstr->getOperand(2);
   
-  if(brA.isReg() && andA.isReg() && brB.isReg() && andB.isReg()) {
+  if(andB.isReg()) {
     brA.ChangeToRegister(
       andA.getReg(),
       andA.isDef(),
@@ -105,7 +105,7 @@ bool DCPU16Peephole::swapOptBrcc(MachineInstr *brInstr, MachineInstr *andInstr) 
     );
     
     return true;
-  } else if(brA.isReg() && andA.isReg() && brB.isImm() && andB.isImm()) {
+  } else if(andB.isImm()) {
     brA.ChangeToRegister(
       andA.getReg(),
       andA.isDef(),
@@ -116,7 +116,7 @@ bool DCPU16Peephole::swapOptBrcc(MachineInstr *brInstr, MachineInstr *andInstr) 
       andA.isDebug()
     );
     
-    brB.setImm(andB.getImm());
+    brB.ChangeToImmediate(andB.getImm());
     
     return true;
   } else {
@@ -133,7 +133,8 @@ void DCPU16Peephole::runOptBrcc(MachineBasicBlock *mbb) {
     
     switch(instruction->getOpcode()) {
       // And instructions
-      case DCPU16::AND16ri: {
+      case DCPU16::AND16ri:
+      case DCPU16::AND16rr: {
         assert(instruction->getNumOperands() == 4);
         
         MachineOperand &result = instruction->getOperand(0);
