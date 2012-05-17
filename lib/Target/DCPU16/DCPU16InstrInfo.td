@@ -36,7 +36,8 @@ def SDT_DCPU16SelectCC     : SDTypeProfile<1, 5, [SDTCisSameAs<0, 1>,
                                                   SDTCisSameAs<3, 4>,
                                                   SDTCisSameAs<4, 5>,
                                                   SDTCisVT<5, i16>]>;
-def SDT_DCPU16Shift        : SDTypeProfile<1, 2, [SDTCisSameAs<0, 1>,
+def SDT_DCPU16BinOp        : SDTypeProfile<1, 2, [SDTCisSameAs<0, 1>,
+                                                  SDTCisSameAs<1, 2>,
                                                   SDTCisI16<2>]>;
 
 //===----------------------------------------------------------------------===//
@@ -47,18 +48,19 @@ def DCPU16retflag  : SDNode<"DCPU16ISD::RET_FLAG", SDTNone,
 def DCPU16retiflag : SDNode<"DCPU16ISD::RETI_FLAG", SDTNone,
                        [SDNPHasChain, SDNPOptInGlue]>;
 
-def DCPU16call    : SDNode<"DCPU16ISD::CALL", SDT_DCPU16Call,
-                     [SDNPHasChain, SDNPOutGlue, SDNPOptInGlue, SDNPVariadic]>;
+def DCPU16call     : SDNode<"DCPU16ISD::CALL", SDT_DCPU16Call,
+                       [SDNPHasChain, SDNPOutGlue, SDNPOptInGlue, SDNPVariadic]>;
 def DCPU16callseq_start :
-                 SDNode<"ISD::CALLSEQ_START", SDT_DCPU16CallSeqStart,
-                        [SDNPHasChain, SDNPOutGlue]>;
+                     SDNode<"ISD::CALLSEQ_START", SDT_DCPU16CallSeqStart,
+                       [SDNPHasChain, SDNPOutGlue]>;
 def DCPU16callseq_end :
-                 SDNode<"ISD::CALLSEQ_END",   SDT_DCPU16CallSeqEnd,
-                        [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue]>;
-def DCPU16Wrapper : SDNode<"DCPU16ISD::Wrapper", SDT_DCPU16Wrapper>;
-def DCPU16brcc    : SDNode<"DCPU16ISD::BR_CC", SDT_DCPU16BrCC,
-                            [SDNPHasChain]>;
-def DCPU16selectcc: SDNode<"DCPU16ISD::SELECT_CC", SDT_DCPU16SelectCC, []>;
+                     SDNode<"ISD::CALLSEQ_END",   SDT_DCPU16CallSeqEnd,
+                       [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue]>;
+def DCPU16Wrapper  : SDNode<"DCPU16ISD::Wrapper", SDT_DCPU16Wrapper>;
+def DCPU16brcc     : SDNode<"DCPU16ISD::BR_CC", SDT_DCPU16BrCC,
+                       [SDNPHasChain]>;
+def DCPU16selectcc : SDNode<"DCPU16ISD::SELECT_CC", SDT_DCPU16SelectCC, []>;
+def DCPU16smul     : SDNode<"DCPU16ISD::SMUL", SDT_DCPU16BinOp, []>;
 
 //===----------------------------------------------------------------------===//
 // DCPU16 Operand Definitions.
@@ -380,7 +382,9 @@ let Defs = [EX] in {
   defm OR16    : BASIC_RR_IS_COM <0x0, "BOR", or>,   BASIC_NORMAL<0x0, "BOR", or>;
   defm XOR16   : BASIC_RR_IS_COM <0x0, "XOR", xor>,  BASIC_NORMAL<0x0, "XOR", xor>;
   defm SUB16   : BASIC_RR_NON_COM<0x0, "SUB", sub>,  BASIC_NORMAL<0x0, "SUB", sub>;
-  defm MUL16   : BASIC_RR_IS_COM <0x0, "MUL", mul>,  BASIC_NORMAL<0x0, "MUL", mul>;
+  defm UMUL16  : BASIC_RR_IS_COM <0x0, "MUL", mul>,  BASIC_NORMAL<0x0, "MUL", mul>;
+  defm SMUL16  : BASIC_RR_IS_COM <0x0, "MLI", DCPU16smul>,
+                   BASIC_NORMAL<0x0, "MLI", DCPU16smul>;
   defm DIV16   : BASIC_RR_NON_COM<0x0, "DIV", udiv>, BASIC_NORMAL<0x0, "DIV", udiv>;
   defm DVI16   : BASIC_RR_NON_COM<0x0, "DVI", sdiv>, BASIC_NORMAL<0x0, "DVI", sdiv>;
   defm SRL16   : BASIC_RR_NON_COM<0x0, "SHR", srl>,  BASIC_NORMAL<0x0, "SHR", srl>;
