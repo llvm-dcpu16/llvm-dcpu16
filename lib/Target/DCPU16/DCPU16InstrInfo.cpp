@@ -78,6 +78,19 @@ void DCPU16InstrInfo::loadRegFromStackSlot(MachineBasicBlock &MBB,
     llvm_unreachable("Cannot store this register to stack slot!");
 }
 
+unsigned DCPU16InstrInfo::isStoreToStackSlot(const MachineInstr *MI,
+                                            int &FrameIndex) const {
+  if (MI->getOpcode() == DCPU16::MOV16mr) {
+    if (MI->getOperand(0).isFI()) {
+      // MOV [SP+idx], reg
+      // operand 0 is frame index, 1 is immediate 0, 2 is register
+      FrameIndex = MI->getOperand(0).getIndex();
+      return MI->getOperand(2).getReg();
+    }
+  }
+  return 0;
+}
+
 void DCPU16InstrInfo::copyPhysReg(MachineBasicBlock &MBB,
                                   MachineBasicBlock::iterator I, DebugLoc DL,
                                   unsigned DestReg, unsigned SrcReg,
