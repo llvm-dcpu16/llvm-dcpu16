@@ -104,27 +104,29 @@ bool DCPU16DuplicateBranch::runOnMachineFunction(MachineFunction &MF) {
     MachineBasicBlock* MBB = MBBb;
 
     // Traverse the basic block.
-    for (MachineBasicBlock::iterator MII = MBB->begin(), MIIe = MBB->end();
-         MII != MIIe; ++MII) {
-
+    MachineBasicBlock::iterator MII = MBB->begin(), MIIe = MBB->end();
+    while (MII != MIIe) {
       MachineInstr *MI = MII;
 
       if (isBR_CC(MI->getOpcode())) {
         if (prevBRCC != NULL
             && isSameBR_CC(prevBRCC, MI)) {
 
-          MII->eraseFromParent();
-          // Restart loop
-          MII = MBB->begin();
-          prevBRCC = NULL;
-
+          MachineBasicBlock::iterator oldMII = MII;
+          ++MII;
+          oldMII->eraseFromParent();
           Changed = true;
+
+          // Step over the additional ++MII;
+          continue;
         } else {
           prevBRCC = MI;
         }
       } else {
         prevBRCC = NULL;
       }
+
+      ++MII;
     }
   }
 
