@@ -40,7 +40,6 @@ DCPU16RegisterInfo::DCPU16RegisterInfo(DCPU16TargetMachine &tm,
 
 const uint16_t*
 DCPU16RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
-  const TargetFrameLowering *TFI = MF->getTarget().getFrameLowering();
   const Function* F = MF->getFunction();
   static const uint16_t CalleeSavedRegs[] = {
     DCPU16::X, DCPU16::Y, DCPU16::Z, DCPU16::I, DCPU16::J,

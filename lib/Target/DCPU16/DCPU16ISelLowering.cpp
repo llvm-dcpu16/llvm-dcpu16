@@ -46,6 +46,7 @@ DCPU16TargetLowering::DCPU16TargetLowering(DCPU16TargetMachine &tm) :
 
   // Set up the register classes.
   addRegisterClass(MVT::i16, &DCPU16::GR16RegClass);
+  addRegisterClass(MVT::i16, &DCPU16::GEXR16RegClass);
 
   // Compute derived properties from the register classes
   computeRegisterProperties();
@@ -65,8 +66,8 @@ DCPU16TargetLowering::DCPU16TargetLowering(DCPU16TargetMachine &tm) :
   setLoadExtAction(ISD::ZEXTLOAD, MVT::i1,  Promote);
   setLoadExtAction(ISD::SEXTLOAD, MVT::i16, Expand);
 
-  setOperationAction(ISD::ROTL,             MVT::i16,   Expand);
-  setOperationAction(ISD::ROTR,             MVT::i16,   Expand);
+  setOperationAction(ISD::ROTL,             MVT::i16,   Custom);
+  setOperationAction(ISD::ROTR,             MVT::i16,   Custom);
   setOperationAction(ISD::BSWAP,            MVT::i16,   Expand);
   setOperationAction(ISD::GlobalAddress,    MVT::i16,   Custom);
   setOperationAction(ISD::ExternalSymbol,   MVT::i16,   Custom);
@@ -116,6 +117,8 @@ SDValue DCPU16TargetLowering::LowerOperation(SDValue Op,
   case ISD::SIGN_EXTEND:      return LowerSIGN_EXTEND(Op, DAG);
   case ISD::RETURNADDR:       return LowerRETURNADDR(Op, DAG);
   case ISD::FRAMEADDR:        return LowerFRAMEADDR(Op, DAG);
+  case ISD::ROTL:             return LowerROTL(Op, DAG);
+  case ISD::ROTR:             return LowerROTR(Op, DAG);
   default:
     llvm_unreachable("unimplemented operand");
   }
@@ -734,14 +737,43 @@ SDValue DCPU16TargetLowering::LowerFRAMEADDR(SDValue Op,
   return FrameAddr;
 }
 
+SDValue DCPU16TargetLowering::LowerROTL(SDValue Op,
+                                        SelectionDAG &DAG) const {
+  EVT VT = Op.getValueType();
+  DebugLoc dl = Op.getDebugLoc();
+
+  SDValue LHS    = Op.getOperand(0);
+  SDValue RHS    = Op.getOperand(1);
+
+  SDVTList VTs = DAG.getVTList(VT);
+  SDValue Ops[] = {LHS, RHS};
+  SDValue SHLNode = DAG.getNode(ISD::SHL, dl, VTs, Ops, 2);
+
+  SDValue Ops2[] = {SHLNode, DAG.getCopyFromReg(SHLNode, dl, DCPU16::EX, VT)};
+  return DAG.getNode(ISD::OR, dl, VTs, Ops2, 2);
+}
+
+SDValue DCPU16TargetLowering::LowerROTR(SDValue Op,
+                                        SelectionDAG &DAG) const {
+  EVT VT = Op.getValueType();
+  DebugLoc dl = Op.getDebugLoc();
+
+  SDValue LHS    = Op.getOperand(0);
+  SDValue RHS    = Op.getOperand(1);
+
+  SDVTList VTs = DAG.getVTList(VT);
+  SDValue Ops[] = {LHS, RHS};
+  SDValue SRLNode = DAG.getNode(ISD::SRL, dl, VTs, Ops, 2);
+
+  SDValue Ops2[] = {SRLNode, DAG.getCopyFromReg(SRLNode, dl, DCPU16::EX, VT)};
+  return DAG.getNode(ISD::OR, dl, VTs, Ops2, 2);
+}
+
 const char *DCPU16TargetLowering::getTargetNodeName(unsigned Opcode) const {
   switch (Opcode) {
   default: return NULL;
   case DCPU16ISD::RET_FLAG:           return "DCPU16ISD::RET_FLAG";
   case DCPU16ISD::RETI_FLAG:          return "DCPU16ISD::RETI_FLAG";
-  case DCPU16ISD::RRA:                return "DCPU16ISD::RRA";
-  case DCPU16ISD::RLA:                return "DCPU16ISD::RLA";
-  case DCPU16ISD::RRC:                return "DCPU16ISD::RRC";
   case DCPU16ISD::CALL:               return "DCPU16ISD::CALL";
   case DCPU16ISD::Wrapper:            return "DCPU16ISD::Wrapper";
   case DCPU16ISD::BR_CC:              return "DCPU16ISD::BR_CC";
