@@ -120,7 +120,7 @@ bool DCPU16Peephole::swapOptBrcc(MachineInstr *brInstr, MachineInstr *andInstr) 
     
     return true;
   } else {
-    assert("Encountered unexpected combination in swapOptBrcc");
+    assert(0 && "Encountered unexpected combination in swapOptBrcc");
     return false;
   }
 }
