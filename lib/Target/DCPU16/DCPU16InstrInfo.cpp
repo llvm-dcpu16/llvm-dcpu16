@@ -72,10 +72,23 @@ void DCPU16InstrInfo::loadRegFromStackSlot(MachineBasicBlock &MBB,
                             MFI.getObjectAlignment(FrameIdx));
 
   if (RC == &DCPU16::GR16RegClass || RC == &DCPU16::GEXR16RegClass)
-    BuildMI(MBB, MI, DL, get(DCPU16::MOV16rm))
-      .addReg(DestReg).addFrameIndex(FrameIdx).addImm(0).addMemOperand(MMO);
+    BuildMI(MBB, MI, DL, get(DCPU16::MOV16rm), DestReg)
+      .addFrameIndex(FrameIdx).addImm(0).addMemOperand(MMO);
   else
     llvm_unreachable("Cannot store this register to stack slot!");
+}
+
+unsigned DCPU16InstrInfo::isLoadFromStackSlot(const MachineInstr *MI,
+                                              int &FrameIndex) const {
+  if (MI->getOpcode() == DCPU16::MOV16rm) {
+    if (MI->getOperand(1).isFI()) {
+      // MOV reg, [SP+idx]
+      // operand 0 is dest reg, 1 is frame index, 2 immediate 0
+      FrameIndex = MI->getOperand(1).getIndex();
+      return MI->getOperand(0).getReg();
+    }
+  }
+  return 0;
 }
 
 unsigned DCPU16InstrInfo::isStoreToStackSlot(const MachineInstr *MI,
