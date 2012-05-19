@@ -48,9 +48,9 @@ namespace llvm {
       /// and operand 4 is the value when the condition is false.
       SELECT_CC,
 
-      /// Special multiplication operator that produces signed overflow.
-      /// If unsigned overflow is desired, just use the normal ISD::MUL.
-      SMUL
+      /// Special multiplication operators that produce overflow and a chain.
+      /// Operand 0 is the chain, Operands 1 and 2 are the LHS and RHS.
+      SMUL, UMUL
     };
   }
 

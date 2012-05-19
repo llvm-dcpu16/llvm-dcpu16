@@ -60,7 +60,10 @@ def DCPU16Wrapper  : SDNode<"DCPU16ISD::Wrapper", SDT_DCPU16Wrapper>;
 def DCPU16brcc     : SDNode<"DCPU16ISD::BR_CC", SDT_DCPU16BrCC,
                        [SDNPHasChain]>;
 def DCPU16selectcc : SDNode<"DCPU16ISD::SELECT_CC", SDT_DCPU16SelectCC, []>;
-def DCPU16smul     : SDNode<"DCPU16ISD::SMUL", SDT_DCPU16BinOp, []>;
+def DCPU16smul     : SDNode<"DCPU16ISD::SMUL", SDT_DCPU16BinOp,
+                       [SDNPHasChain, SDNPOutGlue]>;
+def DCPU16umul     : SDNode<"DCPU16ISD::UMUL", SDT_DCPU16BinOp,
+                       [SDNPHasChain, SDNPOutGlue]>;
 
 //===----------------------------------------------------------------------===//
 // DCPU16 Operand Definitions.
@@ -382,9 +385,11 @@ let Defs = [EX] in {
   defm OR16    : BASIC_RR_IS_COM <0x0, "BOR", or>,   BASIC_NORMAL<0x0, "BOR", or>;
   defm XOR16   : BASIC_RR_IS_COM <0x0, "XOR", xor>,  BASIC_NORMAL<0x0, "XOR", xor>;
   defm SUB16   : BASIC_RR_NON_COM<0x0, "SUB", sub>,  BASIC_NORMAL<0x0, "SUB", sub>;
-  defm UMUL16  : BASIC_RR_IS_COM <0x0, "MUL", mul>,  BASIC_NORMAL<0x0, "MUL", mul>;
+  defm MUL16   : BASIC_RR_IS_COM <0x0, "MUL", mul>,  BASIC_NORMAL<0x0, "MUL", mul>;
   defm SMUL16  : BASIC_RR_IS_COM <0x0, "MLI", DCPU16smul>,
                    BASIC_NORMAL<0x0, "MLI", DCPU16smul>;
+  defm UMUL16  : BASIC_RR_IS_COM <0x0, "MUL", DCPU16umul>,
+                   BASIC_NORMAL<0x0, "MUL", DCPU16umul>;
   defm DIV16   : BASIC_RR_NON_COM<0x0, "DIV", udiv>, BASIC_NORMAL<0x0, "DIV", udiv>;
   defm DVI16   : BASIC_RR_NON_COM<0x0, "DVI", sdiv>, BASIC_NORMAL<0x0, "DVI", sdiv>;
   defm SRL16   : BASIC_RR_NON_COM<0x0, "SHR", srl>,  BASIC_NORMAL<0x0, "SHR", srl>;

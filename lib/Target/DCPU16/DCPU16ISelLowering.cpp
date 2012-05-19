@@ -774,17 +774,18 @@ SDValue DCPU16TargetLowering::LowerROTR(SDValue Op,
 SDValue DCPU16TargetLowering::LowerMUL_LOHI(SDValue Op,
                                             SelectionDAG &DAG,
                                             bool Signed) const {
+  SDValue Chain = DAG.getEntryNode();
   EVT VT = Op.getValueType();
   DebugLoc dl = Op.getDebugLoc();
 
   SDValue LHS    = Op.getOperand(0);
   SDValue RHS    = Op.getOperand(1);
 
-  SDVTList VTs = DAG.getVTList(VT);
-  SDValue Ops[] = {LHS, RHS};
-  SDValue Lo = DAG.getNode(Signed ? DCPU16ISD::SMUL : ISD::MUL,
-                           dl, VTs, Ops, 2);
-  SDValue Hi = DAG.getCopyFromReg(Lo, dl, DCPU16::EX, VT);
+  SDVTList VTs = DAG.getVTList(VT, MVT::Other, MVT::Glue);
+  SDValue Ops[] = {Chain, LHS, RHS};
+  SDValue Lo = DAG.getNode(Signed ? DCPU16ISD::SMUL : DCPU16ISD::UMUL,
+                           dl, VTs, Ops, array_lengthof(Ops));
+  SDValue Hi = DAG.getCopyFromReg(Lo.getValue(1), dl, DCPU16::EX, VT, Lo.getValue(2));
 
   SDValue Ops2[] = {Lo, Hi};
   return DAG.getMergeValues(Ops2, 2, dl);
@@ -800,5 +801,6 @@ const char *DCPU16TargetLowering::getTargetNodeName(unsigned Opcode) const {
   case DCPU16ISD::BR_CC:              return "DCPU16ISD::BR_CC";
   case DCPU16ISD::SELECT_CC:          return "DCPU16ISD::SELECT_CC";
   case DCPU16ISD::SMUL:               return "DCPU16ISD::SMUL";
+  case DCPU16ISD::UMUL:               return "DCPU16ISD::UMUL";
   }
 }
