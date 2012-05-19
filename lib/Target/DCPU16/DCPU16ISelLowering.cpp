@@ -117,8 +117,8 @@ SDValue DCPU16TargetLowering::LowerOperation(SDValue Op,
   case ISD::SIGN_EXTEND:      return LowerSIGN_EXTEND(Op, DAG);
   case ISD::RETURNADDR:       return LowerRETURNADDR(Op, DAG);
   case ISD::FRAMEADDR:        return LowerFRAMEADDR(Op, DAG);
-  case ISD::ROTL:             return LowerROTL(Op, DAG);
-  case ISD::ROTR:             return LowerROTR(Op, DAG);
+  case ISD::ROTL:             return LowerROT(Op, DAG, true);
+  case ISD::ROTR:             return LowerROT(Op, DAG, false);
   case ISD::SMUL_LOHI:        return LowerMUL_LOHI(Op, DAG, true);
   case ISD::UMUL_LOHI:        return LowerMUL_LOHI(Op, DAG, false);
   default:
@@ -739,36 +739,25 @@ SDValue DCPU16TargetLowering::LowerFRAMEADDR(SDValue Op,
   return FrameAddr;
 }
 
-SDValue DCPU16TargetLowering::LowerROTL(SDValue Op,
-                                        SelectionDAG &DAG) const {
+SDValue DCPU16TargetLowering::LowerROT(SDValue Op,
+                                       SelectionDAG &DAG,
+                                       bool IsLeft) const {
   EVT VT = Op.getValueType();
   DebugLoc dl = Op.getDebugLoc();
 
   SDValue LHS    = Op.getOperand(0);
   SDValue RHS    = Op.getOperand(1);
 
-  SDVTList VTs = DAG.getVTList(VT);
+  unsigned Opc = IsLeft ? ISD::SHL : ISD::SRL;
+  SDVTList VTs = DAG.getVTList(VT, MVT::Glue);
   SDValue Ops[] = {LHS, RHS};
-  SDValue SHLNode = DAG.getNode(ISD::SHL, dl, VTs, Ops, 2);
+  SDValue ShiftNode = DAG.getNode(Opc, dl, VTs, Ops, 2);
+  SDValue Ex = DAG.getCopyFromReg(DAG.getEntryNode(), dl, DCPU16::EX, VT,
+                                  ShiftNode.getValue(1));
 
-  SDValue Ops2[] = {SHLNode, DAG.getCopyFromReg(SHLNode, dl, DCPU16::EX, VT)};
-  return DAG.getNode(ISD::OR, dl, VTs, Ops2, 2);
-}
-
-SDValue DCPU16TargetLowering::LowerROTR(SDValue Op,
-                                        SelectionDAG &DAG) const {
-  EVT VT = Op.getValueType();
-  DebugLoc dl = Op.getDebugLoc();
-
-  SDValue LHS    = Op.getOperand(0);
-  SDValue RHS    = Op.getOperand(1);
-
-  SDVTList VTs = DAG.getVTList(VT);
-  SDValue Ops[] = {LHS, RHS};
-  SDValue SRLNode = DAG.getNode(ISD::SRL, dl, VTs, Ops, 2);
-
-  SDValue Ops2[] = {SRLNode, DAG.getCopyFromReg(SRLNode, dl, DCPU16::EX, VT)};
-  return DAG.getNode(ISD::OR, dl, VTs, Ops2, 2);
+  SDVTList VTs2 = DAG.getVTList(VT);
+  SDValue Ops2[] = {ShiftNode, Ex};
+  return DAG.getNode(ISD::OR, dl, VTs2, Ops2, array_lengthof(Ops2));
 }
 
 SDValue DCPU16TargetLowering::LowerMUL_LOHI(SDValue Op,
