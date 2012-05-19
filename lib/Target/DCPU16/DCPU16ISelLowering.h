@@ -48,9 +48,9 @@ namespace llvm {
       /// and operand 4 is the value when the condition is false.
       SELECT_CC,
 
-      /// Special multiplication operator that produces signed overflow.
-      /// If unsigned overflow is desired, just use the normal ISD::MUL.
-      SMUL
+      /// Special multiplication operators that produce overflow and a chain.
+      /// Operand 0 is the chain, Operands 1 and 2 are the LHS and RHS.
+      SMUL, UMUL
     };
   }
 
@@ -79,8 +79,7 @@ namespace llvm {
     SDValue LowerSIGN_EXTEND(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerRETURNADDR(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerFRAMEADDR(SDValue Op, SelectionDAG &DAG) const;
-    SDValue LowerROTL(SDValue Op, SelectionDAG &DAG) const;
-    SDValue LowerROTR(SDValue Op, SelectionDAG &DAG) const;
+    SDValue LowerROT(SDValue Op, SelectionDAG &DAG, bool IsLeft) const;
     SDValue LowerMUL_LOHI(SDValue Op, SelectionDAG &DAG, bool Signed) const;
     SDValue getReturnAddressFrameIndex(SelectionDAG &DAG) const;
 
