@@ -34,7 +34,7 @@ def EX  : DCPU16Reg<0x1d,  "EX">;
 
 // Volatile registers
 def GR16 : RegisterClass<"DCPU16", [i16], 16,
-  (add A,B,C,X,Y,Z,I,J)>;
+  (add A,B,C,X,Y,Z,I,J,SP)>;
 
 // Stack pointer register
 def SPR16 : RegisterClass<"DCPU16", [i16], 16,
