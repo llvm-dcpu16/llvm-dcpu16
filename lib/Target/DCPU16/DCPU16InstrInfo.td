@@ -413,6 +413,7 @@ let Defs = [EX] in {
 def : Pat<(i16 (DCPU16Wrapper tglobaladdr:$dst)), (MOV16ri tglobaladdr:$dst)>;
 def : Pat<(i16 (DCPU16Wrapper texternalsym:$dst)), (MOV16ri texternalsym:$dst)>;
 def : Pat<(i16 (DCPU16Wrapper tblockaddress:$dst)), (MOV16ri tblockaddress:$dst)>;
+def : Pat<(i16 (DCPU16Wrapper tjumptable:$dst)), (MOV16ri tjumptable:$dst)>;
 
 def : Pat<(add GR16:$src, (DCPU16Wrapper tglobaladdr :$src2)),
           (ADD16ri GR16:$src, tglobaladdr:$src2)>;
@@ -420,6 +421,8 @@ def : Pat<(add GR16:$src, (DCPU16Wrapper texternalsym:$src2)),
           (ADD16ri GR16:$src, texternalsym:$src2)>;
 def : Pat<(add GR16:$src, (DCPU16Wrapper tblockaddress:$src2)),
           (ADD16ri GR16:$src, tblockaddress:$src2)>;
+def : Pat<(add GR16:$src, (DCPU16Wrapper tjumptable:$src2)),
+          (ADD16ri GR16:$src, tjumptable:$src2)>;
 
 def : Pat<(store (i16 (DCPU16Wrapper tglobaladdr:$src)), addr:$dst),
           (MOV16mi addr:$dst, tglobaladdr:$src)>;
@@ -427,6 +430,8 @@ def : Pat<(store (i16 (DCPU16Wrapper texternalsym:$src)), addr:$dst),
           (MOV16mi addr:$dst, texternalsym:$src)>;
 def : Pat<(store (i16 (DCPU16Wrapper tblockaddress:$src)), addr:$dst),
           (MOV16mi addr:$dst, tblockaddress:$src)>;
+def : Pat<(store (i16 (DCPU16Wrapper tjumptable:$src)), addr:$dst),
+          (MOV16mi addr:$dst, tjumptable:$src)>;
 
 // calls
 def : Pat<(DCPU16call (i16 tglobaladdr:$dst)),
