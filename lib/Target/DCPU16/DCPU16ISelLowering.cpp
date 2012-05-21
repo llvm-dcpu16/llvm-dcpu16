@@ -73,6 +73,7 @@ DCPU16TargetLowering::DCPU16TargetLowering(DCPU16TargetMachine &tm) :
   setOperationAction(ISD::ExternalSymbol,   MVT::i16,   Custom);
   setOperationAction(ISD::BlockAddress,     MVT::i16,   Custom);
   setOperationAction(ISD::BR_JT,            MVT::Other, Expand);
+  setOperationAction(ISD::JumpTable,        MVT::i16,   Custom);
   setOperationAction(ISD::BR_CC,            MVT::i16,   Custom);
   setOperationAction(ISD::BRCOND,           MVT::Other, Expand);
   setOperationAction(ISD::SETCC,            MVT::i16,   Expand);
@@ -121,6 +122,7 @@ SDValue DCPU16TargetLowering::LowerOperation(SDValue Op,
   case ISD::ROTR:             return LowerROT(Op, DAG, false);
   case ISD::SMUL_LOHI:        return LowerMUL_LOHI(Op, DAG, true);
   case ISD::UMUL_LOHI:        return LowerMUL_LOHI(Op, DAG, false);
+  case ISD::JumpTable:        return LowerJumpTable(Op, DAG);
   default:
     llvm_unreachable("unimplemented operand");
   }
@@ -778,6 +780,15 @@ SDValue DCPU16TargetLowering::LowerMUL_LOHI(SDValue Op,
 
   SDValue Ops2[] = {Lo, Hi};
   return DAG.getMergeValues(Ops2, 2, dl);
+}
+
+SDValue DCPU16TargetLowering::LowerJumpTable(SDValue Op,
+                                             SelectionDAG &DAG) const {
+  JumpTableSDNode *JT = cast<JumpTableSDNode>(Op);
+  DebugLoc dl = Op.getDebugLoc();
+
+  SDValue TJT = DAG.getTargetJumpTable(JT->getIndex(), MVT::i16);
+  return DAG.getNode(DCPU16ISD::Wrapper, dl, MVT::i16, TJT);
 }
 
 const char *DCPU16TargetLowering::getTargetNodeName(unsigned Opcode) const {
