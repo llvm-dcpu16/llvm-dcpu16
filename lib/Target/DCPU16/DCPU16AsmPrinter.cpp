@@ -128,24 +128,26 @@ void DCPU16AsmPrinter::printSrcMemOperand(const MachineInstr *MI, int OpNum,
     return;
   }
 
-  if (Base.getReg())
-    O << '[';
+  O << '[';
 
-  if (Disp.isImm()) {
+  if (Base.getReg()) {
+    O << DCPU16InstPrinter::getRegisterName(Base.getReg());
+  }
+
+  if (Base.getReg()) {
+    // Only print the immediate if it isn't 0, easier to read and
+    // generates more efficient code on bad assemblers
     if (Disp.getImm() != 0) {
-      O << "0x";
-      O.write_hex((Disp.getImm()) & 0xFFFF);
       O << "+";
+      O << "0x";
+      O.write_hex(Disp.getImm() & 0xFFFF);
     }
   } else {
-    llvm_unreachable("Unsupported src mem operand in inline asm");
+    O << "0x";
+    O.write_hex(Disp.getImm() & 0xFFFF);
   }
 
-  // Print register base field
-  if (Base.getReg()) {
-    printOperand(MI, OpNum, O);
-    O << ']';
-  }
+  O << ']';
 }
 
 /// PrintAsmOperand - Print out an operand for an inline asm expression.
