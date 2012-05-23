@@ -24,6 +24,6 @@ define void @am3(i16* nocapture %p, i16 %a) nounwind readonly {
 	ret void
 }
 ; CHECK: :am3
-; CHECK:		SET     [0x2+A], B
+; CHECK:		SET     [A+0x2], B
 
 

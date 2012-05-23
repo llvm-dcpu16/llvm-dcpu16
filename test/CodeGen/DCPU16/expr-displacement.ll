@@ -12,6 +12,6 @@ entry:
   ret void
 }
 ; CHECK: :lookup
-; CHECK: SET [A], [lookup_list+B]
+; CHECK: SET [A], [B+lookup_list]
 
 ; CHECK: :lookup_list

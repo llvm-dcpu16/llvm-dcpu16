@@ -30,6 +30,6 @@ define void @am3(i16* %a, i16 %x) readonly {
 	ret void
 }
 ; CHECK: :am3
-; CHECK:		BOR     [0x2+A], B
+; CHECK:		BOR     [A+0x2], B
 
 
