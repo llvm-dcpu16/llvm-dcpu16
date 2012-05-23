@@ -27,4 +27,4 @@ define i16 @am3(i16 %x, i16* %a) nounwind {
 	ret i16 %3
 }
 ; CHECK: :am3
-; CHECK:		BOR     A, [0x2+B]
+; CHECK:		BOR     A, [B+0x2]
