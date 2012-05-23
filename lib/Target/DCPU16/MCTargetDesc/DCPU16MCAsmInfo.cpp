@@ -34,4 +34,7 @@ DCPU16MCAsmInfo::DCPU16MCAsmInfo(const Target &T, StringRef TT) {
   AllowNameToStartWithDigit = true;
   UsesELFSectionDirectiveForBSS = false;
   HasDotTypeDotSizeDirective = false;
+
+  // Use .lcomm instead of .local .comm (required for binutils support)
+  LCOMMDirectiveType = LCOMM::NoAlignment;
 }
