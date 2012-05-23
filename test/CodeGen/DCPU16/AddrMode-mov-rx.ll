@@ -22,4 +22,4 @@ define i16 @am3(i16* %a) nounwind {
 	ret i16 %2
 }
 ; CHECK: :am3
-; CHECK:		SET     A, [0x2+A]
+; CHECK:		SET     A, [A+0x2]

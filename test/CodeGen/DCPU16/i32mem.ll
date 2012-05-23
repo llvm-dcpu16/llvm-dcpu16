@@ -8,7 +8,7 @@ entry:
   ret void
 }
 
-; CHECK: SET [0x1+A], C
+; CHECK: SET [A+0x1], C
 ; CHECK: SET [A], B
 
 define i32 @loadi32(i32* nocapture %a) nounwind readonly {
@@ -22,4 +22,4 @@ entry:
 !2 = metadata !{metadata !"Simple C/C++ TBAA"}
 
 ; CHECK: SET C, [A]
-; CHECK: SET B, [0x1+A]
+; CHECK: SET B, [A+0x1]

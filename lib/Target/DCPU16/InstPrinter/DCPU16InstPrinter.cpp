@@ -84,10 +84,14 @@ void DCPU16InstPrinter::printSrcMemOperand(const MCInst *MI, unsigned OpNo,
 
   O << '[';
 
+  if (Base.getReg()) {
+    O << getRegisterName(Base.getReg());
+  }
+
   if (Disp.isExpr()) {
-    O << *Disp.getExpr();
     if (Base.getReg())
       O << "+";
+    O << *Disp.getExpr();
   } else {
     assert(Disp.isImm() &&
         "Expected immediate or expression in displacement field");
@@ -95,18 +99,14 @@ void DCPU16InstPrinter::printSrcMemOperand(const MCInst *MI, unsigned OpNo,
       // Only print the immediate if it isn't 0, easier to read and
       // generates more efficient code on bad assemblers
       if (Disp.getImm() != 0) {
+        O << "+";
         O << "0x";
         O.write_hex(Disp.getImm() & 0xFFFF);
-        O << "+";
       }
     } else {
       O << "0x";
       O.write_hex(Disp.getImm() & 0xFFFF);
     }
-  }
-
-  if (Base.getReg()) {
-    O << getRegisterName(Base.getReg());
   }
 
   O << ']';

@@ -70,8 +70,6 @@ void DCPU16AsmPrinter::printOperand(const MachineInstr *MI, int OpNum,
     O << DCPU16InstPrinter::getRegisterName(MO.getReg());
     return;
   case MachineOperand::MO_Immediate:
-    if (!Modifier || strcmp(Modifier, "nohash"))
-      O << '#';
     O << MO.getImm();
     return;
   case MachineOperand::MO_MachineBasicBlock:
@@ -81,28 +79,19 @@ void DCPU16AsmPrinter::printOperand(const MachineInstr *MI, int OpNum,
     bool isMemOp  = Modifier && !strcmp(Modifier, "mem");
     uint64_t Offset = MO.getOffset();
 
-    // If the global address expression is a part of displacement field with a
-    // register base, we should not emit any prefix symbol here, e.g.
-    //   SET r1, &foo ; The Notch order
-    // vs
-    //   SET r2, glb(r1) ; The Notch order
-    // Otherwise (!) dcpu16-as will silently miscompile the output :(
-    if (!Modifier || strcmp(Modifier, "nohash"))
-      O << (isMemOp ? '&' : '#');
-    if (Offset)
-      O << '(' << Offset << '+';
-
+    if (isMemOp) O << '[';
     O << *Mang->getSymbol(MO.getGlobal());
-
     if (Offset)
-      O << ')';
+      O << '+' << Offset;
+    if (isMemOp) O << ']';
 
     return;
   }
   case MachineOperand::MO_ExternalSymbol: {
     bool isMemOp  = Modifier && !strcmp(Modifier, "mem");
-    O << (isMemOp ? '&' : '#');
+    if (isMemOp) O << '[';
     O << MAI->getGlobalPrefix() << MO.getSymbolName();
+    if (isMemOp) O << ']';
     return;
   }
   }
@@ -128,24 +117,26 @@ void DCPU16AsmPrinter::printSrcMemOperand(const MachineInstr *MI, int OpNum,
     return;
   }
 
-  if (Base.getReg())
-    O << '[';
+  O << '[';
 
-  if (Disp.isImm()) {
+  if (Base.getReg()) {
+    O << DCPU16InstPrinter::getRegisterName(Base.getReg());
+  }
+
+  if (Base.getReg()) {
+    // Only print the immediate if it isn't 0, easier to read and
+    // generates more efficient code on bad assemblers
     if (Disp.getImm() != 0) {
-      O << "0x";
-      O.write_hex((Disp.getImm()) & 0xFFFF);
       O << "+";
+      O << "0x";
+      O.write_hex(Disp.getImm() & 0xFFFF);
     }
   } else {
-    llvm_unreachable("Unsupported src mem operand in inline asm");
+    O << "0x";
+    O.write_hex(Disp.getImm() & 0xFFFF);
   }
 
-  // Print register base field
-  if (Base.getReg()) {
-    printOperand(MI, OpNum, O);
-    O << ']';
-  }
+  O << ']';
 }
 
 /// PrintAsmOperand - Print out an operand for an inline asm expression.
