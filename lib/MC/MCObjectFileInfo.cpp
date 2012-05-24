@@ -396,6 +396,10 @@ void MCObjectFileInfo::InitELFMCObjectFileInfo(Triple T) {
 
 
 void MCObjectFileInfo::InitCOFFMCObjectFileInfo(Triple T) {
+  // .comm doesn't support alignment on the DCPU16.
+  if (T.getArch() == Triple::dcpu16)
+    CommDirectiveSupportsAlignment = false;
+
   // COFF
   TextSection =
     Ctx->getCOFFSection(".text",
@@ -558,9 +562,10 @@ void MCObjectFileInfo::InitMCObjectFileInfo(StringRef TT, Reloc::Model relocm,
       (T.isOSDarwin() || T.getEnvironment() == Triple::MachO)) {
     Env = IsMachO;
     InitMachOMCObjectFileInfo(T);
-  } else if ((Arch == Triple::x86 || Arch == Triple::x86_64) &&
-             (T.getOS() == Triple::MinGW32 || T.getOS() == Triple::Cygwin ||
-              T.getOS() == Triple::Win32)) {
+  } else if (((Arch == Triple::x86 || Arch == Triple::x86_64) &&
+              (T.getOS() == Triple::MinGW32 || T.getOS() == Triple::Cygwin ||
+               T.getOS() == Triple::Win32)) ||
+             Arch == Triple::dcpu16) {
     Env = IsCOFF;
     InitCOFFMCObjectFileInfo(T);
   } else {
