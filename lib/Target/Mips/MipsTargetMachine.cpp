@@ -105,8 +105,6 @@ public:
   }
 
   virtual bool addInstSelector();
-  virtual bool addPreRegAlloc();
-  virtual bool addPreSched2();
   virtual bool addPreEmitPass();
 };
 } // namespace
@@ -126,20 +124,13 @@ bool MipsPassConfig::addInstSelector() {
 // machine code is emitted. return true if -print-machineinstrs should
 // print out the code after the passes.
 bool MipsPassConfig::addPreEmitPass() {
-  PM->add(createMipsDelaySlotFillerPass(getMipsTargetMachine()));
-  return true;
-}
+  MipsTargetMachine &TM = getMipsTargetMachine();
+  PM->add(createMipsDelaySlotFillerPass(TM));
 
-bool MipsPassConfig::addPreRegAlloc() {
-  // Do not restore $gp if target is Mips64.
-  // In N32/64, $gp is a callee-saved register.
-  if (!getMipsSubtarget().hasMips64())
-    PM->add(createMipsEmitGPRestorePass(getMipsTargetMachine()));
-  return true;
-}
+  // NOTE: long branch has not been implemented for mips16.
+  if (TM.getSubtarget<MipsSubtarget>().hasStandardEncoding())
+    PM->add(createMipsLongBranchPass(TM));
 
-bool MipsPassConfig::addPreSched2() {
-  PM->add(createMipsExpandPseudoPass(getMipsTargetMachine()));
   return true;
 }
 

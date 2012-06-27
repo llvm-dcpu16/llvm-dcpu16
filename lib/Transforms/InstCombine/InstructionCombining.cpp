@@ -87,6 +87,10 @@ void InstCombiner::getAnalysisUsage(AnalysisUsage &AU) const {
 }
 
 
+Value *InstCombiner::EmitGEPOffset(User *GEP) {
+  return llvm::EmitGEPOffset(Builder, *getTargetData(), GEP);
+}
+
 /// ShouldChangeType - Return true if it is desirable to convert a computation
 /// from 'From' to 'To'.  We don't want to convert from a legal to an illegal
 /// type for example, or from a smaller to a larger illegal type.
@@ -1054,10 +1058,9 @@ Instruction *InstCombiner::visitGetElementPtrInst(GetElementPtrInst &GEP) {
         !isa<BitCastInst>(BCI->getOperand(0)) && GEP.hasAllConstantIndices() &&
         StrippedPtrTy->getAddressSpace() == GEP.getPointerAddressSpace()) {
 
-      // Determine how much the GEP moves the pointer.  We are guaranteed to get
-      // a constant back from EmitGEPOffset.
-      ConstantInt *OffsetV = cast<ConstantInt>(EmitGEPOffset(&GEP));
-      int64_t Offset = OffsetV->getSExtValue();
+      // Determine how much the GEP moves the pointer.
+      SmallVector<Value*, 8> Ops(GEP.idx_begin(), GEP.idx_end());
+      int64_t Offset = TD->getIndexedOffset(GEP.getPointerOperandType(), Ops);
 
       // If this GEP instruction doesn't move the pointer, just replace the GEP
       // with a bitcast of the real input to the dest type.
@@ -1065,7 +1068,7 @@ Instruction *InstCombiner::visitGetElementPtrInst(GetElementPtrInst &GEP) {
         // If the bitcast is of an allocation, and the allocation will be
         // converted to match the type of the cast, don't touch this.
         if (isa<AllocaInst>(BCI->getOperand(0)) ||
-            isMalloc(BCI->getOperand(0))) {
+            isAllocationFn(BCI->getOperand(0))) {
           // See if the bitcast simplifies, if so, don't nuke this GEP yet.
           if (Instruction *I = visitBitCast(*BCI)) {
             if (I != BCI) {
@@ -1163,6 +1166,17 @@ Instruction *InstCombiner::visitMalloc(Instruction &MI) {
         ReplaceInstUsesWith(*I, UndefValue::get(I->getType()));
       }
       EraseInstFromFunction(*I);
+    }
+
+    if (InvokeInst *II = dyn_cast<InvokeInst>(&MI)) {
+      // Replace invoke with a NOOP intrinsic to maintain the original CFG
+      Module *M = II->getParent()->getParent()->getParent();
+      IntegerType *Ty = IntegerType::get(II->getContext(), 8);
+      ConstantInt *CI = ConstantInt::get(Ty, 0);
+      Value *Args[] = {CI, CI};
+      Function *F = Intrinsic::getDeclaration(M, Intrinsic::expect, Ty);
+      InvokeInst::Create(F, II->getNormalDest(), II->getUnwindDest(), Args,
+                         "dummy", II->getParent());
     }
     return EraseInstFromFunction(MI);
   }

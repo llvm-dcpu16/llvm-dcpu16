@@ -156,9 +156,12 @@ MCOperand X86MCInstLower::LowerSymbolOperand(const MachineOperand &MO,
     break;
   case X86II::MO_SECREL:    RefKind = MCSymbolRefExpr::VK_SECREL; break;
   case X86II::MO_TLSGD:     RefKind = MCSymbolRefExpr::VK_TLSGD; break;
+  case X86II::MO_TLSLD:     RefKind = MCSymbolRefExpr::VK_TLSLD; break;
+  case X86II::MO_TLSLDM:    RefKind = MCSymbolRefExpr::VK_TLSLDM; break;
   case X86II::MO_GOTTPOFF:  RefKind = MCSymbolRefExpr::VK_GOTTPOFF; break;
   case X86II::MO_INDNTPOFF: RefKind = MCSymbolRefExpr::VK_INDNTPOFF; break;
   case X86II::MO_TPOFF:     RefKind = MCSymbolRefExpr::VK_TPOFF; break;
+  case X86II::MO_DTPOFF:    RefKind = MCSymbolRefExpr::VK_DTPOFF; break;
   case X86II::MO_NTPOFF:    RefKind = MCSymbolRefExpr::VK_NTPOFF; break;
   case X86II::MO_GOTNTPOFF: RefKind = MCSymbolRefExpr::VK_GOTNTPOFF; break;
   case X86II::MO_GOTPCREL:  RefKind = MCSymbolRefExpr::VK_GOTPCREL; break;
@@ -551,23 +554,52 @@ ReSimplify:
 static void LowerTlsAddr(MCStreamer &OutStreamer,
                          X86MCInstLower &MCInstLowering,
                          const MachineInstr &MI) {
-  bool is64Bits = MI.getOpcode() == X86::TLS_addr64;
+
+  bool is64Bits = MI.getOpcode() == X86::TLS_addr64 ||
+                  MI.getOpcode() == X86::TLS_base_addr64;
+
+  bool needsPadding = MI.getOpcode() == X86::TLS_addr64;
+
   MCContext &context = OutStreamer.getContext();
 
-  if (is64Bits) {
+  if (needsPadding) {
     MCInst prefix;
     prefix.setOpcode(X86::DATA16_PREFIX);
     OutStreamer.EmitInstruction(prefix);
   }
+
+  MCSymbolRefExpr::VariantKind SRVK;
+  switch (MI.getOpcode()) {
+    case X86::TLS_addr32:
+    case X86::TLS_addr64:
+      SRVK = MCSymbolRefExpr::VK_TLSGD;
+      break;
+    case X86::TLS_base_addr32:
+      SRVK = MCSymbolRefExpr::VK_TLSLDM;
+      break;
+    case X86::TLS_base_addr64:
+      SRVK = MCSymbolRefExpr::VK_TLSLD;
+      break;
+    default:
+      llvm_unreachable("unexpected opcode");
+  }
+
   MCSymbol *sym = MCInstLowering.GetSymbolFromOperand(MI.getOperand(3));
-  const MCSymbolRefExpr *symRef =
-    MCSymbolRefExpr::Create(sym, MCSymbolRefExpr::VK_TLSGD, context);
+  const MCSymbolRefExpr *symRef = MCSymbolRefExpr::Create(sym, SRVK, context);
 
   MCInst LEA;
   if (is64Bits) {
     LEA.setOpcode(X86::LEA64r);
     LEA.addOperand(MCOperand::CreateReg(X86::RDI)); // dest
     LEA.addOperand(MCOperand::CreateReg(X86::RIP)); // base
+    LEA.addOperand(MCOperand::CreateImm(1));        // scale
+    LEA.addOperand(MCOperand::CreateReg(0));        // index
+    LEA.addOperand(MCOperand::CreateExpr(symRef));  // disp
+    LEA.addOperand(MCOperand::CreateReg(0));        // seg
+  } else if (SRVK == MCSymbolRefExpr::VK_TLSLDM) {
+    LEA.setOpcode(X86::LEA32r);
+    LEA.addOperand(MCOperand::CreateReg(X86::EAX)); // dest
+    LEA.addOperand(MCOperand::CreateReg(X86::EBX)); // base
     LEA.addOperand(MCOperand::CreateImm(1));        // scale
     LEA.addOperand(MCOperand::CreateReg(0));        // index
     LEA.addOperand(MCOperand::CreateExpr(symRef));  // disp
@@ -583,7 +615,7 @@ static void LowerTlsAddr(MCStreamer &OutStreamer,
   }
   OutStreamer.EmitInstruction(LEA);
 
-  if (is64Bits) {
+  if (needsPadding) {
     MCInst prefix;
     prefix.setOpcode(X86::DATA16_PREFIX);
     OutStreamer.EmitInstruction(prefix);
@@ -610,8 +642,6 @@ static void LowerTlsAddr(MCStreamer &OutStreamer,
 }
 
 void X86AsmPrinter::EmitInstruction(const MachineInstr *MI) {
-  OutStreamer.EmitCodeRegion();
-
   X86MCInstLower MCInstLowering(Mang, *MF, *this);
   switch (MI->getOpcode()) {
   case TargetOpcode::DBG_VALUE:
@@ -647,6 +677,8 @@ void X86AsmPrinter::EmitInstruction(const MachineInstr *MI) {
 
   case X86::TLS_addr32:
   case X86::TLS_addr64:
+  case X86::TLS_base_addr32:
+  case X86::TLS_base_addr64:
     return LowerTlsAddr(OutStreamer, MCInstLowering, *MI);
 
   case X86::MOVPC32r: {
@@ -716,4 +748,3 @@ void X86AsmPrinter::EmitInstruction(const MachineInstr *MI) {
   MCInstLowering.Lower(MI, TmpInst);
   OutStreamer.EmitInstruction(TmpInst);
 }
-

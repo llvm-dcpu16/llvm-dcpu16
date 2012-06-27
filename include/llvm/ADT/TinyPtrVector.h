@@ -10,8 +10,10 @@
 #ifndef LLVM_ADT_TINYPTRVECTOR_H
 #define LLVM_ADT_TINYPTRVECTOR_H
 
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/Support/Compiler.h"
 
 namespace llvm {
   
@@ -32,6 +34,11 @@ public:
     if (VecTy *V = Val.template dyn_cast<VecTy*>())
       Val = new VecTy(*V);
   }
+#if LLVM_USE_RVALUE_REFERENCES
+  TinyPtrVector(TinyPtrVector &&RHS) : Val(RHS.Val) {
+    RHS.Val = (EltTy)0;
+  }
+#endif
   ~TinyPtrVector() {
     if (VecTy *V = Val.template dyn_cast<VecTy*>())
       delete V;
@@ -113,6 +120,14 @@ public:
     return Val.template get<VecTy*>()->front();
   }
   
+  EltTy back() const {
+    assert(!empty() && "vector empty");
+    if (EltTy V = Val.template dyn_cast<EltTy>())
+      return V;
+    return Val.template get<VecTy*>()->back();
+  }
+
+  
   void push_back(EltTy NewVal) {
     assert(NewVal != 0 && "Can't add a null value");
     
@@ -131,6 +146,15 @@ public:
     // Add the new value, we know we have a vector.
     Val.template get<VecTy*>()->push_back(NewVal);
   }
+  
+  void pop_back() {
+    // If we have a single value, convert to empty.
+    if (Val.template is<EltTy>())
+      Val = (EltTy)0;
+    else if (VecTy *Vec = Val.template get<VecTy*>())
+      Vec->pop_back();
+  }
+
   
   void clear() {
     // If we have a single value, convert to empty.
@@ -159,6 +183,9 @@ public:
   
 private:
   void operator=(const TinyPtrVector&); // NOT IMPLEMENTED YET.
+#if LLVM_USE_RVALUE_REFERENCES
+  void operator=(TinyPtrVector&&); // NOT IMPLEMENTED YET.
+#endif
 };
 } // end namespace llvm
 

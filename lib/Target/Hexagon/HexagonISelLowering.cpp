@@ -370,14 +370,18 @@ HexagonTargetLowering::LowerCallResult(SDValue Chain, SDValue InFlag,
 /// LowerCall - Functions arguments are copied from virtual regs to
 /// (physical regs)/(stack frame), CALLSEQ_START and CALLSEQ_END are emitted.
 SDValue
-HexagonTargetLowering::LowerCall(SDValue Chain, SDValue Callee,
-                                 CallingConv::ID CallConv, bool isVarArg,
-                                 bool doesNotRet, bool &isTailCall,
-                                 const SmallVectorImpl<ISD::OutputArg> &Outs,
-                                 const SmallVectorImpl<SDValue> &OutVals,
-                                 const SmallVectorImpl<ISD::InputArg> &Ins,
-                                 DebugLoc dl, SelectionDAG &DAG,
+HexagonTargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
                                  SmallVectorImpl<SDValue> &InVals) const {
+  SelectionDAG &DAG                     = CLI.DAG;
+  DebugLoc &dl                          = CLI.DL;
+  SmallVector<ISD::OutputArg, 32> &Outs = CLI.Outs;
+  SmallVector<SDValue, 32> &OutVals     = CLI.OutVals;
+  SmallVector<ISD::InputArg, 32> &Ins   = CLI.Ins;
+  SDValue Chain                         = CLI.Chain;
+  SDValue Callee                        = CLI.Callee;
+  bool &isTailCall                      = CLI.IsTailCall;
+  CallingConv::ID CallConv              = CLI.CallConv;
+  bool isVarArg                         = CLI.IsVarArg;
 
   bool IsStructRet    = (Outs.empty()) ? false : Outs[0].Flags.isSRet();
 
@@ -504,7 +508,7 @@ HexagonTargetLowering::LowerCall(SDValue Chain, SDValue Callee,
 
   // Build a sequence of copy-to-reg nodes chained together with token
   // chain and flag operands which copy the outgoing args into registers.
-  // The InFlag in necessary since all emited instructions must be
+  // The InFlag in necessary since all emitted instructions must be
   // stuck together.
   SDValue InFlag;
   if (!isTailCall) {
@@ -524,7 +528,7 @@ HexagonTargetLowering::LowerCall(SDValue Chain, SDValue Callee,
     // than necessary, because it means that each store effectively depends
     // on every argument instead of just those arguments it would clobber.
     //
-    // Do not flag preceeding copytoreg stuff together with the following stuff.
+    // Do not flag preceding copytoreg stuff together with the following stuff.
     InFlag = SDValue();
     for (unsigned i = 0, e = RegsToPass.size(); i != e; ++i) {
       Chain = DAG.getCopyToReg(Chain, dl, RegsToPass[i].first,

@@ -517,7 +517,7 @@ static GlobalVariable *SRAGlobal(GlobalVariable *GV, const TargetData &TD) {
       GlobalVariable *NGV = new GlobalVariable(STy->getElementType(i), false,
                                                GlobalVariable::InternalLinkage,
                                                In, GV->getName()+"."+Twine(i),
-                                               GV->isThreadLocal(),
+                                               GV->getThreadLocalMode(),
                                               GV->getType()->getAddressSpace());
       Globals.insert(GV, NGV);
       NewGlobals.push_back(NGV);
@@ -550,7 +550,7 @@ static GlobalVariable *SRAGlobal(GlobalVariable *GV, const TargetData &TD) {
       GlobalVariable *NGV = new GlobalVariable(STy->getElementType(), false,
                                                GlobalVariable::InternalLinkage,
                                                In, GV->getName()+"."+Twine(i),
-                                               GV->isThreadLocal(),
+                                               GV->getThreadLocalMode(),
                                               GV->getType()->getAddressSpace());
       Globals.insert(GV, NGV);
       NewGlobals.push_back(NGV);
@@ -866,7 +866,7 @@ static GlobalVariable *OptimizeGlobalAddressOfMalloc(GlobalVariable *GV,
                                              UndefValue::get(GlobalType),
                                              GV->getName()+".body",
                                              GV,
-                                             GV->isThreadLocal());
+                                             GV->getThreadLocalMode());
 
   // If there are bitcast users of the malloc (which is typical, usually we have
   // a malloc + bitcast) then replace them with uses of the new global.  Update
@@ -899,7 +899,7 @@ static GlobalVariable *OptimizeGlobalAddressOfMalloc(GlobalVariable *GV,
     new GlobalVariable(Type::getInt1Ty(GV->getContext()), false,
                        GlobalValue::InternalLinkage,
                        ConstantInt::getFalse(GV->getContext()),
-                       GV->getName()+".init", GV->isThreadLocal());
+                       GV->getName()+".init", GV->getThreadLocalMode());
   bool InitBoolUsed = false;
 
   // Loop over all uses of GV, processing them in turn.
@@ -1321,7 +1321,7 @@ static GlobalVariable *PerformHeapAllocSRoA(GlobalVariable *GV, CallInst *CI,
                          PFieldTy, false, GlobalValue::InternalLinkage,
                          Constant::getNullValue(PFieldTy),
                          GV->getName() + ".f" + Twine(FieldNo), GV,
-                         GV->isThreadLocal());
+                         GV->getThreadLocalMode());
     FieldGlobals.push_back(NGV);
 
     unsigned TypeSize = TD->getTypeAllocSize(FieldTy);
@@ -1567,8 +1567,10 @@ static bool TryToOptimizeStoreOfMallocToGlobal(GlobalVariable *GV,
       Instruction *Cast = new BitCastInst(Malloc, CI->getType(), "tmp", CI);
       CI->replaceAllUsesWith(Cast);
       CI->eraseFromParent();
-      CI = dyn_cast<BitCastInst>(Malloc) ?
-        extractMallocCallFromBitCast(Malloc) : cast<CallInst>(Malloc);
+      if (BitCastInst *BCI = dyn_cast<BitCastInst>(Malloc))
+        CI = cast<CallInst>(BCI->getOperand(0));
+      else
+        CI = cast<CallInst>(Malloc);
     }
 
     GVI = PerformHeapAllocSRoA(GV, CI, getMallocArraySize(CI, TD, true), TD);
@@ -1645,7 +1647,7 @@ static bool TryToShrinkGlobalToBoolean(GlobalVariable *GV, Constant *OtherVal) {
                                              GlobalValue::InternalLinkage,
                                         ConstantInt::getFalse(GV->getContext()),
                                              GV->getName()+".b",
-                                             GV->isThreadLocal());
+                                             GV->getThreadLocalMode());
   GV->getParent()->getGlobalList().insert(GV, NewGV);
 
   Constant *InitVal = GV->getInitializer();
@@ -1716,7 +1718,7 @@ static bool TryToShrinkGlobalToBoolean(GlobalVariable *GV, Constant *OtherVal) {
 /// possible.  If we make a change, return true.
 bool GlobalOpt::ProcessGlobal(GlobalVariable *GV,
                               Module::global_iterator &GVI) {
-  if (!GV->hasLocalLinkage())
+  if (!GV->isDiscardableIfUnused())
     return false;
 
   // Do more involved optimizations if the global is internal.
@@ -1729,6 +1731,15 @@ bool GlobalOpt::ProcessGlobal(GlobalVariable *GV,
     return true;
   }
 
+  if (GV->hasLinkOnceODRLinkage() && GV->hasUnnamedAddr() && GV->isConstant() &&
+      GV->getVisibility() != GlobalValue::HiddenVisibility) {
+    GV->setVisibility(GlobalValue::HiddenVisibility);
+    return true;
+  }
+
+  if (!GV->hasLocalLinkage())
+    return false;
+
   SmallPtrSet<const PHINode*, 16> PHIUsers;
   GlobalStatus GS;
 
@@ -1738,6 +1749,7 @@ bool GlobalOpt::ProcessGlobal(GlobalVariable *GV,
   if (!GS.isCompared && !GV->hasUnnamedAddr()) {
     GV->setUnnamedAddr(true);
     NumUnnamed++;
+    return true;
   }
 
   if (GV->isConstant() || !GV->hasInitializer())
@@ -1870,6 +1882,8 @@ bool GlobalOpt::ProcessInternalGlobal(GlobalVariable *GV,
 /// function, changing them to FastCC.
 static void ChangeCalleesToFastCall(Function *F) {
   for (Value::use_iterator UI = F->use_begin(), E = F->use_end(); UI != E;++UI){
+    if (isa<BlockAddress>(*UI))
+      continue;
     CallSite User(cast<Instruction>(*UI));
     User.setCallingConv(CallingConv::Fast);
   }
@@ -1890,6 +1904,8 @@ static AttrListPtr StripNest(const AttrListPtr &Attrs) {
 static void RemoveNestAttribute(Function *F) {
   F->setAttributes(StripNest(F->getAttributes()));
   for (Value::use_iterator UI = F->use_begin(), E = F->use_end(); UI != E;++UI){
+    if (isa<BlockAddress>(*UI))
+      continue;
     CallSite User(cast<Instruction>(*UI));
     User.setAttributes(StripNest(User.getAttributes()));
   }
@@ -1908,6 +1924,10 @@ bool GlobalOpt::OptimizeFunctions(Module &M) {
       F->eraseFromParent();
       Changed = true;
       ++NumFnDeleted;
+    } else if (F->hasLinkOnceODRLinkage() && F->hasUnnamedAddr() &&
+               F->getVisibility() != GlobalValue::HiddenVisibility) {
+      F->setVisibility(GlobalValue::HiddenVisibility);
+      Changed = true;
     } else if (F->hasLocalLinkage()) {
       if (F->getCallingConv() == CallingConv::C && !F->isVarArg() &&
           !F->hasAddressTaken()) {
@@ -2045,7 +2065,7 @@ static GlobalVariable *InstallGlobalCtors(GlobalVariable *GCL,
   // Create the new global and insert it next to the existing list.
   GlobalVariable *NGV = new GlobalVariable(CA->getType(), GCL->isConstant(),
                                            GCL->getLinkage(), CA, "",
-                                           GCL->isThreadLocal());
+                                           GCL->getThreadLocalMode());
   GCL->getParent()->getGlobalList().insert(GCL, NGV);
   NGV->takeName(GCL);
 
@@ -2701,7 +2721,7 @@ static bool EvaluateStaticConstructor(Function *F, const TargetData *TD,
           << " stores.\n");
     for (DenseMap<Constant*, Constant*>::const_iterator I =
            Eval.getMutatedMemory().begin(), E = Eval.getMutatedMemory().end();
-	 I != E; ++I)
+         I != E; ++I)
       CommitValueTo(I->second, I->first);
     for (SmallPtrSet<GlobalVariable*, 8>::const_iterator I =
            Eval.getInvariants().begin(), E = Eval.getInvariants().end();

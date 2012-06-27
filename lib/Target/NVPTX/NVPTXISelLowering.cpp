@@ -438,17 +438,21 @@ std::string NVPTXTargetLowering::getPrototype(Type *retTy,
 }
 
 
-#if 0
 SDValue
-NVPTXTargetLowering::LowerCall(SDValue Chain, SDValue Callee,
-                               CallingConv::ID CallConv, bool isVarArg,
-                               bool doesNotRet, bool &isTailCall,
-                               const SmallVectorImpl<ISD::OutputArg> &Outs,
-                               const SmallVectorImpl<SDValue> &OutVals,
-                               const SmallVectorImpl<ISD::InputArg> &Ins,
-                               DebugLoc dl, SelectionDAG &DAG,
-                               SmallVectorImpl<SDValue> &InVals, Type *retTy,
-                               const ArgListTy &Args) const {
+NVPTXTargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
+                               SmallVectorImpl<SDValue> &InVals) const {
+  SelectionDAG &DAG                     = CLI.DAG;
+  DebugLoc &dl                          = CLI.DL;
+  SmallVector<ISD::OutputArg, 32> &Outs = CLI.Outs;
+  SmallVector<SDValue, 32> &OutVals     = CLI.OutVals;
+  SmallVector<ISD::InputArg, 32> &Ins   = CLI.Ins;
+  SDValue Chain                         = CLI.Chain;
+  SDValue Callee                        = CLI.Callee;
+  bool &isTailCall                      = CLI.IsTailCall;
+  ArgListTy &Args                       = CLI.Args;
+  Type *retTy                           = CLI.RetTy;
+  ImmutableCallSite *CS                 = CLI.CS;
+
   bool isABI = (nvptxSubtarget.getSmVersion() >= 20);
 
   SDValue tempChain = Chain;
@@ -649,20 +653,14 @@ NVPTXTargetLowering::LowerCall(SDValue Chain, SDValue Callee,
         InFlag = Chain.getValue(1);
       }
       else {
-        // @TODO: Re-enable getAlign calls.  We do not have the
-        // ImmutableCallSite object here anymore.
-        //if (Func) { // direct call
-        //if (!llvm::getAlign(*(CS->getCalledFunction()), 0, retAlignment))
-        //retAlignment = TD->getABITypeAlignment(retTy);
-        //}
-        //else { // indirect call
-        //const CallInst *CallI = dyn_cast<CallInst>(CS->getInstruction());
-        //if (!llvm::getAlign(*CallI, 0, retAlignment))
-        //retAlignment = TD->getABITypeAlignment(retTy);
-        //}
-        // @TODO: Remove this hack!
-        // Functions with explicit alignment metadata will be broken, for now.
-        retAlignment = 16;
+        if (Func) { // direct call
+          if (!llvm::getAlign(*(CS->getCalledFunction()), 0, retAlignment))
+            retAlignment = getTargetData()->getABITypeAlignment(retTy);
+        } else { // indirect call
+          const CallInst *CallI = dyn_cast<CallInst>(CS->getInstruction());
+          if (!llvm::getAlign(*CallI, 0, retAlignment))
+            retAlignment = getTargetData()->getABITypeAlignment(retTy);
+        }
         SDVTList DeclareRetVTs = DAG.getVTList(MVT::Other, MVT::Glue);
         SDValue DeclareRetOps[] = { Chain, DAG.getConstant(retAlignment,
                                                            MVT::i32),
@@ -823,7 +821,6 @@ NVPTXTargetLowering::LowerCall(SDValue Chain, SDValue Callee,
   isTailCall = false;
   return Chain;
 }
-#endif
 
 // By default CONCAT_VECTORS is lowered by ExpandVectorBuildThroughStack()
 // (see LegalizeDAG.cpp). This is slow and uses local memory.
@@ -887,10 +884,10 @@ NVPTXTargetLowering::getParamHelpSymbol(SelectionDAG &DAG, int idx) {
 // Check to see if the kernel argument is image*_t or sampler_t
 
 bool llvm::isImageOrSamplerVal(const Value *arg, const Module *context) {
-  const char *specialTypes[] = {
-                                "struct._image2d_t",
-                                "struct._image3d_t",
-                                "struct._sampler_t"
+  static const char *const specialTypes[] = {
+                                             "struct._image2d_t",
+                                             "struct._image3d_t",
+                                             "struct._sampler_t"
   };
 
   const Type *Ty = arg->getType();
@@ -905,7 +902,7 @@ bool llvm::isImageOrSamplerVal(const Value *arg, const Module *context) {
   const StructType *STy = dyn_cast<StructType>(PTy->getElementType());
   const std::string TypeName = STy ? STy->getName() : "";
 
-  for (int i=0, e=sizeof(specialTypes)/sizeof(specialTypes[0]); i!=e; ++i)
+  for (int i = 0, e = array_lengthof(specialTypes); i != e; ++i)
     if (TypeName == specialTypes[i])
       return true;
 

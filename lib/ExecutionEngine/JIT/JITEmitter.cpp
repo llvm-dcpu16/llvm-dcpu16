@@ -108,13 +108,18 @@ namespace {
     /// particular GlobalVariable so that we can reuse them if necessary.
     GlobalToIndirectSymMapTy GlobalToIndirectSymMap;
 
+#ifndef NDEBUG
     /// Instance of the JIT this ResolverState serves.
     JIT *TheJIT;
+#endif
 
   public:
     JITResolverState(JIT *jit) : FunctionToLazyStubMap(this),
-                                 FunctionToCallSitesMap(this),
-                                 TheJIT(jit) {}
+                                 FunctionToCallSitesMap(this) {
+#ifndef NDEBUG
+      TheJIT = jit;
+#endif
+    }
 
     FunctionToLazyStubMapTy& getFunctionToLazyStubMap(
       const MutexGuard& locked) {

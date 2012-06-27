@@ -31,13 +31,8 @@ class LLVM_LIBRARY_VISIBILITY MipsMCInstLower {
   MipsAsmPrinter &AsmPrinter;
 public:
   MipsMCInstLower(MipsAsmPrinter &asmprinter);
-  void Initialize(Mangler *mang, MCContext* C);
+  void Initialize(Mangler *mang, MCContext *C);
   void Lower(const MachineInstr *MI, MCInst &OutMI) const;
-  void LowerCPLOAD(SmallVector<MCInst, 4>& MCInsts);
-  void LowerCPRESTORE(int64_t Offset, SmallVector<MCInst, 4>& MCInsts);
-  void LowerUnalignedLoadStore(const MachineInstr *MI,
-                               SmallVector<MCInst, 4>& MCInsts);
-  void LowerSETGP01(const MachineInstr *MI, SmallVector<MCInst, 4>& MCInsts);
 private:
   MCOperand LowerSymbolOperand(const MachineOperand &MO,
                                MachineOperandType MOTy, unsigned Offset) const;

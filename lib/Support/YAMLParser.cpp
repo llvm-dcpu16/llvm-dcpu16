@@ -27,12 +27,12 @@ using namespace llvm;
 using namespace yaml;
 
 enum UnicodeEncodingForm {
-  UEF_UTF32_LE, //< UTF-32 Little Endian
-  UEF_UTF32_BE, //< UTF-32 Big Endian
-  UEF_UTF16_LE, //< UTF-16 Little Endian
-  UEF_UTF16_BE, //< UTF-16 Big Endian
-  UEF_UTF8,     //< UTF-8 or ascii.
-  UEF_Unknown   //< Not a valid Unicode encoding.
+  UEF_UTF32_LE, ///< UTF-32 Little Endian
+  UEF_UTF32_BE, ///< UTF-32 Big Endian
+  UEF_UTF16_LE, ///< UTF-16 Little Endian
+  UEF_UTF16_BE, ///< UTF-16 Big Endian
+  UEF_UTF8,     ///< UTF-8 or ascii.
+  UEF_Unknown   ///< Not a valid Unicode encoding.
 };
 
 /// EncodingInfo - Holds the encoding type and length of the byte order mark if
@@ -1630,9 +1630,7 @@ StringRef ScalarNode::getValue(SmallVectorImpl<char> &Storage) const {
     return UnquotedValue;
   }
   // Plain or block.
-  size_t trimtrail = Value.rfind(' ');
-  return Value.drop_back(
-    trimtrail == StringRef::npos ? 0 : Value.size() - trimtrail);
+  return Value.rtrim(" ");
 }
 
 StringRef ScalarNode::unescapeDoubleQuoted( StringRef UnquotedValue

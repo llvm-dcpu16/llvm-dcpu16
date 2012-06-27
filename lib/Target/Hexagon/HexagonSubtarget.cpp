@@ -40,7 +40,7 @@ EnableIEEERndNear(
 
 HexagonSubtarget::HexagonSubtarget(StringRef TT, StringRef CPU, StringRef FS):
   HexagonGenSubtargetInfo(TT, CPU, FS),
-  HexagonArchVersion(V1),
+  HexagonArchVersion(V2),
   CPUString(CPU.str()) {
   ParseSubtargetFeatures(CPU, FS);
 
@@ -60,9 +60,6 @@ HexagonSubtarget::HexagonSubtarget(StringRef TT, StringRef CPU, StringRef FS):
 
   // Initialize scheduling itinerary for the specified CPU.
   InstrItins = getInstrItineraryForCPU(CPUString);
-
-  // Max issue per cycle == bundle width.
-  InstrItins.IssueWidth = 4;
 
   if (EnableMemOps)
     UseMemOps = true;

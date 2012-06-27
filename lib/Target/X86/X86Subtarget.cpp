@@ -202,12 +202,12 @@ void X86Subtarget::AutoDetectSubtargetFeatures() {
   bool IsAMD   = !IsIntel && memcmp(text.c, "AuthenticAMD", 12) == 0;
 
   if ((ECX >> 1) & 0x1) {
-    HasCLMUL = true;
-    ToggleFeature(X86::FeatureCLMUL);
+    HasPCLMUL = true;
+    ToggleFeature(X86::FeaturePCLMUL);
   }
   if ((ECX >> 12) & 0x1) {
-    HasFMA3 = true;
-    ToggleFeature(X86::FeatureFMA3);
+    HasFMA = true;
+    ToggleFeature(X86::FeatureFMA);
   }
   if (IsIntel && ((ECX >> 22) & 0x1)) {
     HasMOVBE = true;
@@ -326,8 +326,8 @@ X86Subtarget::X86Subtarget(const std::string &TT, const std::string &CPU,
   , HasPOPCNT(false)
   , HasSSE4A(false)
   , HasAES(false)
-  , HasCLMUL(false)
-  , HasFMA3(false)
+  , HasPCLMUL(false)
+  , HasFMA(false)
   , HasFMA4(false)
   , HasXOP(false)
   , HasMOVBE(false)

@@ -22,6 +22,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/ADT/Triple.h"
 #include "llvm/Function.h"
 #include "llvm/IntrinsicInst.h"
 #include "llvm/LLVMContext.h"
@@ -47,6 +48,7 @@ using namespace llvm;
 static const uint64_t kDefaultShadowScale = 3;
 static const uint64_t kDefaultShadowOffset32 = 1ULL << 29;
 static const uint64_t kDefaultShadowOffset64 = 1ULL << 44;
+static const uint64_t kDefaultShadowOffsetAndroid = 0;
 
 static const size_t kMaxStackMallocSize = 1 << 16;  // 64K
 static const uintptr_t kCurrentStackFrameMagic = 0x41B58AB3;
@@ -77,6 +79,9 @@ static cl::opt<bool> ClInstrumentReads("asan-instrument-reads",
        cl::desc("instrument read instructions"), cl::Hidden, cl::init(true));
 static cl::opt<bool> ClInstrumentWrites("asan-instrument-writes",
        cl::desc("instrument write instructions"), cl::Hidden, cl::init(true));
+static cl::opt<bool> ClInstrumentAtomics("asan-instrument-atomics",
+       cl::desc("instrument atomic instructions (rmw, cmpxchg)"),
+       cl::Hidden, cl::init(true));
 // This flag may need to be replaced with -f[no]asan-stack.
 static cl::opt<bool> ClStack("asan-stack",
        cl::desc("Handle stack memory"), cl::Hidden, cl::init(true));
@@ -288,16 +293,36 @@ bool AddressSanitizer::instrumentMemIntrinsic(MemIntrinsic *MI) {
   return true;
 }
 
-static Value *getLDSTOperand(Instruction *I) {
+// If I is an interesting memory access, return the PointerOperand
+// and set IsWrite. Otherwise return NULL.
+static Value *isInterestingMemoryAccess(Instruction *I, bool *IsWrite) {
   if (LoadInst *LI = dyn_cast<LoadInst>(I)) {
+    if (!ClInstrumentReads) return NULL;
+    *IsWrite = false;
     return LI->getPointerOperand();
   }
-  return cast<StoreInst>(*I).getPointerOperand();
+  if (StoreInst *SI = dyn_cast<StoreInst>(I)) {
+    if (!ClInstrumentWrites) return NULL;
+    *IsWrite = true;
+    return SI->getPointerOperand();
+  }
+  if (AtomicRMWInst *RMW = dyn_cast<AtomicRMWInst>(I)) {
+    if (!ClInstrumentAtomics) return NULL;
+    *IsWrite = true;
+    return RMW->getPointerOperand();
+  }
+  if (AtomicCmpXchgInst *XCHG = dyn_cast<AtomicCmpXchgInst>(I)) {
+    if (!ClInstrumentAtomics) return NULL;
+    *IsWrite = true;
+    return XCHG->getPointerOperand();
+  }
+  return NULL;
 }
 
 void AddressSanitizer::instrumentMop(Instruction *I) {
-  int IsWrite = isa<StoreInst>(*I);
-  Value *Addr = getLDSTOperand(I);
+  bool IsWrite;
+  Value *Addr = isInterestingMemoryAccess(I, &IsWrite);
+  assert(Addr);
   if (ClOpt && ClOptGlobals && isa<GlobalVariable>(Addr)) {
     // We are accessing a global scalar variable. Nothing to catch here.
     return;
@@ -486,7 +511,7 @@ bool AddressSanitizer::insertGlobalRedzones(Module &M) {
     // Create a new global variable with enough space for a redzone.
     GlobalVariable *NewGlobal = new GlobalVariable(
         M, NewTy, G->isConstant(), G->getLinkage(),
-        NewInitializer, "", G, G->isThreadLocal());
+        NewInitializer, "", G, G->getThreadLocalMode());
     NewGlobal->copyAttributesFrom(G);
     NewGlobal->setAlignment(RedzoneSize);
 
@@ -571,8 +596,11 @@ bool AddressSanitizer::runOnModule(Module &M) {
   AsanInitFunction->setLinkage(Function::ExternalLinkage);
   IRB.CreateCall(AsanInitFunction);
 
-  MappingOffset = LongSize == 32
-      ? kDefaultShadowOffset32 : kDefaultShadowOffset64;
+  llvm::Triple targetTriple(M.getTargetTriple());
+  bool isAndroid = targetTriple.getEnvironment() == llvm::Triple::ANDROIDEABI;
+
+  MappingOffset = isAndroid ? kDefaultShadowOffsetAndroid :
+    (LongSize == 32 ? kDefaultShadowOffset32 : kDefaultShadowOffset64);
   if (ClMappingOffsetLog >= 0) {
     if (ClMappingOffsetLog == 0) {
       // special case
@@ -655,6 +683,7 @@ bool AddressSanitizer::handleFunction(Module &M, Function &F) {
   SmallSet<Value*, 16> TempsToInstrument;
   SmallVector<Instruction*, 16> ToInstrument;
   SmallVector<Instruction*, 8> NoReturnCalls;
+  bool IsWrite;
 
   // Fill the set of memory operations to instrument.
   for (Function::iterator FI = F.begin(), FE = F.end();
@@ -663,9 +692,7 @@ bool AddressSanitizer::handleFunction(Module &M, Function &F) {
     for (BasicBlock::iterator BI = FI->begin(), BE = FI->end();
          BI != BE; ++BI) {
       if (LooksLikeCodeInBug11395(BI)) return false;
-      if ((isa<LoadInst>(BI) && ClInstrumentReads) ||
-          (isa<StoreInst>(BI) && ClInstrumentWrites)) {
-        Value *Addr = getLDSTOperand(BI);
+      if (Value *Addr = isInterestingMemoryAccess(BI, &IsWrite)) {
         if (ClOpt && ClOptSameTemp) {
           if (!TempsToInstrument.insert(Addr))
             continue;  // We've seen this temp in the current BB.
@@ -692,7 +719,7 @@ bool AddressSanitizer::handleFunction(Module &M, Function &F) {
     Instruction *Inst = ToInstrument[i];
     if (ClDebugMin < 0 || ClDebugMax < 0 ||
         (NumInstrumented >= ClDebugMin && NumInstrumented <= ClDebugMax)) {
-      if (isa<StoreInst>(Inst) || isa<LoadInst>(Inst))
+      if (isInterestingMemoryAccess(Inst, &IsWrite))
         instrumentMop(Inst);
       else
         instrumentMemIntrinsic(cast<MemIntrinsic>(Inst));

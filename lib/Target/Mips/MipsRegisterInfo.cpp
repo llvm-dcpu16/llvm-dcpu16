@@ -16,6 +16,7 @@
 #include "MipsRegisterInfo.h"
 #include "Mips.h"
 #include "MipsAnalyzeImmediate.h"
+#include "MipsInstrInfo.h"
 #include "MipsSubtarget.h"
 #include "MipsMachineFunction.h"
 #include "llvm/Constants.h"
@@ -54,8 +55,7 @@ unsigned MipsRegisterInfo::getPICCallReg() { return Mips::T9; }
 
 /// Mips Callee Saved Registers
 const uint16_t* MipsRegisterInfo::
-getCalleeSavedRegs(const MachineFunction *MF) const
-{
+getCalleeSavedRegs(const MachineFunction *MF) const {
   if (Subtarget.isSingleFloat())
     return CSR_SingleFloatOnly_SaveList;
   else if (!Subtarget.hasMips64())
@@ -64,12 +64,11 @@ getCalleeSavedRegs(const MachineFunction *MF) const
     return CSR_N32_SaveList;
 
   assert(Subtarget.isABI_N64());
-  return CSR_N64_SaveList;  
+  return CSR_N64_SaveList;
 }
 
 const uint32_t*
-MipsRegisterInfo::getCallPreservedMask(CallingConv::ID) const
-{  
+MipsRegisterInfo::getCallPreservedMask(CallingConv::ID) const {
   if (Subtarget.isSingleFloat())
     return CSR_SingleFloatOnly_RegMask;
   else if (!Subtarget.hasMips64())
@@ -78,7 +77,7 @@ MipsRegisterInfo::getCallPreservedMask(CallingConv::ID) const
     return CSR_N32_RegMask;
 
   assert(Subtarget.isABI_N64());
-  return CSR_N64_RegMask;  
+  return CSR_N64_RegMask;
 }
 
 BitVector MipsRegisterInfo::
@@ -116,12 +115,6 @@ getReservedRegs(const MachineFunction &MF) const {
     for (RegIter Reg = Mips::FGR64RegClass.begin(),
          EReg = Mips::FGR64RegClass.end(); Reg != EReg; ++Reg)
       Reserved.set(*Reg);
-  }
-
-  // If GP is dedicated as a global base register, reserve it.
-  if (MF.getInfo<MipsFunctionInfo>()->globalBaseRegFixed()) {
-    Reserved.set(Mips::GP);
-    Reserved.set(Mips::GP_64);
   }
 
   // Reserve FP if this function should have a dedicated frame pointer register.
@@ -217,8 +210,8 @@ eliminateFrameIndex(MachineBasicBlock::iterator II, int SPAdj,
   //   incoming argument, callee-saved register location or local variable.
   int64_t Offset;
 
-  if (MipsFI->isOutArgFI(FrameIndex) || MipsFI->isGPFI(FrameIndex) ||
-      MipsFI->isDynAllocFI(FrameIndex))
+  if (MipsFI->isOutArgFI(FrameIndex) || MipsFI->isDynAllocFI(FrameIndex) ||
+      MipsFI->isGlobalRegFI(FrameIndex))
     Offset = spOffset;
   else
     Offset = spOffset + (int64_t)stackSize;
@@ -232,37 +225,17 @@ eliminateFrameIndex(MachineBasicBlock::iterator II, int SPAdj,
   if (!MI.isDebugValue() && !isInt<16>(Offset)) {
     MachineBasicBlock &MBB = *MI.getParent();
     DebugLoc DL = II->getDebugLoc();
-    MipsAnalyzeImmediate AnalyzeImm;
-    unsigned Size = Subtarget.isABI_N64() ? 64 : 32;
-    unsigned LUi = Subtarget.isABI_N64() ? Mips::LUi64 : Mips::LUi;
     unsigned ADDu = Subtarget.isABI_N64() ? Mips::DADDu : Mips::ADDu;
-    unsigned ZEROReg = Subtarget.isABI_N64() ? Mips::ZERO_64 : Mips::ZERO;
     unsigned ATReg = Subtarget.isABI_N64() ? Mips::AT_64 : Mips::AT;
-    const MipsAnalyzeImmediate::InstSeq &Seq =
-      AnalyzeImm.Analyze(Offset, Size, true /* LastInstrIsADDiu */);
-    MipsAnalyzeImmediate::InstSeq::const_iterator Inst = Seq.begin();
+    MipsAnalyzeImmediate::Inst LastInst(0, 0);
 
     MipsFI->setEmitNOAT();
-
-    // The first instruction can be a LUi, which is different from other
-    // instructions (ADDiu, ORI and SLL) in that it does not have a register
-    // operand.
-    if (Inst->Opc == LUi)
-      BuildMI(MBB, II, DL, TII.get(LUi), ATReg)
-        .addImm(SignExtend64<16>(Inst->ImmOpnd));
-    else
-      BuildMI(MBB, II, DL, TII.get(Inst->Opc), ATReg).addReg(ZEROReg)
-        .addImm(SignExtend64<16>(Inst->ImmOpnd));
-
-    // Build the remaining instructions in Seq except for the last one.
-    for (++Inst; Inst != Seq.end() - 1; ++Inst)
-      BuildMI(MBB, II, DL, TII.get(Inst->Opc), ATReg).addReg(ATReg)
-        .addImm(SignExtend64<16>(Inst->ImmOpnd));
-
+    Mips::loadImmediate(Offset, Subtarget.isABI_N64(), TII, MBB, II, DL, true,
+                        &LastInst);
     BuildMI(MBB, II, DL, TII.get(ADDu), ATReg).addReg(FrameReg).addReg(ATReg);
 
     FrameReg = ATReg;
-    Offset = SignExtend64<16>(Inst->ImmOpnd);
+    Offset = SignExtend64<16>(LastInst.ImmOpnd);
   }
 
   MI.getOperand(i).ChangeToRegister(FrameReg, false);

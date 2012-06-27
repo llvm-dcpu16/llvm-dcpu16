@@ -79,7 +79,17 @@ namespace llvm {
       Sync,
 
       Ext,
-      Ins
+      Ins,
+
+      // Load/Store Left/Right nodes.
+      LWL = ISD::FIRST_TARGET_MEMORY_OPCODE,
+      LWR,
+      SWL,
+      SWR,
+      LDL,
+      LDR,
+      SDL,
+      SDR
     };
   }
 
@@ -136,7 +146,10 @@ namespace llvm {
     SDValue LowerMEMBARRIER(SDValue Op, SelectionDAG& DAG) const;
     SDValue LowerATOMIC_FENCE(SDValue Op, SelectionDAG& DAG) const;
     SDValue LowerShiftLeftParts(SDValue Op, SelectionDAG& DAG) const;
-    SDValue LowerShiftRightParts(SDValue Op, SelectionDAG& DAG, bool IsSRA) const;
+    SDValue LowerShiftRightParts(SDValue Op, SelectionDAG& DAG,
+                                 bool IsSRA) const;
+    SDValue LowerLOAD(SDValue Op, SelectionDAG &DAG) const;
+    SDValue LowerSTORE(SDValue Op, SelectionDAG &DAG) const;
 
     virtual SDValue
       LowerFormalArguments(SDValue Chain,
@@ -146,13 +159,7 @@ namespace llvm {
                            SmallVectorImpl<SDValue> &InVals) const;
 
     virtual SDValue
-      LowerCall(SDValue Chain, SDValue Callee,
-                CallingConv::ID CallConv, bool isVarArg,
-                bool doesNotRet, bool &isTailCall,
-                const SmallVectorImpl<ISD::OutputArg> &Outs,
-                const SmallVectorImpl<SDValue> &OutVals,
-                const SmallVectorImpl<ISD::InputArg> &Ins,
-                DebugLoc dl, SelectionDAG &DAG,
+      LowerCall(TargetLowering::CallLoweringInfo &CLI,
                 SmallVectorImpl<SDValue> &InVals) const;
 
     virtual SDValue
@@ -188,6 +195,11 @@ namespace llvm {
                                               SelectionDAG &DAG) const;
 
     virtual bool isOffsetFoldingLegal(const GlobalAddressSDNode *GA) const;
+
+    virtual EVT getOptimalMemOpType(uint64_t Size, unsigned DstAlign,
+                                    unsigned SrcAlign, bool IsZeroVal,
+                                    bool MemcpyStrSrc,
+                                    MachineFunction &MF) const;
 
     /// isFPImmLegal - Returns true if the target can instruction select the
     /// specified FP immediate natively. If false, the legalizer will

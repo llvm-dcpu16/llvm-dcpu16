@@ -1,4 +1,4 @@
-; RUN: llc < %s -mtriple=armv7-eabi -mattr=+neon,+vfp4 | FileCheck %s
+; RUN: llc < %s -mtriple=armv7-eabi -mattr=+neon,+vfp4 -fp-contract=fast | FileCheck %s
 ; Check generated fused MAC and MLS.
 
 define double @fusedMACTest1(double %d1, double %d2, double %d3) {
@@ -141,6 +141,15 @@ entry:
   ret double %tmp2
 }
 
+define float @test_fnms_f32(float %a, float %b, float* %c) nounwind readnone ssp {
+; CHECK: test_fnms_f32
+; CHECK: vfnms.f32
+  %tmp1 = load float* %c, align 4
+  %tmp2 = fsub float -0.0, %tmp1
+  %tmp3 = tail call float @llvm.fma.f32(float %a, float %b, float %tmp2) nounwind readnone
+  ret float %tmp3 
+}
+
 define double @test_fnms_f64(double %a, double %b, double %c) nounwind readnone ssp {
 entry:
 ; CHECK: test_fnms_f64
@@ -189,6 +198,27 @@ define float @test_fma_const_fold(float %a, float %b) nounwind {
   ret float %ret
 }
 
+define float @test_fma_canonicalize(float %a, float %b) nounwind {
+; CHECK: test_fma_canonicalize
+; CHECK: vmov.f32 [[R1:s[0-9]+]], #2.000000e+00
+; CHECK: vfma.f32 {{s[0-9]+}}, {{s[0-9]+}}, [[R1]]
+  %ret = call float @llvm.fma.f32(float 2.0, float %a, float %b)
+  ret float %ret
+}
+
+; Check that very wide vector fma's can be split into legal fma's.
+define void @test_fma_v8f32(<8 x float> %a, <8 x float> %b, <8 x float> %c, <8 x float>* %p) nounwind readnone ssp {
+; CHECK: test_fma_v8f32
+; CHECK: vfma.f32
+; CHECK: vfma.f32
+entry:
+  %call = tail call <8 x float> @llvm.fma.v8f32(<8 x float> %a, <8 x float> %b, <8 x float> %c) nounwind readnone
+  store <8 x float> %call, <8 x float>* %p, align 16
+  ret void
+}
+
+
 declare float @llvm.fma.f32(float, float, float) nounwind readnone
 declare double @llvm.fma.f64(double, double, double) nounwind readnone
 declare <2 x float> @llvm.fma.v2f32(<2 x float>, <2 x float>, <2 x float>) nounwind readnone
+declare <8 x float> @llvm.fma.v8f32(<8 x float>, <8 x float>, <8 x float>) nounwind readnone

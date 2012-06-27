@@ -43,19 +43,6 @@
 
 using namespace llvm;
 
-void MipsAsmPrinter::EmitInstrWithMacroNoAT(const MachineInstr *MI) {
-  MCInst TmpInst;
-
-  MCInstLowering.Lower(MI, TmpInst);
-  OutStreamer.EmitRawText(StringRef("\t.set\tmacro"));
-  if (MipsFI->getEmitNOAT())
-    OutStreamer.EmitRawText(StringRef("\t.set\tat"));
-  OutStreamer.EmitInstruction(TmpInst);
-  if (MipsFI->getEmitNOAT())
-    OutStreamer.EmitRawText(StringRef("\t.set\tnoat"));
-  OutStreamer.EmitRawText(StringRef("\t.set\tnomacro"));
-}
-
 bool MipsAsmPrinter::runOnMachineFunction(MachineFunction &MF) {
   MipsFI = MF.getInfo<MipsFunctionInfo>();
   AsmPrinter::runOnMachineFunction(MF);
@@ -71,84 +58,14 @@ void MipsAsmPrinter::EmitInstruction(const MachineInstr *MI) {
     return;
   }
 
-  unsigned Opc = MI->getOpcode();
-  MCInst TmpInst0;
-  SmallVector<MCInst, 4> MCInsts;
+  MachineBasicBlock::const_instr_iterator I = MI;
+  MachineBasicBlock::const_instr_iterator E = MI->getParent()->instr_end();
 
-  switch (Opc) {
-  case Mips::ULW:
-  case Mips::ULH:
-  case Mips::ULHu:
-  case Mips::USW:
-  case Mips::USH:
-  case Mips::ULW_P8:
-  case Mips::ULH_P8:
-  case Mips::ULHu_P8:
-  case Mips::USW_P8:
-  case Mips::USH_P8:
-  case Mips::ULD:
-  case Mips::ULW64:
-  case Mips::ULH64:
-  case Mips::ULHu64:
-  case Mips::USD:
-  case Mips::USW64:
-  case Mips::USH64:
-  case Mips::ULD_P8:
-  case Mips::ULW64_P8:
-  case Mips::ULH64_P8:
-  case Mips::ULHu64_P8:
-  case Mips::USD_P8:
-  case Mips::USW64_P8:
-  case Mips::USH64_P8: {
-    if (OutStreamer.hasRawTextSupport()) {
-      EmitInstrWithMacroNoAT(MI);
-      return;
-    }
-
-    MCInstLowering.LowerUnalignedLoadStore(MI, MCInsts);
-    for (SmallVector<MCInst, 4>::iterator I = MCInsts.begin(); I
-           != MCInsts.end(); ++I)
-      OutStreamer.EmitInstruction(*I);
-
-    return;
-  }
-  case Mips::CPRESTORE: {
-    const MachineOperand &MO = MI->getOperand(0);
-    assert(MO.isImm() && "CPRESTORE's operand must be an immediate.");
-    int64_t Offset = MO.getImm();
-
-    if (OutStreamer.hasRawTextSupport()) {
-      if (!isInt<16>(Offset)) {
-        EmitInstrWithMacroNoAT(MI);
-        return;
-      }
-    } else {
-      MCInstLowering.LowerCPRESTORE(Offset, MCInsts);
-
-      for (SmallVector<MCInst, 4>::iterator I = MCInsts.begin();
-           I != MCInsts.end(); ++I)
-        OutStreamer.EmitInstruction(*I);
-
-      return;
-    }
-
-    break;
-  }
-  case Mips::SETGP01: {
-    MCInstLowering.LowerSETGP01(MI, MCInsts);
-
-    for (SmallVector<MCInst, 4>::iterator I = MCInsts.begin();
-         I != MCInsts.end(); ++I)
-      OutStreamer.EmitInstruction(*I);
-
-    return;
-  }
-  default:
-    break;
-  }
-
-  MCInstLowering.Lower(MI, TmpInst0);
-  OutStreamer.EmitInstruction(TmpInst0);
+  do {
+    MCInst TmpInst0;
+    MCInstLowering.Lower(I++, TmpInst0);
+    OutStreamer.EmitInstruction(TmpInst0);
+  } while ((I != E) && I->isInsideBundle());
 }
 
 //===----------------------------------------------------------------------===//
@@ -283,8 +200,15 @@ const char *MipsAsmPrinter::getCurrentABIString() const {
 }
 
 void MipsAsmPrinter::EmitFunctionEntryLabel() {
-  if (OutStreamer.hasRawTextSupport())
+  if (OutStreamer.hasRawTextSupport()) {
+    if (Subtarget->inMips16Mode())
+      OutStreamer.EmitRawText(StringRef("\t.set\tmips16"));
+    else
+      OutStreamer.EmitRawText(StringRef("\t.set\tnomips16"));
+    // leave out until FSF available gas has micromips changes
+    // OutStreamer.EmitRawText(StringRef("\t.set\tnomicromips"));
     OutStreamer.EmitRawText("\t.ent\t" + Twine(CurrentFnSym->getName()));
+  }
   OutStreamer.EmitLabel(CurrentFnSym);
 }
 
@@ -295,10 +219,6 @@ void MipsAsmPrinter::EmitFunctionBodyStart() {
 
   emitFrameDirective();
 
-  bool EmitCPLoad = (MF->getTarget().getRelocationModel() == Reloc::PIC_) &&
-    Subtarget->isABI_O32() && MipsFI->globalBaseRegSet() &&
-    MipsFI->globalBaseRegFixed();
-
   if (OutStreamer.hasRawTextSupport()) {
     SmallString<128> Str;
     raw_svector_ostream OS(Str);
@@ -306,20 +226,9 @@ void MipsAsmPrinter::EmitFunctionBodyStart() {
     OutStreamer.EmitRawText(OS.str());
 
     OutStreamer.EmitRawText(StringRef("\t.set\tnoreorder"));
-
-    // Emit .cpload directive if needed.
-    if (EmitCPLoad)
-      OutStreamer.EmitRawText(StringRef("\t.cpload\t$25"));
-
     OutStreamer.EmitRawText(StringRef("\t.set\tnomacro"));
     if (MipsFI->getEmitNOAT())
       OutStreamer.EmitRawText(StringRef("\t.set\tnoat"));
-  } else if (EmitCPLoad) {
-    SmallVector<MCInst, 4> MCInsts;
-    MCInstLowering.LowerCPLOAD(MCInsts);
-    for (SmallVector<MCInst, 4>::iterator I = MCInsts.begin();
-         I != MCInsts.end(); ++I)
-      OutStreamer.EmitInstruction(*I);
   }
 }
 
@@ -391,13 +300,29 @@ bool MipsAsmPrinter::PrintAsmOperand(const MachineInstr *MI, unsigned OpNum,
 
     const MachineOperand &MO = MI->getOperand(OpNum);
     switch (ExtraCode[0]) {
-      default:
-        return true;  // Unknown modifier.
-      case 'X': // hex const int
-        if ((MO.getType()) != MachineOperand::MO_Immediate)
-          return true;
-        O << "0x" << StringRef(utohexstr(MO.getImm())).lower();
-        return false;
+    default:
+      // See if this is a generic print operand
+      return AsmPrinter::PrintAsmOperand(MI,OpNum,AsmVariant,ExtraCode,O);
+    case 'X': // hex const int
+      if ((MO.getType()) != MachineOperand::MO_Immediate)
+        return true;
+      O << "0x" << StringRef(utohexstr(MO.getImm())).lower();
+      return false;
+    case 'x': // hex const int (low 16 bits)
+      if ((MO.getType()) != MachineOperand::MO_Immediate)
+        return true;
+      O << "0x" << StringRef(utohexstr(MO.getImm() & 0xffff)).lower();
+      return false;
+    case 'd': // decimal const int
+      if ((MO.getType()) != MachineOperand::MO_Immediate)
+        return true;
+      O << MO.getImm();
+      return false;
+    case 'm': // decimal const int minus 1
+      if ((MO.getType()) != MachineOperand::MO_Immediate)
+        return true;
+      O << MO.getImm() - 1;
+      return false;
     }
   }
 
@@ -462,7 +387,7 @@ void MipsAsmPrinter::printOperand(const MachineInstr *MI, int opNum,
       break;
 
     case MachineOperand::MO_BlockAddress: {
-      MCSymbol* BA = GetBlockAddressSymbol(MO.getBlockAddress());
+      MCSymbol *BA = GetBlockAddressSymbol(MO.getBlockAddress());
       O << BA->getName();
       break;
     }
@@ -523,7 +448,7 @@ printMemOperandEA(const MachineInstr *MI, int opNum, raw_ostream &O) {
 void MipsAsmPrinter::
 printFCCOperand(const MachineInstr *MI, int opNum, raw_ostream &O,
                 const char *Modifier) {
-  const MachineOperand& MO = MI->getOperand(opNum);
+  const MachineOperand &MO = MI->getOperand(opNum);
   O << Mips::MipsFCCToString((Mips::CondCode)MO.getImm());
 }
 

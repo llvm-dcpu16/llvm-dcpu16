@@ -817,9 +817,7 @@ void SelectionDAGLegalize::LegalizeOp(SDNode *Node) {
   }
 
   if (SimpleFinishLegalizing) {
-    SmallVector<SDValue, 8> Ops;
-    for (unsigned i = 0, e = Node->getNumOperands(); i != e; ++i)
-      Ops.push_back(Node->getOperand(i));
+    SDNode *NewNode = Node;
     switch (Node->getOpcode()) {
     default: break;
     case ISD::SHL:
@@ -829,11 +827,14 @@ void SelectionDAGLegalize::LegalizeOp(SDNode *Node) {
     case ISD::ROTR:
       // Legalizing shifts/rotates requires adjusting the shift amount
       // to the appropriate width.
-      if (!Ops[1].getValueType().isVector()) {
-        SDValue SAO = DAG.getShiftAmountOperand(Ops[0].getValueType(), Ops[1]);
+      if (!Node->getOperand(1).getValueType().isVector()) {
+        SDValue SAO =
+          DAG.getShiftAmountOperand(Node->getOperand(0).getValueType(),
+                                    Node->getOperand(1));
         HandleSDNode Handle(SAO);
         LegalizeOp(SAO.getNode());
-        Ops[1] = Handle.getValue();
+        NewNode = DAG.UpdateNodeOperands(Node, Node->getOperand(0),
+                                         Handle.getValue());
       }
       break;
     case ISD::SRL_PARTS:
@@ -841,16 +842,19 @@ void SelectionDAGLegalize::LegalizeOp(SDNode *Node) {
     case ISD::SHL_PARTS:
       // Legalizing shifts/rotates requires adjusting the shift amount
       // to the appropriate width.
-      if (!Ops[2].getValueType().isVector()) {
-        SDValue SAO = DAG.getShiftAmountOperand(Ops[0].getValueType(), Ops[2]);
+      if (!Node->getOperand(2).getValueType().isVector()) {
+        SDValue SAO =
+          DAG.getShiftAmountOperand(Node->getOperand(0).getValueType(),
+                                    Node->getOperand(2));
         HandleSDNode Handle(SAO);
         LegalizeOp(SAO.getNode());
-        Ops[2] = Handle.getValue();
+        NewNode = DAG.UpdateNodeOperands(Node, Node->getOperand(0),
+                                         Node->getOperand(1),
+                                         Handle.getValue());
       }
       break;
     }
 
-    SDNode *NewNode = DAG.UpdateNodeOperands(Node, Ops.data(), Ops.size());
     if (NewNode != Node) {
       DAG.ReplaceAllUsesWith(Node, NewNode);
       for (unsigned i = 0, e = Node->getNumValues(); i != e; ++i)
@@ -1312,8 +1316,9 @@ void SelectionDAGLegalize::LegalizeOp(SDNode *Node) {
           }
           break;
         case TargetLowering::Custom:
-          ReplaceNode(SDValue(Node, 0),
-                      TLI.LowerOperation(SDValue(Node, 0), DAG));
+          Tmp1 = TLI.LowerOperation(SDValue(Node, 0), DAG);
+          if (Tmp1.getNode())
+            ReplaceNode(SDValue(Node, 0), Tmp1);
           break;
         case TargetLowering::Expand:
           assert(!StVT.isVector() &&
@@ -1800,11 +1805,13 @@ SDValue SelectionDAGLegalize::ExpandLibCall(RTLIB::Libcall LC, SDNode *Node,
   if (isTailCall)
     InChain = TCChain;
 
-  std::pair<SDValue, SDValue> CallInfo =
-    TLI.LowerCallTo(InChain, RetTy, isSigned, !isSigned, false, false,
+  TargetLowering::
+  CallLoweringInfo CLI(InChain, RetTy, isSigned, !isSigned, false, false,
                     0, TLI.getLibcallCallingConv(LC), isTailCall,
                     /*doesNotReturn=*/false, /*isReturnValueUsed=*/true,
                     Callee, Args, DAG, Node->getDebugLoc());
+  std::pair<SDValue, SDValue> CallInfo = TLI.LowerCallTo(CLI);
+
 
   if (!CallInfo.second.getNode())
     // It's a tailcall, return the chain (which is the DAG root).
@@ -1833,11 +1840,13 @@ SDValue SelectionDAGLegalize::ExpandLibCall(RTLIB::Libcall LC, EVT RetVT,
                                          TLI.getPointerTy());
 
   Type *RetTy = RetVT.getTypeForEVT(*DAG.getContext());
-  std::pair<SDValue,SDValue> CallInfo =
-  TLI.LowerCallTo(DAG.getEntryNode(), RetTy, isSigned, !isSigned, false,
-                  false, 0, TLI.getLibcallCallingConv(LC), /*isTailCall=*/false,
+  TargetLowering::
+  CallLoweringInfo CLI(DAG.getEntryNode(), RetTy, isSigned, !isSigned, false,
+                       false, 0, TLI.getLibcallCallingConv(LC),
+                       /*isTailCall=*/false,
                   /*doesNotReturn=*/false, /*isReturnValueUsed=*/true,
                   Callee, Args, DAG, dl);
+  std::pair<SDValue,SDValue> CallInfo = TLI.LowerCallTo(CLI);
 
   return CallInfo.first;
 }
@@ -1865,11 +1874,12 @@ SelectionDAGLegalize::ExpandChainLibCall(RTLIB::Libcall LC,
                                          TLI.getPointerTy());
 
   Type *RetTy = Node->getValueType(0).getTypeForEVT(*DAG.getContext());
-  std::pair<SDValue, SDValue> CallInfo =
-    TLI.LowerCallTo(InChain, RetTy, isSigned, !isSigned, false, false,
+  TargetLowering::
+  CallLoweringInfo CLI(InChain, RetTy, isSigned, !isSigned, false, false,
                     0, TLI.getLibcallCallingConv(LC), /*isTailCall=*/false,
                     /*doesNotReturn=*/false, /*isReturnValueUsed=*/true,
                     Callee, Args, DAG, Node->getDebugLoc());
+  std::pair<SDValue, SDValue> CallInfo = TLI.LowerCallTo(CLI);
 
   return CallInfo;
 }
@@ -1924,9 +1934,11 @@ static bool isDivRemLibcallAvailable(SDNode *Node, bool isSigned,
   return TLI.getLibcallName(LC) != 0;
 }
 
-/// UseDivRem - Only issue divrem libcall if both quotient and remainder are
+/// useDivRem - Only issue divrem libcall if both quotient and remainder are
 /// needed.
-static bool UseDivRem(SDNode *Node, bool isSigned, bool isDIV) {
+static bool useDivRem(SDNode *Node, bool isSigned, bool isDIV) {
+  // The other use might have been replaced with a divrem already.
+  unsigned DivRemOpc = isSigned ? ISD::SDIVREM : ISD::UDIVREM;
   unsigned OtherOpcode = 0;
   if (isSigned)
     OtherOpcode = isDIV ? ISD::SREM : ISD::SDIV;
@@ -1940,7 +1952,7 @@ static bool UseDivRem(SDNode *Node, bool isSigned, bool isDIV) {
     SDNode *User = *UI;
     if (User == Node)
       continue;
-    if (User->getOpcode() == OtherOpcode &&
+    if ((User->getOpcode() == OtherOpcode || User->getOpcode() == DivRemOpc) &&
         User->getOperand(0) == Op0 &&
         User->getOperand(1) == Op1)
       return true;
@@ -1997,11 +2009,12 @@ SelectionDAGLegalize::ExpandDivRemLibCall(SDNode *Node,
                                          TLI.getPointerTy());
 
   DebugLoc dl = Node->getDebugLoc();
-  std::pair<SDValue, SDValue> CallInfo =
-    TLI.LowerCallTo(InChain, RetTy, isSigned, !isSigned, false, false,
+  TargetLowering::
+  CallLoweringInfo CLI(InChain, RetTy, isSigned, !isSigned, false, false,
                     0, TLI.getLibcallCallingConv(LC), /*isTailCall=*/false,
                     /*doesNotReturn=*/false, /*isReturnValueUsed=*/true,
                     Callee, Args, DAG, dl);
+  std::pair<SDValue, SDValue> CallInfo = TLI.LowerCallTo(CLI);
 
   // Remainder is loaded back from the stack frame.
   SDValue Rem = DAG.getLoad(RetVT, dl, CallInfo.second, FIPtr,
@@ -2575,14 +2588,17 @@ void SelectionDAGLegalize::ExpandNode(SDNode *Node) {
     // If the target didn't lower this, lower it to '__sync_synchronize()' call
     // FIXME: handle "fence singlethread" more efficiently.
     TargetLowering::ArgListTy Args;
-    std::pair<SDValue, SDValue> CallResult =
-      TLI.LowerCallTo(Node->getOperand(0), Type::getVoidTy(*DAG.getContext()),
+    TargetLowering::
+    CallLoweringInfo CLI(Node->getOperand(0),
+                         Type::getVoidTy(*DAG.getContext()),
                       false, false, false, false, 0, CallingConv::C,
                       /*isTailCall=*/false,
                       /*doesNotReturn=*/false, /*isReturnValueUsed=*/true,
                       DAG.getExternalSymbol("__sync_synchronize",
                                             TLI.getPointerTy()),
                       Args, DAG, dl);
+    std::pair<SDValue, SDValue> CallResult = TLI.LowerCallTo(CLI);
+
     Results.push_back(CallResult.second);
     break;
   }
@@ -2652,13 +2668,16 @@ void SelectionDAGLegalize::ExpandNode(SDNode *Node) {
   case ISD::TRAP: {
     // If this operation is not supported, lower it to 'abort()' call
     TargetLowering::ArgListTy Args;
-    std::pair<SDValue, SDValue> CallResult =
-      TLI.LowerCallTo(Node->getOperand(0), Type::getVoidTy(*DAG.getContext()),
+    TargetLowering::
+    CallLoweringInfo CLI(Node->getOperand(0),
+                         Type::getVoidTy(*DAG.getContext()),
                       false, false, false, false, 0, CallingConv::C,
                       /*isTailCall=*/false,
                       /*doesNotReturn=*/false, /*isReturnValueUsed=*/true,
                       DAG.getExternalSymbol("abort", TLI.getPointerTy()),
                       Args, DAG, dl);
+    std::pair<SDValue, SDValue> CallResult = TLI.LowerCallTo(CLI);
+
     Results.push_back(CallResult.second);
     break;
   }
@@ -3064,7 +3083,7 @@ void SelectionDAGLegalize::ExpandNode(SDNode *Node) {
            "Don't know how to expand this subtraction!");
     Tmp1 = DAG.getNode(ISD::XOR, dl, VT, Node->getOperand(1),
                DAG.getConstant(APInt::getAllOnesValue(VT.getSizeInBits()), VT));
-    Tmp1 = DAG.getNode(ISD::ADD, dl, VT, Tmp2, DAG.getConstant(1, VT));
+    Tmp1 = DAG.getNode(ISD::ADD, dl, VT, Tmp1, DAG.getConstant(1, VT));
     Results.push_back(DAG.getNode(ISD::ADD, dl, VT, Node->getOperand(0), Tmp1));
     break;
   }
@@ -3079,7 +3098,7 @@ void SelectionDAGLegalize::ExpandNode(SDNode *Node) {
     Tmp3 = Node->getOperand(1);
     if (TLI.isOperationLegalOrCustom(DivRemOpc, VT) ||
         (isDivRemLibcallAvailable(Node, isSigned, TLI) &&
-         UseDivRem(Node, isSigned, false))) {
+         useDivRem(Node, isSigned, false))) {
       Tmp1 = DAG.getNode(DivRemOpc, dl, VTs, Tmp2, Tmp3).getValue(1);
     } else if (TLI.isOperationLegalOrCustom(DivOpc, VT)) {
       // X % Y -> X-X/Y*Y
@@ -3107,7 +3126,7 @@ void SelectionDAGLegalize::ExpandNode(SDNode *Node) {
     SDVTList VTs = DAG.getVTList(VT, VT);
     if (TLI.isOperationLegalOrCustom(DivRemOpc, VT) ||
         (isDivRemLibcallAvailable(Node, isSigned, TLI) &&
-         UseDivRem(Node, isSigned, true)))
+         useDivRem(Node, isSigned, true)))
       Tmp1 = DAG.getNode(DivRemOpc, dl, VTs, Node->getOperand(0),
                          Node->getOperand(1));
     else if (isSigned)

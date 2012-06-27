@@ -20,7 +20,7 @@
 // This file also defines a simple ARC-aware AliasAnalysis.
 //
 // WARNING: This file knows about certain library functions. It recognizes them
-// by name, and hardwires knowedge of their semantics.
+// by name, and hardwires knowledge of their semantics.
 //
 // WARNING: This file knows about how certain Objective-C library functions are
 // used. Naive LLVM IR transformations which would otherwise be
@@ -812,7 +812,7 @@ ObjCARCAliasAnalysis::getModRefInfo(ImmutableCallSite CS, const Location &Loc) {
   case IC_FusedRetainAutorelease:
   case IC_FusedRetainAutoreleaseRV:
     // These functions don't access any memory visible to the compiler.
-    // Note that this doesn't include objc_retainBlock, becuase it updates
+    // Note that this doesn't include objc_retainBlock, because it updates
     // pointers when it copies block data.
     return NoModRef;
   default:
@@ -3486,8 +3486,18 @@ void ObjCARCOpt::OptimizeWeakCalls(Function &F) {
       for (Value::use_iterator UI = Alloca->use_begin(),
            UE = Alloca->use_end(); UI != UE; ) {
         CallInst *UserInst = cast<CallInst>(*UI++);
-        if (!UserInst->use_empty())
-          UserInst->replaceAllUsesWith(UserInst->getArgOperand(0));
+        switch (GetBasicInstructionClass(UserInst)) {
+        case IC_InitWeak:
+        case IC_StoreWeak:
+          // These functions return their second argument.
+          UserInst->replaceAllUsesWith(UserInst->getArgOperand(1));
+          break;
+        case IC_DestroyWeak:
+          // No return value.
+          break;
+        default:
+          llvm_unreachable("alloca really is used!");
+        }
         UserInst->eraseFromParent();
       }
       Alloca->eraseFromParent();
@@ -4054,8 +4064,22 @@ bool ObjCARCContract::runOnFunction(Function &F) {
       if (!RetainRVMarker)
         break;
       BasicBlock::iterator BBI = Inst;
-      --BBI;
-      while (isNoopInstruction(BBI)) --BBI;
+      BasicBlock *InstParent = Inst->getParent();
+
+      // Step up to see if the call immediately precedes the RetainRV call.
+      // If it's an invoke, we have to cross a block boundary. And we have
+      // to carefully dodge no-op instructions.
+      do {
+        if (&*BBI == InstParent->begin()) {
+          BasicBlock *Pred = InstParent->getSinglePredecessor();
+          if (!Pred)
+            goto decline_rv_optimization;
+          BBI = Pred->getTerminator();
+          break;
+        }
+        --BBI;
+      } while (isNoopInstruction(BBI));
+
       if (&*BBI == GetObjCArg(Inst)) {
         Changed = true;
         InlineAsm *IA =
@@ -4065,6 +4089,7 @@ bool ObjCARCContract::runOnFunction(Function &F) {
                          /*Constraints=*/"", /*hasSideEffects=*/true);
         CallInst::Create(IA, "", Inst);
       }
+    decline_rv_optimization:
       break;
     }
     case IC_InitWeak: {
