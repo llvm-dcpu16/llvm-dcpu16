@@ -1,4 +1,4 @@
-; RUN: llc < %s -mtriple=arm-apple-ios5.0 | FileCheck %s
+; RUN: llc < %s -mtriple=arm-apple-ios5.0 -mcpu=cortex-a8 | FileCheck %s
 
 define void @foo(i32 %x, i32 %y, i32* nocapture %P) nounwind ssp {
 entry:
@@ -43,7 +43,7 @@ bb:
   %3 = load i32* @tabsize, align 4
   %4 = srem i32 %cols, %3
   %5 = sdiv i32 %cols, %3
-  %6 = tail call i32 @llvm.objectsize.i32(i8* null, i1 false, i32 0)
+  %6 = tail call i32 @llvm.objectsize.i32(i8* null, i1 false)
   %7 = tail call i8* @__memset_chk(i8* null, i32 9, i32 %5, i32 %6) nounwind
   br label %bb1
 
@@ -54,5 +54,19 @@ bb1:
   ret void
 }
 
-declare i32 @llvm.objectsize.i32(i8*, i1, i32) nounwind readnone
+declare i32 @llvm.objectsize.i32(i8*, i1) nounwind readnone
 declare i8* @__memset_chk(i8*, i32, i32, i32) nounwind
+
+; rdar://11714607
+define i32 @howmany(i32 %x, i32 %y) nounwind {
+entry:
+; CHECK: howmany:
+; CHECK: bl ___udivmodsi4
+; CHECK-NOT: ___udivsi3
+  %rem = urem i32 %x, %y
+  %div = udiv i32 %x, %y
+  %not.cmp = icmp ne i32 %rem, 0
+  %add = zext i1 %not.cmp to i32
+  %cond = add i32 %add, %div
+  ret i32 %cond
+}

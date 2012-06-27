@@ -196,8 +196,7 @@ std::string getNVPTXElemClassName(TargetRegisterClass const *RC) {
     return getNVPTXRegClassName(&NVPTX::Int32RegsRegClass);
   if (RC->getID() == NVPTX::V4I8RegsRegClassID)
     return getNVPTXRegClassName(&NVPTX::Int8RegsRegClass);
-  assert(0 && "Not a vector register class");
-  return "Unsupported";
+  llvm_unreachable("Not a vector register class");
 }
 
 const TargetRegisterClass *getNVPTXElemClass(TargetRegisterClass const *RC) {
@@ -221,8 +220,7 @@ const TargetRegisterClass *getNVPTXElemClass(TargetRegisterClass const *RC) {
     return (&NVPTX::Int32RegsRegClass);
   if (RC->getID() == NVPTX::V4I8RegsRegClassID)
     return (&NVPTX::Int8RegsRegClass);
-  assert(0 && "Not a vector register class");
-  return 0;
+  llvm_unreachable("Not a vector register class");
 }
 
 int getNVPTXVectorSize(TargetRegisterClass const *RC) {
@@ -246,19 +244,14 @@ int getNVPTXVectorSize(TargetRegisterClass const *RC) {
     return 4;
   if (RC->getID() == NVPTX::V4I8RegsRegClassID)
     return 4;
-  assert(0 && "Not a vector register class");
-  return -1;
+  llvm_unreachable("Not a vector register class");
 }
 }
 
 NVPTXRegisterInfo::NVPTXRegisterInfo(const TargetInstrInfo &tii,
                                      const NVPTXSubtarget &st)
-: NVPTXGenRegisterInfo(0),
-  TII(tii),
-  ST(st) {
-  Is64Bit = st.is64Bit();
-}
-
+  : NVPTXGenRegisterInfo(0),
+    Is64Bit(st.is64Bit()) {}
 
 #define GET_REGINFO_TARGET_DESC
 #include "NVPTXGenRegisterInfo.inc"

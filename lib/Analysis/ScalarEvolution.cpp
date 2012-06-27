@@ -826,8 +826,7 @@ const SCEV *ScalarEvolution::getTruncateExpr(const SCEV *Op,
   // Fold if the operand is constant.
   if (const SCEVConstant *SC = dyn_cast<SCEVConstant>(Op))
     return getConstant(
-      cast<ConstantInt>(ConstantExpr::getTrunc(SC->getValue(),
-                                               getEffectiveSCEVType(Ty))));
+      cast<ConstantInt>(ConstantExpr::getTrunc(SC->getValue(), Ty)));
 
   // trunc(trunc(x)) --> trunc(x)
   if (const SCEVTruncateExpr *ST = dyn_cast<SCEVTruncateExpr>(Op))
@@ -906,8 +905,7 @@ const SCEV *ScalarEvolution::getZeroExtendExpr(const SCEV *Op,
   // Fold if the operand is constant.
   if (const SCEVConstant *SC = dyn_cast<SCEVConstant>(Op))
     return getConstant(
-      cast<ConstantInt>(ConstantExpr::getZExt(SC->getValue(),
-                                              getEffectiveSCEVType(Ty))));
+      cast<ConstantInt>(ConstantExpr::getZExt(SC->getValue(), Ty)));
 
   // zext(zext(x)) --> zext(x)
   if (const SCEVZeroExtendExpr *SZ = dyn_cast<SCEVZeroExtendExpr>(Op))
@@ -976,12 +974,15 @@ const SCEV *ScalarEvolution::getZeroExtendExpr(const SCEV *Op,
           Type *WideTy = IntegerType::get(getContext(), BitWidth * 2);
           // Check whether Start+Step*MaxBECount has no unsigned overflow.
           const SCEV *ZMul = getMulExpr(CastedMaxBECount, Step);
-          const SCEV *Add = getAddExpr(Start, ZMul);
+          const SCEV *ZAdd = getZeroExtendExpr(getAddExpr(Start, ZMul), WideTy);
+          const SCEV *WideStart = getZeroExtendExpr(Start, WideTy);
+          const SCEV *WideMaxBECount =
+            getZeroExtendExpr(CastedMaxBECount, WideTy);
           const SCEV *OperandExtendedAdd =
-            getAddExpr(getZeroExtendExpr(Start, WideTy),
-                       getMulExpr(getZeroExtendExpr(CastedMaxBECount, WideTy),
+            getAddExpr(WideStart,
+                       getMulExpr(WideMaxBECount,
                                   getZeroExtendExpr(Step, WideTy)));
-          if (getZeroExtendExpr(Add, WideTy) == OperandExtendedAdd) {
+          if (ZAdd == OperandExtendedAdd) {
             // Cache knowledge of AR NUW, which is propagated to this AddRec.
             const_cast<SCEVAddRecExpr *>(AR)->setNoWrapFlags(SCEV::FlagNUW);
             // Return the expression with the addrec on the outside.
@@ -991,13 +992,11 @@ const SCEV *ScalarEvolution::getZeroExtendExpr(const SCEV *Op,
           }
           // Similar to above, only this time treat the step value as signed.
           // This covers loops that count down.
-          const SCEV *SMul = getMulExpr(CastedMaxBECount, Step);
-          Add = getAddExpr(Start, SMul);
           OperandExtendedAdd =
-            getAddExpr(getZeroExtendExpr(Start, WideTy),
-                       getMulExpr(getZeroExtendExpr(CastedMaxBECount, WideTy),
+            getAddExpr(WideStart,
+                       getMulExpr(WideMaxBECount,
                                   getSignExtendExpr(Step, WideTy)));
-          if (getZeroExtendExpr(Add, WideTy) == OperandExtendedAdd) {
+          if (ZAdd == OperandExtendedAdd) {
             // Cache knowledge of AR NW, which is propagated to this AddRec.
             // Negative step causes unsigned wrap, but it still can't self-wrap.
             const_cast<SCEVAddRecExpr *>(AR)->setNoWrapFlags(SCEV::FlagNW);
@@ -1164,8 +1163,7 @@ const SCEV *ScalarEvolution::getSignExtendExpr(const SCEV *Op,
   // Fold if the operand is constant.
   if (const SCEVConstant *SC = dyn_cast<SCEVConstant>(Op))
     return getConstant(
-      cast<ConstantInt>(ConstantExpr::getSExt(SC->getValue(),
-                                              getEffectiveSCEVType(Ty))));
+      cast<ConstantInt>(ConstantExpr::getSExt(SC->getValue(), Ty)));
 
   // sext(sext(x)) --> sext(x)
   if (const SCEVSignExtendExpr *SS = dyn_cast<SCEVSignExtendExpr>(Op))
@@ -1242,12 +1240,15 @@ const SCEV *ScalarEvolution::getSignExtendExpr(const SCEV *Op,
           Type *WideTy = IntegerType::get(getContext(), BitWidth * 2);
           // Check whether Start+Step*MaxBECount has no signed overflow.
           const SCEV *SMul = getMulExpr(CastedMaxBECount, Step);
-          const SCEV *Add = getAddExpr(Start, SMul);
+          const SCEV *SAdd = getSignExtendExpr(getAddExpr(Start, SMul), WideTy);
+          const SCEV *WideStart = getSignExtendExpr(Start, WideTy);
+          const SCEV *WideMaxBECount =
+            getZeroExtendExpr(CastedMaxBECount, WideTy);
           const SCEV *OperandExtendedAdd =
-            getAddExpr(getSignExtendExpr(Start, WideTy),
-                       getMulExpr(getZeroExtendExpr(CastedMaxBECount, WideTy),
+            getAddExpr(WideStart,
+                       getMulExpr(WideMaxBECount,
                                   getSignExtendExpr(Step, WideTy)));
-          if (getSignExtendExpr(Add, WideTy) == OperandExtendedAdd) {
+          if (SAdd == OperandExtendedAdd) {
             // Cache knowledge of AR NSW, which is propagated to this AddRec.
             const_cast<SCEVAddRecExpr *>(AR)->setNoWrapFlags(SCEV::FlagNSW);
             // Return the expression with the addrec on the outside.
@@ -1257,13 +1258,11 @@ const SCEV *ScalarEvolution::getSignExtendExpr(const SCEV *Op,
           }
           // Similar to above, only this time treat the step value as unsigned.
           // This covers loops that count up with an unsigned step.
-          const SCEV *UMul = getMulExpr(CastedMaxBECount, Step);
-          Add = getAddExpr(Start, UMul);
           OperandExtendedAdd =
-            getAddExpr(getSignExtendExpr(Start, WideTy),
-                       getMulExpr(getZeroExtendExpr(CastedMaxBECount, WideTy),
+            getAddExpr(WideStart,
+                       getMulExpr(WideMaxBECount,
                                   getZeroExtendExpr(Step, WideTy)));
-          if (getSignExtendExpr(Add, WideTy) == OperandExtendedAdd) {
+          if (SAdd == OperandExtendedAdd) {
             // Cache knowledge of AR NSW, which is propagated to this AddRec.
             const_cast<SCEVAddRecExpr *>(AR)->setNoWrapFlags(SCEV::FlagNSW);
             // Return the expression with the addrec on the outside.
@@ -1839,7 +1838,7 @@ static uint64_t umul_ov(uint64_t i, uint64_t j, bool &Overflow) {
 
 /// Compute the result of "n choose k", the binomial coefficient.  If an
 /// intermediate computation overflows, Overflow will be set and the return will
-/// be garbage. Overflow is not cleared on absense of overflow.
+/// be garbage. Overflow is not cleared on absence of overflow.
 static uint64_t Choose(uint64_t n, uint64_t k, bool &Overflow) {
   // We use the multiplicative formula:
   //     n(n-1)(n-2)...(n-(k-1)) / k(k-1)(k-2)...1 .
@@ -2038,63 +2037,67 @@ const SCEV *ScalarEvolution::getMulExpr(SmallVectorImpl<const SCEV *> &Ops,
     for (unsigned OtherIdx = Idx+1;
          OtherIdx < Ops.size() && isa<SCEVAddRecExpr>(Ops[OtherIdx]);
          ++OtherIdx) {
-      if (AddRecLoop == cast<SCEVAddRecExpr>(Ops[OtherIdx])->getLoop()) {
-        // {A1,+,A2,+,...,+,An}<L> * {B1,+,B2,+,...,+,Bn}<L>
-        // = {x=1 in [ sum y=x..2x [ sum z=max(y-x, y-n)..min(x,n) [
-        //       choose(x, 2x)*choose(2x-y, x-z)*A_{y-z}*B_z
-        //   ]]],+,...up to x=2n}.
-        // Note that the arguments to choose() are always integers with values
-        // known at compile time, never SCEV objects.
-        //
-        // The implementation avoids pointless extra computations when the two
-        // addrec's are of different length (mathematically, it's equivalent to
-        // an infinite stream of zeros on the right).
-        bool OpsModified = false;
-        for (; OtherIdx != Ops.size() && isa<SCEVAddRecExpr>(Ops[OtherIdx]);
-             ++OtherIdx)
-          if (const SCEVAddRecExpr *OtherAddRec =
-                dyn_cast<SCEVAddRecExpr>(Ops[OtherIdx]))
-            if (OtherAddRec->getLoop() == AddRecLoop) {
-              bool Overflow = false;
-              Type *Ty = AddRec->getType();
-              bool LargerThan64Bits = getTypeSizeInBits(Ty) > 64;
-              SmallVector<const SCEV*, 7> AddRecOps;
-              for (int x = 0, xe = AddRec->getNumOperands() +
-                     OtherAddRec->getNumOperands() - 1;
-                   x != xe && !Overflow; ++x) {
-                const SCEV *Term = getConstant(Ty, 0);
-                for (int y = x, ye = 2*x+1; y != ye && !Overflow; ++y) {
-                  uint64_t Coeff1 = Choose(x, 2*x - y, Overflow);
-                  for (int z = std::max(y-x, y-(int)AddRec->getNumOperands()+1),
-                         ze = std::min(x+1, (int)OtherAddRec->getNumOperands());
-                       z < ze && !Overflow; ++z) {
-                    uint64_t Coeff2 = Choose(2*x - y, x-z, Overflow);
-                    uint64_t Coeff;
-                    if (LargerThan64Bits)
-                      Coeff = umul_ov(Coeff1, Coeff2, Overflow);
-                    else
-                      Coeff = Coeff1*Coeff2;
-                    const SCEV *CoeffTerm = getConstant(Ty, Coeff);
-                    const SCEV *Term1 = AddRec->getOperand(y-z);
-                    const SCEV *Term2 = OtherAddRec->getOperand(z);
-                    Term = getAddExpr(Term, getMulExpr(CoeffTerm, Term1,Term2));
-                  }
-                }
-                AddRecOps.push_back(Term);
-              }
-              if (!Overflow) {
-                const SCEV *NewAddRec = getAddRecExpr(AddRecOps,
-                                                      AddRec->getLoop(),
-                                                      SCEV::FlagAnyWrap);
-                if (Ops.size() == 2) return NewAddRec;
-                Ops[Idx] = AddRec = cast<SCEVAddRecExpr>(NewAddRec);
-                Ops.erase(Ops.begin() + OtherIdx); --OtherIdx;
-                OpsModified = true;
-              }
+      if (AddRecLoop != cast<SCEVAddRecExpr>(Ops[OtherIdx])->getLoop())
+        continue;
+
+      // {A1,+,A2,+,...,+,An}<L> * {B1,+,B2,+,...,+,Bn}<L>
+      // = {x=1 in [ sum y=x..2x [ sum z=max(y-x, y-n)..min(x,n) [
+      //       choose(x, 2x)*choose(2x-y, x-z)*A_{y-z}*B_z
+      //   ]]],+,...up to x=2n}.
+      // Note that the arguments to choose() are always integers with values
+      // known at compile time, never SCEV objects.
+      //
+      // The implementation avoids pointless extra computations when the two
+      // addrec's are of different length (mathematically, it's equivalent to
+      // an infinite stream of zeros on the right).
+      bool OpsModified = false;
+      for (; OtherIdx != Ops.size() && isa<SCEVAddRecExpr>(Ops[OtherIdx]);
+           ++OtherIdx) {
+        const SCEVAddRecExpr *OtherAddRec =
+          dyn_cast<SCEVAddRecExpr>(Ops[OtherIdx]);
+        if (!OtherAddRec || OtherAddRec->getLoop() != AddRecLoop)
+          continue;
+
+        bool Overflow = false;
+        Type *Ty = AddRec->getType();
+        bool LargerThan64Bits = getTypeSizeInBits(Ty) > 64;
+        SmallVector<const SCEV*, 7> AddRecOps;
+        for (int x = 0, xe = AddRec->getNumOperands() +
+               OtherAddRec->getNumOperands() - 1; x != xe && !Overflow; ++x) {
+          const SCEV *Term = getConstant(Ty, 0);
+          for (int y = x, ye = 2*x+1; y != ye && !Overflow; ++y) {
+            uint64_t Coeff1 = Choose(x, 2*x - y, Overflow);
+            for (int z = std::max(y-x, y-(int)AddRec->getNumOperands()+1),
+                   ze = std::min(x+1, (int)OtherAddRec->getNumOperands());
+                 z < ze && !Overflow; ++z) {
+              uint64_t Coeff2 = Choose(2*x - y, x-z, Overflow);
+              uint64_t Coeff;
+              if (LargerThan64Bits)
+                Coeff = umul_ov(Coeff1, Coeff2, Overflow);
+              else
+                Coeff = Coeff1*Coeff2;
+              const SCEV *CoeffTerm = getConstant(Ty, Coeff);
+              const SCEV *Term1 = AddRec->getOperand(y-z);
+              const SCEV *Term2 = OtherAddRec->getOperand(z);
+              Term = getAddExpr(Term, getMulExpr(CoeffTerm, Term1,Term2));
             }
-        if (OpsModified)
-          return getMulExpr(Ops);
+          }
+          AddRecOps.push_back(Term);
+        }
+        if (!Overflow) {
+          const SCEV *NewAddRec = getAddRecExpr(AddRecOps, AddRec->getLoop(),
+                                                SCEV::FlagAnyWrap);
+          if (Ops.size() == 2) return NewAddRec;
+          Ops[Idx] = NewAddRec;
+          Ops.erase(Ops.begin() + OtherIdx); --OtherIdx;
+          OpsModified = true;
+          AddRec = dyn_cast<SCEVAddRecExpr>(NewAddRec);
+          if (!AddRec)
+            break;
+        }
       }
+      if (OpsModified)
+        return getMulExpr(Ops);
     }
 
     // Otherwise couldn't fold anything into this recurrence.  Move onto the
@@ -5602,8 +5605,13 @@ static bool HasSameValue(const SCEV *A, const SCEV *B) {
 /// predicate Pred. Return true iff any changes were made.
 ///
 bool ScalarEvolution::SimplifyICmpOperands(ICmpInst::Predicate &Pred,
-                                           const SCEV *&LHS, const SCEV *&RHS) {
+                                           const SCEV *&LHS, const SCEV *&RHS,
+                                           unsigned Depth) {
   bool Changed = false;
+
+  // If we hit the max recursion limit bail out.
+  if (Depth >= 3)
+    return false;
 
   // Canonicalize a constant to the right side.
   if (const SCEVConstant *LHSC = dyn_cast<SCEVConstant>(LHS)) {
@@ -5642,6 +5650,16 @@ bool ScalarEvolution::SimplifyICmpOperands(ICmpInst::Predicate &Pred,
     default: llvm_unreachable("Unexpected ICmpInst::Predicate value!");
     case ICmpInst::ICMP_EQ:
     case ICmpInst::ICMP_NE:
+      // Fold ((-1) * %a) + %b == 0 (equivalent to %b-%a == 0) into %a == %b.
+      if (!RA)
+        if (const SCEVAddExpr *AE = dyn_cast<SCEVAddExpr>(LHS))
+          if (const SCEVMulExpr *ME = dyn_cast<SCEVMulExpr>(AE->getOperand(0)))
+            if (AE->getNumOperands() == 2 && ME->getNumOperands() == 2 &&
+                ME->getOperand(0)->isAllOnesValue()) {
+              RHS = AE->getOperand(1);
+              LHS = ME->getOperand(1);
+              Changed = true;
+            }
       break;
     case ICmpInst::ICMP_UGE:
       if ((RA - 1).isMinValue()) {
@@ -5843,6 +5861,11 @@ bool ScalarEvolution::SimplifyICmpOperands(ICmpInst::Predicate &Pred,
 
   // TODO: More simplifications are possible here.
 
+  // Recursively simplify until we either hit a recursion limit or nothing
+  // changes.
+  if (Changed)
+    return SimplifyICmpOperands(Pred, LHS, RHS, Depth+1);
+
   return Changed;
 
 trivially_true:
@@ -6040,12 +6063,34 @@ ScalarEvolution::isLoopEntryGuardedByCond(const Loop *L,
   return false;
 }
 
+/// RAII wrapper to prevent recursive application of isImpliedCond.
+/// ScalarEvolution's PendingLoopPredicates set must be empty unless we are
+/// currently evaluating isImpliedCond.
+struct MarkPendingLoopPredicate {
+  Value *Cond;
+  DenseSet<Value*> &LoopPreds;
+  bool Pending;
+
+  MarkPendingLoopPredicate(Value *C, DenseSet<Value*> &LP)
+    : Cond(C), LoopPreds(LP) {
+    Pending = !LoopPreds.insert(Cond).second;
+  }
+  ~MarkPendingLoopPredicate() {
+    if (!Pending)
+      LoopPreds.erase(Cond);
+  }
+};
+
 /// isImpliedCond - Test whether the condition described by Pred, LHS,
 /// and RHS is true whenever the given Cond value evaluates to true.
 bool ScalarEvolution::isImpliedCond(ICmpInst::Predicate Pred,
                                     const SCEV *LHS, const SCEV *RHS,
                                     Value *FoundCondValue,
                                     bool Inverse) {
+  MarkPendingLoopPredicate Mark(FoundCondValue, PendingLoopPredicates);
+  if (Mark.Pending)
+    return false;
+
   // Recursively handle And and Or conditions.
   if (BinaryOperator *BO = dyn_cast<BinaryOperator>(FoundCondValue)) {
     if (BO->getOpcode() == Instruction::And) {
@@ -6571,6 +6616,8 @@ void ScalarEvolution::releaseMemory() {
        I != E; ++I) {
     I->second.clear();
   }
+
+  assert(PendingLoopPredicates.empty() && "isImpliedCond garbage");
 
   BackedgeTakenCounts.clear();
   ConstantEvolutionLoopExitValue.clear();

@@ -236,7 +236,10 @@ public:
     Match_RequiresITBlock = FIRST_TARGET_MATCH_RESULT_TY,
     Match_RequiresNotITBlock,
     Match_RequiresV6,
-    Match_RequiresThumb2
+    Match_RequiresThumb2,
+#define GET_OPERAND_DIAGNOSTIC_TYPES
+#include "ARMGenAsmMatcher.inc"
+
   };
 
   ARMAsmParser(MCSubtargetInfo &_STI, MCAsmParser &_Parser)
@@ -2305,7 +2308,7 @@ void ARMOperand::print(raw_ostream &OS) const {
     OS << "<ccout " << getReg() << ">";
     break;
   case k_ITCondMask: {
-    static const char *MaskStr[] = {
+    static const char *const MaskStr[] = {
       "()", "(t)", "(e)", "(tt)", "(et)", "(te)", "(ee)", "(ttt)", "(ett)",
       "(tet)", "(eet)", "(tte)", "(ete)", "(tee)", "(eee)"
     };
@@ -3284,7 +3287,8 @@ ARMAsmParser::OperandMatchResultTy ARMAsmParser::
 parseProcIFlagsOperand(SmallVectorImpl<MCParsedAsmOperand*> &Operands) {
   SMLoc S = Parser.getTok().getLoc();
   const AsmToken &Tok = Parser.getTok();
-  assert(Tok.is(AsmToken::Identifier) && "Token is not an Identifier");
+  if (!Tok.is(AsmToken::Identifier)) 
+    return MatchOperand_NoMatch;
   StringRef IFlagsStr = Tok.getString();
 
   // An iflags string of "none" is interpreted to mean that none of the AIF
@@ -3324,26 +3328,51 @@ parseMSRMaskOperand(SmallVectorImpl<MCParsedAsmOperand*> &Operands) {
     // See ARMv6-M 10.1.1
     std::string Name = Mask.lower();
     unsigned FlagsVal = StringSwitch<unsigned>(Name)
-      .Case("apsr", 0)
-      .Case("iapsr", 1)
-      .Case("eapsr", 2)
-      .Case("xpsr", 3)
-      .Case("ipsr", 5)
-      .Case("epsr", 6)
-      .Case("iepsr", 7)
-      .Case("msp", 8)
-      .Case("psp", 9)
-      .Case("primask", 16)
-      .Case("basepri", 17)
-      .Case("basepri_max", 18)
-      .Case("faultmask", 19)
-      .Case("control", 20)
+      // Note: in the documentation:
+      //  ARM deprecates using MSR APSR without a _<bits> qualifier as an alias
+      //  for MSR APSR_nzcvq.
+      // but we do make it an alias here.  This is so to get the "mask encoding"
+      // bits correct on MSR APSR writes.
+      //
+      // FIXME: Note the 0xc00 "mask encoding" bits version of the registers
+      // should really only be allowed when writing a special register.  Note
+      // they get dropped in the MRS instruction reading a special register as
+      // the SYSm field is only 8 bits.
+      //
+      // FIXME: the _g and _nzcvqg versions are only allowed if the processor
+      // includes the DSP extension but that is not checked.
+      .Case("apsr", 0x800)
+      .Case("apsr_nzcvq", 0x800)
+      .Case("apsr_g", 0x400)
+      .Case("apsr_nzcvqg", 0xc00)
+      .Case("iapsr", 0x801)
+      .Case("iapsr_nzcvq", 0x801)
+      .Case("iapsr_g", 0x401)
+      .Case("iapsr_nzcvqg", 0xc01)
+      .Case("eapsr", 0x802)
+      .Case("eapsr_nzcvq", 0x802)
+      .Case("eapsr_g", 0x402)
+      .Case("eapsr_nzcvqg", 0xc02)
+      .Case("xpsr", 0x803)
+      .Case("xpsr_nzcvq", 0x803)
+      .Case("xpsr_g", 0x403)
+      .Case("xpsr_nzcvqg", 0xc03)
+      .Case("ipsr", 0x805)
+      .Case("epsr", 0x806)
+      .Case("iepsr", 0x807)
+      .Case("msp", 0x808)
+      .Case("psp", 0x809)
+      .Case("primask", 0x810)
+      .Case("basepri", 0x811)
+      .Case("basepri_max", 0x812)
+      .Case("faultmask", 0x813)
+      .Case("control", 0x814)
       .Default(~0U);
 
     if (FlagsVal == ~0U)
       return MatchOperand_NoMatch;
 
-    if (!hasV7Ops() && FlagsVal >= 17 && FlagsVal <= 19)
+    if (!hasV7Ops() && FlagsVal >= 0x811 && FlagsVal <= 0x813)
       // basepri, basepri_max and faultmask only valid for V7m.
       return MatchOperand_NoMatch;
 
@@ -6764,8 +6793,8 @@ processInstruction(MCInst &Inst,
     case ARM_AM::ror: newOpc = ARM::t2RORri; isNarrow = false; break;
     case ARM_AM::rrx: isNarrow = false; newOpc = ARM::t2RRX; break;
     }
-    unsigned Ammount = ARM_AM::getSORegOffset(Inst.getOperand(2).getImm());
-    if (Ammount == 32) Ammount = 0;
+    unsigned Amount = ARM_AM::getSORegOffset(Inst.getOperand(2).getImm());
+    if (Amount == 32) Amount = 0;
     TmpInst.setOpcode(newOpc);
     TmpInst.addOperand(Inst.getOperand(0)); // Rd
     if (isNarrow)
@@ -6773,7 +6802,7 @@ processInstruction(MCInst &Inst,
           Inst.getOpcode() == ARM::t2MOVSsi ? ARM::CPSR : 0));
     TmpInst.addOperand(Inst.getOperand(1)); // Rn
     if (newOpc != ARM::t2RRX)
-      TmpInst.addOperand(MCOperand::CreateImm(Ammount));
+      TmpInst.addOperand(MCOperand::CreateImm(Amount));
     TmpInst.addOperand(Inst.getOperand(3)); // CondCode
     TmpInst.addOperand(Inst.getOperand(4));
     if (!isNarrow)
@@ -7375,7 +7404,7 @@ MatchAndEmitInstruction(SMLoc IDLoc,
     return Error(IDLoc, "invalid instruction",
                  ((ARMOperand*)Operands[0])->getLocRange());
   case Match_ConversionFail:
-    // The converter function will have already emited a diagnostic.
+    // The converter function will have already emitted a diagnostic.
     return true;
   case Match_RequiresNotITBlock:
     return Error(IDLoc, "flag setting instruction only valid outside IT block");
@@ -7385,6 +7414,11 @@ MatchAndEmitInstruction(SMLoc IDLoc,
     return Error(IDLoc, "instruction variant requires ARMv6 or later");
   case Match_RequiresThumb2:
     return Error(IDLoc, "instruction variant requires Thumb2");
+  case Match_ImmRange0_15: {
+    SMLoc ErrorLoc = ((ARMOperand*)Operands[ErrorInfo])->getStartLoc();
+    if (ErrorLoc == SMLoc()) ErrorLoc = IDLoc;
+    return Error(ErrorLoc, "immediate operand must be in the range [0,15]");
+  }
   }
 
   llvm_unreachable("Implement any new match types added!");

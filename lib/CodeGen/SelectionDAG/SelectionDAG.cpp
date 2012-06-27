@@ -3710,8 +3710,8 @@ SDValue SelectionDAG::getMemcpy(SDValue Chain, DebugLoc dl, SDValue Dst,
   Entry.Node = Src; Args.push_back(Entry);
   Entry.Node = Size; Args.push_back(Entry);
   // FIXME: pass in DebugLoc
-  std::pair<SDValue,SDValue> CallResult =
-    TLI.LowerCallTo(Chain, Type::getVoidTy(*getContext()),
+  TargetLowering::
+  CallLoweringInfo CLI(Chain, Type::getVoidTy(*getContext()),
                     false, false, false, false, 0,
                     TLI.getLibcallCallingConv(RTLIB::MEMCPY),
                     /*isTailCall=*/false,
@@ -3719,6 +3719,8 @@ SDValue SelectionDAG::getMemcpy(SDValue Chain, DebugLoc dl, SDValue Dst,
                     getExternalSymbol(TLI.getLibcallName(RTLIB::MEMCPY),
                                       TLI.getPointerTy()),
                     Args, *this, dl);
+  std::pair<SDValue,SDValue> CallResult = TLI.LowerCallTo(CLI);
+
   return CallResult.second;
 }
 
@@ -3763,8 +3765,8 @@ SDValue SelectionDAG::getMemmove(SDValue Chain, DebugLoc dl, SDValue Dst,
   Entry.Node = Src; Args.push_back(Entry);
   Entry.Node = Size; Args.push_back(Entry);
   // FIXME:  pass in DebugLoc
-  std::pair<SDValue,SDValue> CallResult =
-    TLI.LowerCallTo(Chain, Type::getVoidTy(*getContext()),
+  TargetLowering::
+  CallLoweringInfo CLI(Chain, Type::getVoidTy(*getContext()),
                     false, false, false, false, 0,
                     TLI.getLibcallCallingConv(RTLIB::MEMMOVE),
                     /*isTailCall=*/false,
@@ -3772,6 +3774,8 @@ SDValue SelectionDAG::getMemmove(SDValue Chain, DebugLoc dl, SDValue Dst,
                     getExternalSymbol(TLI.getLibcallName(RTLIB::MEMMOVE),
                                       TLI.getPointerTy()),
                     Args, *this, dl);
+  std::pair<SDValue,SDValue> CallResult = TLI.LowerCallTo(CLI);
+
   return CallResult.second;
 }
 
@@ -3824,8 +3828,8 @@ SDValue SelectionDAG::getMemset(SDValue Chain, DebugLoc dl, SDValue Dst,
   Entry.isSExt = false;
   Args.push_back(Entry);
   // FIXME: pass in DebugLoc
-  std::pair<SDValue,SDValue> CallResult =
-    TLI.LowerCallTo(Chain, Type::getVoidTy(*getContext()),
+  TargetLowering::
+  CallLoweringInfo CLI(Chain, Type::getVoidTy(*getContext()),
                     false, false, false, false, 0,
                     TLI.getLibcallCallingConv(RTLIB::MEMSET),
                     /*isTailCall=*/false,
@@ -3833,6 +3837,8 @@ SDValue SelectionDAG::getMemset(SDValue Chain, DebugLoc dl, SDValue Dst,
                     getExternalSymbol(TLI.getLibcallName(RTLIB::MEMSET),
                                       TLI.getPointerTy()),
                     Args, *this, dl);
+  std::pair<SDValue,SDValue> CallResult = TLI.LowerCallTo(CLI);
+
   return CallResult.second;
 }
 
@@ -5570,7 +5576,7 @@ unsigned SelectionDAG::AssignTopologicalOrder() {
     }
   }
 
-  // Visit all the nodes. As we iterate, moves nodes into sorted order,
+  // Visit all the nodes. As we iterate, move nodes into sorted order,
   // such that by the time the end is reached all nodes will be sorted.
   for (allnodes_iterator I = allnodes_begin(),E = allnodes_end(); I != E; ++I) {
     SDNode *N = I;

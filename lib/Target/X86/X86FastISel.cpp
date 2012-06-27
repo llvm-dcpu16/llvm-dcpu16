@@ -1424,7 +1424,7 @@ bool X86FastISel::X86VisitIntrinsicCall(const IntrinsicInst &I) {
     return DoSelectCall(&I, "memset");
   }
   case Intrinsic::stackprotector: {
-    // Emit code inline code to store the stack guard onto the stack.
+    // Emit code to store the stack guard onto the stack.
     EVT PtrTy = TLI.getPointerTy();
 
     const Value *Op1 = I.getArgOperand(0); // The guard's value.
@@ -1549,9 +1549,8 @@ bool X86FastISel::DoSelectCall(const Instruction *I, const char *MemIntName) {
 
   // Check whether the function can return without sret-demotion.
   SmallVector<ISD::OutputArg, 4> Outs;
-  SmallVector<uint64_t, 4> Offsets;
   GetReturnInfo(I->getType(), CS.getAttributes().getRetAttributes(),
-                Outs, TLI, &Offsets);
+                Outs, TLI);
   bool CanLowerReturn = TLI.CanLowerReturn(CS.getCallingConv(),
 					   *FuncInfo.MF, FTy->isVarArg(),
 					   Outs, FTy->getContext());

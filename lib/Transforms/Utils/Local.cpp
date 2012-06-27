@@ -169,16 +169,21 @@ bool llvm::ConstantFoldTerminator(BasicBlock *BB, bool DeleteDeadConditions) {
       // Otherwise, we can fold this switch into a conditional branch
       // instruction if it has only one non-default destination.
       SwitchInst::CaseIt FirstCase = SI->case_begin();
-      Value *Cond = Builder.CreateICmpEQ(SI->getCondition(),
-          FirstCase.getCaseValue(), "cond");
+      IntegersSubset& Case = FirstCase.getCaseValueEx();
+      if (Case.isSingleNumber()) {
+        // FIXME: Currently work with ConstantInt based numbers.
+        Value *Cond = Builder.CreateICmpEQ(SI->getCondition(),
+             Case.getSingleNumber(0).toConstantInt(),
+            "cond");
 
-      // Insert the new branch.
-      Builder.CreateCondBr(Cond, FirstCase.getCaseSuccessor(),
-                           SI->getDefaultDest());
+        // Insert the new branch.
+        Builder.CreateCondBr(Cond, FirstCase.getCaseSuccessor(),
+                             SI->getDefaultDest());
 
-      // Delete the old switch.
-      SI->eraseFromParent();
-      return true;
+        // Delete the old switch.
+        SI->eraseFromParent();
+        return true;
+      }
     }
     return false;
   }
@@ -260,7 +265,7 @@ bool llvm::isInstructionTriviallyDead(Instruction *I) {
       return isa<UndefValue>(II->getArgOperand(1));
   }
 
-  if (extractMallocCall(I) || extractCallocCall(I)) return true;
+  if (isAllocLikeFn(I)) return true;
 
   if (CallInst *CI = isFreeCall(I))
     if (Constant *C = dyn_cast<Constant>(CI->getArgOperand(0)))
@@ -700,7 +705,7 @@ bool llvm::EliminateDuplicatePHINodes(BasicBlock *BB) {
         CollisionMap[PN] = Old;
         break;
       }
-      // Procede to the next PHI in the list.
+      // Proceed to the next PHI in the list.
       OtherPN = I->second;
     }
   }

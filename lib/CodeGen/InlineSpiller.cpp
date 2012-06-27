@@ -52,7 +52,6 @@ static cl::opt<bool> DisableHoisting("disable-spill-hoist", cl::Hidden,
 
 namespace {
 class InlineSpiller : public Spiller {
-  MachineFunctionPass &Pass;
   MachineFunction &MF;
   LiveIntervals &LIS;
   LiveStacks &LSS;
@@ -137,8 +136,7 @@ public:
   InlineSpiller(MachineFunctionPass &pass,
                 MachineFunction &mf,
                 VirtRegMap &vrm)
-    : Pass(pass),
-      MF(mf),
+    : MF(mf),
       LIS(pass.getAnalysis<LiveIntervals>()),
       LSS(pass.getAnalysis<LiveStacks>()),
       AA(&pass.getAnalysis<AliasAnalysis>()),
@@ -578,11 +576,11 @@ MachineInstr *InlineSpiller::traceSiblingValue(unsigned UseReg, VNInfo *UseVNI,
     if (unsigned SrcReg = isFullCopyOf(MI, Reg)) {
       if (isSibling(SrcReg)) {
         LiveInterval &SrcLI = LIS.getInterval(SrcReg);
-        LiveRange *SrcLR = SrcLI.getLiveRangeContaining(VNI->def.getRegSlot(true));
-        assert(SrcLR && "Copy from non-existing value");
+        LiveRangeQuery SrcQ(SrcLI, VNI->def);
+        assert(SrcQ.valueIn() && "Copy from non-existing value");
         // Check if this COPY kills its source.
-        SVI->second.KillsSource = (SrcLR->end == VNI->def);
-        VNInfo *SrcVNI = SrcLR->valno;
+        SVI->second.KillsSource = SrcQ.isKill();
+        VNInfo *SrcVNI = SrcQ.valueIn();
         DEBUG(dbgs() << "copy of " << PrintReg(SrcReg) << ':'
                      << SrcVNI->id << '@' << SrcVNI->def
                      << " kill=" << unsigned(SVI->second.KillsSource) << '\n');
@@ -1275,8 +1273,8 @@ void InlineSpiller::spill(LiveRangeEdit &edit) {
 
   DEBUG(dbgs() << "Inline spilling "
                << MRI.getRegClass(edit.getReg())->getName()
-               << ':' << edit.getParent() << "\nFrom original "
-               << LIS.getInterval(Original) << '\n');
+               << ':' << PrintReg(edit.getReg()) << ' ' << edit.getParent()
+               << "\nFrom original " << LIS.getInterval(Original) << '\n');
   assert(edit.getParent().isSpillable() &&
          "Attempting to spill already spilled value.");
   assert(DeadDefs.empty() && "Previous spill didn't remove dead defs");

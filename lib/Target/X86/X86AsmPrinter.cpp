@@ -186,9 +186,12 @@ void X86AsmPrinter::printSymbolOperand(const MachineOperand &MO,
     O << '-' << *MF->getPICBaseSymbol();
     break;
   case X86II::MO_TLSGD:     O << "@TLSGD";     break;
+  case X86II::MO_TLSLD:     O << "@TLSLD";     break;
+  case X86II::MO_TLSLDM:    O << "@TLSLDM";    break;
   case X86II::MO_GOTTPOFF:  O << "@GOTTPOFF";  break;
   case X86II::MO_INDNTPOFF: O << "@INDNTPOFF"; break;
   case X86II::MO_TPOFF:     O << "@TPOFF";     break;
+  case X86II::MO_DTPOFF:    O << "@DTPOFF";    break;
   case X86II::MO_NTPOFF:    O << "@NTPOFF";    break;
   case X86II::MO_GOTNTPOFF: O << "@GOTNTPOFF"; break;
   case X86II::MO_GOTPCREL:  O << "@GOTPCREL";  break;
@@ -404,7 +407,9 @@ bool X86AsmPrinter::PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
     const MachineOperand &MO = MI->getOperand(OpNo);
 
     switch (ExtraCode[0]) {
-    default: return true;  // Unknown modifier.
+    default:
+      // See if this is a generic print operand
+      return AsmPrinter::PrintAsmOperand(MI, OpNo, AsmVariant, ExtraCode, O);
     case 'a': // This is an address.  Currently only 'i' and 'r' are expected.
       if (MO.isImm()) {
         O << MO.getImm();

@@ -207,6 +207,10 @@ namespace llvm {
       // TLSADDR - Thread Local Storage.
       TLSADDR,
 
+      // TLSBASEADDR - Thread Local Storage. A call to get the start address
+      // of the TLS block for the current module.
+      TLSBASEADDR,
+
       // TLSCALL - Thread Local Storage.  When calling to an OS provided
       // thunk at the address from an earlier relocation.
       TLSCALL,
@@ -241,9 +245,6 @@ namespace llvm {
 
       // PCMP* - Vector integer comparisons.
       PCMPEQ, PCMPGT,
-
-      // VPCOM, VPCOMU - XOP Vector integer comparisons.
-      VPCOM, VPCOMU,
 
       // ADD, SUB, SMUL, etc. - Arithmetic operations with FLAGS results.
       ADD, SUB, ADC, SBB, SMUL,
@@ -803,12 +804,7 @@ namespace llvm {
                            DebugLoc dl, SelectionDAG &DAG,
                            SmallVectorImpl<SDValue> &InVals) const;
     virtual SDValue
-      LowerCall(SDValue Chain, SDValue Callee, CallingConv::ID CallConv,
-                bool isVarArg, bool doesNotRet, bool &isTailCall,
-                const SmallVectorImpl<ISD::OutputArg> &Outs,
-                const SmallVectorImpl<SDValue> &OutVals,
-                const SmallVectorImpl<ISD::InputArg> &Ins,
-                DebugLoc dl, SelectionDAG &DAG,
+      LowerCall(CallLoweringInfo &CLI,
                 SmallVectorImpl<SDValue> &InVals) const;
 
     virtual SDValue

@@ -127,8 +127,8 @@ namespace llvm {
                              StringRef Name = StringRef());
 
     /// createReferenceType - Create debugging information entry for a c++
-    /// style reference.
-    DIType createReferenceType(DIType RTy);
+    /// style reference or rvalue reference type.
+    DIType createReferenceType(unsigned Tag, DIType RTy);
 
     /// createTypedef - Create debugging information entry for a typedef.
     /// @param Ty          Original type.
@@ -177,7 +177,7 @@ namespace llvm {
     /// @param OffsetInBits Member offset.
     /// @param Flags        Flags to encode member attribute, e.g. private
     /// @param Ty           Parent type.
-    /// @param PropertyName Name of the Objective C property assoicated with
+    /// @param PropertyName Name of the Objective C property associated with
     ///                     this ivar.
     /// @param GetterName   Name of the Objective C property getter selector.
     /// @param SetterName   Name of the Objective C property setter selector.
@@ -329,10 +329,12 @@ namespace llvm {
     /// @param SizeInBits   Member size.
     /// @param AlignInBits  Member alignment.
     /// @param Elements     Enumeration elements.
+    /// @param Flags        Flags (e.g. forward decl)
     DIType createEnumerationType(DIDescriptor Scope, StringRef Name, 
                                  DIFile File, unsigned LineNumber, 
-                                 uint64_t SizeInBits, 
-                                 uint64_t AlignInBits, DIArray Elements);
+                                 uint64_t SizeInBits, uint64_t AlignInBits,
+                                 DIArray Elements, DIType ClassType,
+                                 unsigned Flags);
 
     /// createSubroutineType - Create subroutine type.
     /// @param File          File in which this subroutine is defined.

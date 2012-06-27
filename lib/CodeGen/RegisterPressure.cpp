@@ -12,12 +12,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "RegisterClassInfo.h"
-#include "RegisterPressure.h"
 #include "llvm/CodeGen/LiveInterval.h"
 #include "llvm/CodeGen/LiveIntervalAnalysis.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
+#include "llvm/CodeGen/RegisterClassInfo.h"
+#include "llvm/CodeGen/RegisterPressure.h"
 #include "llvm/Target/TargetMachine.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace llvm;
 
@@ -59,6 +61,22 @@ void RegisterPressure::increase(const TargetRegisterClass *RC,
 void RegisterPressure::decrease(const TargetRegisterClass *RC,
                                 const TargetRegisterInfo *TRI) {
   decreaseSetPressure(MaxSetPressure, RC, TRI);
+}
+
+void RegisterPressure::dump(const TargetRegisterInfo *TRI) {
+  dbgs() << "Live In: ";
+  for (unsigned i = 0, e = LiveInRegs.size(); i < e; ++i)
+    dbgs() << PrintReg(LiveInRegs[i], TRI) << " ";
+  dbgs() << '\n';
+  dbgs() << "Live Out: ";
+  for (unsigned i = 0, e = LiveOutRegs.size(); i < e; ++i)
+    dbgs() << PrintReg(LiveOutRegs[i], TRI) << " ";
+  dbgs() << '\n';
+  for (unsigned i = 0, e = MaxSetPressure.size(); i < e; ++i) {
+    if (MaxSetPressure[i] != 0)
+      dbgs() << TRI->getRegPressureSetName(i) << "=" << MaxSetPressure[i]
+             << '\n';
+  }
 }
 
 /// Increase the current pressure as impacted by these physical registers and
@@ -253,10 +271,9 @@ void RegPressureTracker::closeRegion() {
 static bool hasRegAlias(unsigned Reg, SparseSet<unsigned> &Regs,
                         const TargetRegisterInfo *TRI) {
   assert(!TargetRegisterInfo::isVirtualRegister(Reg) && "only for physregs");
-  for (const uint16_t *Alias = TRI->getOverlaps(Reg); *Alias; ++Alias) {
-    if (Regs.count(*Alias))
+  for (MCRegAliasIterator AI(Reg, TRI, true); AI.isValid(); ++AI)
+    if (Regs.count(*AI))
       return true;
-  }
   return false;
 }
 
@@ -265,9 +282,9 @@ static bool hasRegAlias(unsigned Reg, SparseSet<unsigned> &Regs,
 static SmallVectorImpl<unsigned>::iterator
 findRegAlias(unsigned Reg, SmallVectorImpl<unsigned> &Regs,
              const TargetRegisterInfo *TRI) {
-  for (const uint16_t *Alias = TRI->getOverlaps(Reg); *Alias; ++Alias) {
+  for (MCRegAliasIterator AI(Reg, TRI, true); AI.isValid(); ++AI) {
     SmallVectorImpl<unsigned>::iterator I =
-      std::find(Regs.begin(), Regs.end(), *Alias);
+      std::find(Regs.begin(), Regs.end(), *AI);
     if (I != Regs.end())
       return I;
   }
@@ -356,7 +373,7 @@ void RegPressureTracker::addLiveRegs(ArrayRef<unsigned> Regs) {
 /// Add PhysReg to the live in set and increase max pressure.
 void RegPressureTracker::discoverPhysLiveIn(unsigned Reg) {
   assert(!LivePhysRegs.count(Reg) && "avoid bumping max pressure twice");
-  if (findRegAlias(Reg, P.LiveInRegs, TRI) == P.LiveInRegs.end())
+  if (findRegAlias(Reg, P.LiveInRegs, TRI) != P.LiveInRegs.end())
     return;
 
   // At live in discovery, unconditionally increase the high water mark.
@@ -367,7 +384,7 @@ void RegPressureTracker::discoverPhysLiveIn(unsigned Reg) {
 /// Add PhysReg to the live out set and increase max pressure.
 void RegPressureTracker::discoverPhysLiveOut(unsigned Reg) {
   assert(!LivePhysRegs.count(Reg) && "avoid bumping max pressure twice");
-  if (findRegAlias(Reg, P.LiveOutRegs, TRI) == P.LiveOutRegs.end())
+  if (findRegAlias(Reg, P.LiveOutRegs, TRI) != P.LiveOutRegs.end())
     return;
 
   // At live out discovery, unconditionally increase the high water mark.
@@ -562,12 +579,13 @@ bool RegPressureTracker::advance() {
   return true;
 }
 
-// Find the max change in excess pressure across all sets.
-static int computeMaxPressureDelta(ArrayRef<unsigned> OldPressureVec,
-                                   ArrayRef<unsigned> NewPressureVec,
-                                   unsigned &PSetID,
-                                   const TargetRegisterInfo *TRI) {
+/// Find the max change in excess pressure across all sets.
+static void computeExcessPressureDelta(ArrayRef<unsigned> OldPressureVec,
+                                       ArrayRef<unsigned> NewPressureVec,
+                                       RegPressureDelta &Delta,
+                                       const TargetRegisterInfo *TRI) {
   int ExcessUnits = 0;
+  unsigned PSetID = ~0U;
   for (unsigned i = 0, e = OldPressureVec.size(); i < e; ++i) {
     unsigned POld = OldPressureVec[i];
     unsigned PNew = NewPressureVec[i];
@@ -578,42 +596,75 @@ static int computeMaxPressureDelta(ArrayRef<unsigned> OldPressureVec,
     unsigned Limit = TRI->getRegPressureSetLimit(i);
     if (Limit > POld) {
       if (Limit > PNew)
-        PDiff = 0;          // Under the limit
+        PDiff = 0;            // Under the limit
       else
         PDiff = PNew - Limit; // Just exceeded limit.
     }
     else if (Limit > PNew)
-      PDiff = Limit - POld; // Just obeyed limit.
+      PDiff = Limit - POld;   // Just obeyed limit.
 
     if (std::abs(PDiff) > std::abs(ExcessUnits)) {
       ExcessUnits = PDiff;
       PSetID = i;
     }
   }
-  return ExcessUnits;
+  Delta.Excess.PSetID = PSetID;
+  Delta.Excess.UnitIncrease = ExcessUnits;
 }
 
-/// Consider the pressure increase caused by traversing this instruction
-/// bottom-up. Find the pressure set with the most change beyond its pressure
-/// limit based on the tracker's current pressure, and return the change in
-/// number of register units of that pressure set introduced by this
-/// instruction.
+/// Find the max change in max pressure that either surpasses a critical PSet
+/// limit or exceeds the current MaxPressureLimit.
 ///
-/// This assumes that the current LiveOut set is sufficient.
+/// FIXME: comparing each element of the old and new MaxPressure vectors here is
+/// silly. It's done now to demonstrate the concept but will go away with a
+/// RegPressureTracker API change to work with pressure differences.
+static void computeMaxPressureDelta(ArrayRef<unsigned> OldMaxPressureVec,
+                                    ArrayRef<unsigned> NewMaxPressureVec,
+                                    ArrayRef<PressureElement> CriticalPSets,
+                                    ArrayRef<unsigned> MaxPressureLimit,
+                                    RegPressureDelta &Delta) {
+  Delta.CriticalMax = PressureElement();
+  Delta.CurrentMax = PressureElement();
+
+  unsigned CritIdx = 0, CritEnd = CriticalPSets.size();
+  for (unsigned i = 0, e = OldMaxPressureVec.size(); i < e; ++i) {
+    unsigned POld = OldMaxPressureVec[i];
+    unsigned PNew = NewMaxPressureVec[i];
+    if (PNew == POld) // No change in this set in the common case.
+      continue;
+
+    while (CritIdx != CritEnd && CriticalPSets[CritIdx].PSetID < i)
+      ++CritIdx;
+
+    if (CritIdx != CritEnd && CriticalPSets[CritIdx].PSetID == i) {
+      int PDiff = (int)PNew - (int)CriticalPSets[CritIdx].UnitIncrease;
+      if (PDiff > Delta.CriticalMax.UnitIncrease) {
+        Delta.CriticalMax.PSetID = i;
+        Delta.CriticalMax.UnitIncrease = PDiff;
+      }
+    }
+
+    // Find the greatest increase above MaxPressureLimit.
+    // (Ignores negative MDiff).
+    int MDiff = (int)PNew - (int)MaxPressureLimit[i];
+    if (MDiff > Delta.CurrentMax.UnitIncrease) {
+      Delta.CurrentMax.PSetID = i;
+      Delta.CurrentMax.UnitIncrease = PNew;
+    }
+  }
+}
+
+/// Record the upward impact of a single instruction on current register
+/// pressure. Unlike the advance/recede pressure tracking interface, this does
+/// not discover live in/outs.
 ///
-/// FIXME: This is expensive for an on-the-fly query. We need to cache the
-/// result per-SUnit with enough information to adjust for the current
-/// scheduling position. But this works as a proof of concept.
-void RegPressureTracker::
-getMaxUpwardPressureDelta(const MachineInstr *MI, RegPressureDelta &Delta) {
+/// This is intended for speculative queries. It leaves pressure inconsistent
+/// with the current position, so must be restored by the caller.
+void RegPressureTracker::bumpUpwardPressure(const MachineInstr *MI) {
   // Account for register pressure similar to RegPressureTracker::recede().
   PhysRegOperands PhysRegOpers;
   VirtRegOperands VirtRegOpers;
   collectOperands(MI, PhysRegOpers, VirtRegOpers, TRI, RCI);
-
-  // Snapshot Pressure.
-  std::vector<unsigned> SavedPressure = CurrSetPressure;
-  std::vector<unsigned> SavedMaxPressure = P.MaxSetPressure;
 
   // Boost max pressure for all dead defs together.
   // Since CurrSetPressure and MaxSetPressure
@@ -629,23 +680,44 @@ getMaxUpwardPressureDelta(const MachineInstr *MI, RegPressureDelta &Delta) {
   // Generate liveness for uses.
   for (unsigned i = 0, e = PhysRegOpers.Uses.size(); i < e; ++i) {
     unsigned Reg = PhysRegOpers.Uses[i];
-    if (!hasRegAlias(Reg, LivePhysRegs, TRI)) {
+    if (!hasRegAlias(Reg, LivePhysRegs, TRI))
       increasePhysRegPressure(Reg);
-    }
   }
   for (unsigned i = 0, e = VirtRegOpers.Uses.size(); i < e; ++i) {
     unsigned Reg = VirtRegOpers.Uses[i];
-    if (!LiveVirtRegs.count(Reg)) {
+    if (!LiveVirtRegs.count(Reg))
       increaseVirtRegPressure(Reg);
-    }
   }
-  Delta.ExcessUnits =
-    computeMaxPressureDelta(SavedPressure, CurrSetPressure,
-                            Delta.ExcessSetID, TRI);
-  Delta.MaxUnitIncrease =
-    computeMaxPressureDelta(SavedMaxPressure, P.MaxSetPressure,
-                            Delta.MaxSetID, TRI);
-  assert(Delta.MaxUnitIncrease >= 0 && "cannot increase max pressure");
+}
+
+/// Consider the pressure increase caused by traversing this instruction
+/// bottom-up. Find the pressure set with the most change beyond its pressure
+/// limit based on the tracker's current pressure, and return the change in
+/// number of register units of that pressure set introduced by this
+/// instruction.
+///
+/// This assumes that the current LiveOut set is sufficient.
+///
+/// FIXME: This is expensive for an on-the-fly query. We need to cache the
+/// result per-SUnit with enough information to adjust for the current
+/// scheduling position. But this works as a proof of concept.
+void RegPressureTracker::
+getMaxUpwardPressureDelta(const MachineInstr *MI, RegPressureDelta &Delta,
+                          ArrayRef<PressureElement> CriticalPSets,
+                          ArrayRef<unsigned> MaxPressureLimit) {
+  // Snapshot Pressure.
+  // FIXME: The snapshot heap space should persist. But I'm planning to
+  // summarize the pressure effect so we don't need to snapshot at all.
+  std::vector<unsigned> SavedPressure = CurrSetPressure;
+  std::vector<unsigned> SavedMaxPressure = P.MaxSetPressure;
+
+  bumpUpwardPressure(MI);
+
+  computeExcessPressureDelta(SavedPressure, CurrSetPressure, Delta, TRI);
+  computeMaxPressureDelta(SavedMaxPressure, P.MaxSetPressure, CriticalPSets,
+                          MaxPressureLimit, Delta);
+  assert(Delta.CriticalMax.UnitIncrease >= 0 &&
+         Delta.CurrentMax.UnitIncrease >= 0 && "cannot decrease max pressure");
 
   // Restore the tracker's state.
   P.MaxSetPressure.swap(SavedMaxPressure);
@@ -668,22 +740,17 @@ static bool findUseBetween(unsigned Reg,
   return false;
 }
 
-/// Consider the pressure increase caused by traversing this instruction
-/// top-down. Find the register class with the most change in its pressure limit
-/// based on the tracker's current pressure, and return the number of excess
-/// register units of that pressure set introduced by this instruction.
+/// Record the downward impact of a single instruction on current register
+/// pressure. Unlike the advance/recede pressure tracking interface, this does
+/// not discover live in/outs.
 ///
-/// This assumes that the current LiveIn set is sufficient.
-void RegPressureTracker::
-getMaxDownwardPressureDelta(const MachineInstr *MI, RegPressureDelta &Delta) {
+/// This is intended for speculative queries. It leaves pressure inconsistent
+/// with the current position, so must be restored by the caller.
+void RegPressureTracker::bumpDownwardPressure(const MachineInstr *MI) {
   // Account for register pressure similar to RegPressureTracker::recede().
   PhysRegOperands PhysRegOpers;
   VirtRegOperands VirtRegOpers;
   collectOperands(MI, PhysRegOpers, VirtRegOpers, TRI, RCI);
-
-  // Snapshot Pressure.
-  std::vector<unsigned> SavedPressure = CurrSetPressure;
-  std::vector<unsigned> SavedMaxPressure = P.MaxSetPressure;
 
   // Kill liveness at last uses. Assume allocatable physregs are single-use
   // rather than checking LiveIntervals.
@@ -694,7 +761,7 @@ getMaxDownwardPressureDelta(const MachineInstr *MI, RegPressureDelta &Delta) {
       unsigned Reg = VirtRegOpers.Uses[i];
       const LiveInterval *LI = &LIS->getInterval(Reg);
       // FIXME: allow the caller to pass in the list of vreg uses that remain to
-      // be top-scheduled to avoid searching uses at each query.
+      // be bottom-scheduled to avoid searching uses at each query.
       SlotIndex CurrIdx = LIS->getInstructionIndex(CurrPos).getRegSlot();
       if (LI->killedAt(SlotIdx)
           && !findUseBetween(Reg, CurrIdx, SlotIdx, MRI, LIS)) {
@@ -712,15 +779,63 @@ getMaxDownwardPressureDelta(const MachineInstr *MI, RegPressureDelta &Delta) {
   increaseVirtRegPressure(VirtRegOpers.DeadDefs);
   decreasePhysRegPressure(PhysRegOpers.DeadDefs);
   decreaseVirtRegPressure(VirtRegOpers.DeadDefs);
+}
 
-  Delta.ExcessUnits =
-    computeMaxPressureDelta(SavedPressure, CurrSetPressure,
-                            Delta.ExcessSetID, TRI);
-  Delta.MaxUnitIncrease =
-    computeMaxPressureDelta(SavedMaxPressure, P.MaxSetPressure,
-                            Delta.MaxSetID, TRI);
+/// Consider the pressure increase caused by traversing this instruction
+/// top-down. Find the register class with the most change in its pressure limit
+/// based on the tracker's current pressure, and return the number of excess
+/// register units of that pressure set introduced by this instruction.
+///
+/// This assumes that the current LiveIn set is sufficient.
+void RegPressureTracker::
+getMaxDownwardPressureDelta(const MachineInstr *MI, RegPressureDelta &Delta,
+                            ArrayRef<PressureElement> CriticalPSets,
+                            ArrayRef<unsigned> MaxPressureLimit) {
+  // Snapshot Pressure.
+  std::vector<unsigned> SavedPressure = CurrSetPressure;
+  std::vector<unsigned> SavedMaxPressure = P.MaxSetPressure;
+
+  bumpDownwardPressure(MI);
+
+  computeExcessPressureDelta(SavedPressure, CurrSetPressure, Delta, TRI);
+  computeMaxPressureDelta(SavedMaxPressure, P.MaxSetPressure, CriticalPSets,
+                          MaxPressureLimit, Delta);
+  assert(Delta.CriticalMax.UnitIncrease >= 0 &&
+         Delta.CurrentMax.UnitIncrease >= 0 && "cannot decrease max pressure");
 
   // Restore the tracker's state.
   P.MaxSetPressure.swap(SavedMaxPressure);
   CurrSetPressure.swap(SavedPressure);
+}
+
+/// Get the pressure of each PSet after traversing this instruction bottom-up.
+void RegPressureTracker::
+getUpwardPressure(const MachineInstr *MI,
+                  std::vector<unsigned> &PressureResult,
+                  std::vector<unsigned> &MaxPressureResult) {
+  // Snapshot pressure.
+  PressureResult = CurrSetPressure;
+  MaxPressureResult = P.MaxSetPressure;
+
+  bumpUpwardPressure(MI);
+
+  // Current pressure becomes the result. Restore current pressure.
+  P.MaxSetPressure.swap(MaxPressureResult);
+  CurrSetPressure.swap(PressureResult);
+}
+
+/// Get the pressure of each PSet after traversing this instruction top-down.
+void RegPressureTracker::
+getDownwardPressure(const MachineInstr *MI,
+                    std::vector<unsigned> &PressureResult,
+                    std::vector<unsigned> &MaxPressureResult) {
+  // Snapshot pressure.
+  PressureResult = CurrSetPressure;
+  MaxPressureResult = P.MaxSetPressure;
+
+  bumpDownwardPressure(MI);
+
+  // Current pressure becomes the result. Restore current pressure.
+  P.MaxSetPressure.swap(MaxPressureResult);
+  CurrSetPressure.swap(PressureResult);
 }

@@ -48,6 +48,26 @@ LiveInterval::iterator LiveInterval::find(SlotIndex Pos) {
   return I;
 }
 
+VNInfo *LiveInterval::createDeadDef(SlotIndex Def,
+                                    VNInfo::Allocator &VNInfoAllocator) {
+  assert(!Def.isDead() && "Cannot define a value at the dead slot");
+  iterator I = find(Def);
+  if (I == end()) {
+    VNInfo *VNI = getNextValue(Def, VNInfoAllocator);
+    ranges.push_back(LiveRange(Def, Def.getDeadSlot(), VNI));
+    return VNI;
+  }
+  if (SlotIndex::isSameInstr(Def, I->start)) {
+    assert(I->start == Def && "Cannot insert def, already live");
+    assert(I->valno->def == Def && "Inconsistent existing value def");
+    return I->valno;
+  }
+  assert(SlotIndex::isEarlierInstr(Def, I->start) && "Already live at def");
+  VNInfo *VNI = getNextValue(Def, VNInfoAllocator);
+  ranges.insert(I, LiveRange(Def, Def.getDeadSlot(), VNI));
+  return VNI;
+}
+
 /// killedInRange - Return true if the interval has kills in [Start,End).
 bool LiveInterval::killedInRange(SlotIndex Start, SlotIndex End) const {
   Ranges::const_iterator r =
@@ -572,15 +592,10 @@ void LiveRange::dump() const {
   dbgs() << *this << "\n";
 }
 
-void LiveInterval::print(raw_ostream &OS, const TargetRegisterInfo *TRI) const {
-  OS << PrintReg(reg, TRI);
-  if (weight != 0)
-    OS << ',' << weight;
-
+void LiveInterval::print(raw_ostream &OS) const {
   if (empty())
-    OS << " EMPTY";
+    OS << "EMPTY";
   else {
-    OS << " = ";
     for (LiveInterval::Ranges::const_iterator I = ranges.begin(),
            E = ranges.end(); I != E; ++I) {
       OS << *I;
@@ -681,7 +696,10 @@ void ConnectedVNInfoEqClasses::Distribute(LiveInterval *LIV[],
     SlotIndex Idx = LIS.getInstructionIndex(MI);
     Idx = Idx.getRegSlot(MO.isUse());
     const VNInfo *VNI = LI.getVNInfoAt(Idx);
-    assert(VNI && "Interval not live at use.");
+    // FIXME: We should be able to assert(VNI) here, but the coalescer leaves
+    // dangling defs around.
+    if (!VNI)
+      continue;
     MO.setReg(LIV[getEqClass(VNI)]->reg);
   }
 

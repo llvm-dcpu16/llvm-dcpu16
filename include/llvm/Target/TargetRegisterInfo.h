@@ -337,9 +337,15 @@ public:
     if (regA == regB) return true;
     if (isVirtualRegister(regA) || isVirtualRegister(regB))
       return false;
-    for (const uint16_t *regList = getOverlaps(regA)+1; *regList; ++regList) {
-      if (*regList == regB) return true;
-    }
+
+    // Regunits are numerically ordered. Find a common unit.
+    MCRegUnitIterator RUA(regA, this);
+    MCRegUnitIterator RUB(regB, this);
+    do {
+      if (*RUA == *RUB) return true;
+      if (*RUA < *RUB) ++RUA;
+      else             ++RUB;
+    } while (RUA.isValid() && RUB.isValid());
     return false;
   }
 
@@ -351,10 +357,10 @@ public:
 
   /// isSuperRegister - Returns true if regB is a super-register of regA.
   ///
-  bool isSuperRegister(unsigned regA, unsigned regB) const {
-    for (const uint16_t *regList = getSuperRegisters(regA); *regList;++regList){
-      if (*regList == regB) return true;
-    }
+  bool isSuperRegister(unsigned RegA, unsigned RegB) const {
+    for (MCSuperRegIterator I(RegA, this); I.isValid(); ++I)
+      if (*I == RegB)
+        return true;
     return false;
   }
 
@@ -840,6 +846,29 @@ public:
 };
 
 static inline raw_ostream &operator<<(raw_ostream &OS, const PrintReg &PR) {
+  PR.print(OS);
+  return OS;
+}
+
+/// PrintRegUnit - Helper class for printing register units on a raw_ostream.
+///
+/// Register units are named after their root registers:
+///
+///   AL      - Single root.
+///   FP0~ST7 - Dual roots.
+///
+/// Usage: OS << PrintRegUnit(Unit, TRI) << '\n';
+///
+class PrintRegUnit {
+  const TargetRegisterInfo *TRI;
+  unsigned Unit;
+public:
+  PrintRegUnit(unsigned unit, const TargetRegisterInfo *tri)
+    : TRI(tri), Unit(unit) {}
+  void print(raw_ostream&) const;
+};
+
+static inline raw_ostream &operator<<(raw_ostream &OS, const PrintRegUnit &PR) {
   PR.print(OS);
   return OS;
 }

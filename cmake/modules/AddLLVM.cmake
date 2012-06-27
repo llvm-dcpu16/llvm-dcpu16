@@ -82,7 +82,6 @@ macro(add_llvm_executable name)
     add_executable(${name} ${ALL_FILES})
   endif()
   set(EXCLUDE_FROM_ALL OFF)
-  target_link_libraries( ${name} ${LLVM_USED_LIBS} )
   llvm_config( ${name} ${LLVM_LINK_COMPONENTS} )
   if( LLVM_COMMON_DEPENDS )
     add_dependencies( ${name} ${LLVM_COMMON_DEPENDS} )
@@ -148,3 +147,53 @@ macro(add_llvm_external_project name)
     endif()
   endif()
 endmacro(add_llvm_external_project)
+
+# Generic support for adding a unittest.
+function(add_unittest test_suite test_name)
+  if (CMAKE_BUILD_TYPE)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY
+      ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE})
+  else()
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+  endif()
+  if( NOT LLVM_BUILD_TESTS )
+    set(EXCLUDE_FROM_ALL ON)
+  endif()
+
+  add_llvm_executable(${test_name} ${ARGN})
+  target_link_libraries(${test_name}
+    gtest
+    gtest_main
+    LLVMSupport # gtest needs it for raw_ostream.
+    )
+
+  add_dependencies(${test_suite} ${test_name})
+  get_target_property(test_suite_folder ${test_suite} FOLDER)
+  if (NOT ${test_suite_folder} STREQUAL "NOTFOUND")
+    set_property(TARGET ${test_name} PROPERTY FOLDER "${test_suite_folder}")
+  endif ()
+
+  # Visual Studio 2012 only supports up to 8 template parameters in
+  # std::tr1::tuple by default, but gtest requires 10
+  if (MSVC AND MSVC_VERSION EQUAL 1700)
+    set_property(TARGET ${test_name} APPEND PROPERTY COMPILE_DEFINITIONS _VARIADIC_MAX=10)
+  endif ()
+
+  include_directories(${LLVM_MAIN_SRC_DIR}/utils/unittest/googletest/include)
+  set_property(TARGET ${test_name} APPEND PROPERTY COMPILE_DEFINITIONS GTEST_HAS_RTTI=0)
+  if (NOT LLVM_ENABLE_THREADS)
+    set_property(TARGET ${test_name} APPEND PROPERTY COMPILE_DEFINITIONS GTEST_HAS_PTHREAD=0)
+  endif ()
+
+  get_property(target_compile_flags TARGET ${test_name} PROPERTY COMPILE_FLAGS)
+  if (LLVM_COMPILER_IS_GCC_COMPATIBLE)
+    set(target_compile_flags "${target_compile_flags} -fno-rtti")
+  elseif (MSVC)
+    set(target_compile_flags "${target_compile_flags} /GR-")
+  endif ()
+
+  if (SUPPORTS_NO_VARIADIC_MACROS_FLAG)
+    set(target_compile_flags "${target_compile_flags} -Wno-variadic-macros")
+  endif ()
+  set_property(TARGET ${test_name} PROPERTY COMPILE_FLAGS "${target_compile_flags}")
+endfunction()

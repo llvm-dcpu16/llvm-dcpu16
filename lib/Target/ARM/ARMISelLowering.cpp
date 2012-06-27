@@ -52,6 +52,7 @@ using namespace llvm;
 
 STATISTIC(NumTailCalls, "Number of tail calls");
 STATISTIC(NumMovwMovt, "Number of GAs materialized with movw + movt");
+STATISTIC(NumLoopByVals, "Number of loops generated for byval arguments");
 
 // This option should go away when tail calls fully work.
 static cl::opt<bool>
@@ -894,6 +895,7 @@ const char *ARMTargetLowering::getTargetNodeName(unsigned Opcode) const {
   case ARMISD::RET_FLAG:      return "ARMISD::RET_FLAG";
   case ARMISD::PIC_ADD:       return "ARMISD::PIC_ADD";
   case ARMISD::CMP:           return "ARMISD::CMP";
+  case ARMISD::CMN:           return "ARMISD::CMN";
   case ARMISD::CMPZ:          return "ARMISD::CMPZ";
   case ARMISD::CMPFP:         return "ARMISD::CMPFP";
   case ARMISD::CMPFPw0:       return "ARMISD::CMPFPw0";
@@ -1289,14 +1291,20 @@ void ARMTargetLowering::PassF64ArgInRegs(DebugLoc dl, SelectionDAG &DAG,
 /// ARMISD:CALL <- callseq_end chain. Also add input and output parameter
 /// nodes.
 SDValue
-ARMTargetLowering::LowerCall(SDValue Chain, SDValue Callee,
-                             CallingConv::ID CallConv, bool isVarArg,
-                             bool doesNotRet, bool &isTailCall,
-                             const SmallVectorImpl<ISD::OutputArg> &Outs,
-                             const SmallVectorImpl<SDValue> &OutVals,
-                             const SmallVectorImpl<ISD::InputArg> &Ins,
-                             DebugLoc dl, SelectionDAG &DAG,
+ARMTargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
                              SmallVectorImpl<SDValue> &InVals) const {
+  SelectionDAG &DAG                     = CLI.DAG;
+  DebugLoc &dl                          = CLI.DL;
+  SmallVector<ISD::OutputArg, 32> &Outs = CLI.Outs;
+  SmallVector<SDValue, 32> &OutVals     = CLI.OutVals;
+  SmallVector<ISD::InputArg, 32> &Ins   = CLI.Ins;
+  SDValue Chain                         = CLI.Chain;
+  SDValue Callee                        = CLI.Callee;
+  bool &isTailCall                      = CLI.IsTailCall;
+  CallingConv::ID CallConv              = CLI.CallConv;
+  bool doesNotRet                       = CLI.DoesNotReturn;
+  bool isVarArg                         = CLI.IsVarArg;
+
   MachineFunction &MF = DAG.getMachineFunction();
   bool IsStructRet    = (Outs.empty()) ? false : Outs[0].Flags.isSRet();
   bool IsSibCall = false;
@@ -1418,21 +1426,22 @@ ARMTargetLowering::LowerCall(SDValue Chain, SDValue Callee,
         CCInfo.clearFirstByValReg();
       }
 
-      unsigned LocMemOffset = VA.getLocMemOffset();
-      SDValue StkPtrOff = DAG.getIntPtrConstant(LocMemOffset);
-      SDValue Dst = DAG.getNode(ISD::ADD, dl, getPointerTy(), StackPtr,
-                                StkPtrOff);
-      SDValue SrcOffset = DAG.getIntPtrConstant(4*offset);
-      SDValue Src = DAG.getNode(ISD::ADD, dl, getPointerTy(), Arg, SrcOffset);
-      SDValue SizeNode = DAG.getConstant(Flags.getByValSize() - 4*offset,
-                                         MVT::i32);
-      MemOpChains.push_back(DAG.getMemcpy(Chain, dl, Dst, Src, SizeNode,
-                                          Flags.getByValAlign(),
-                                          /*isVolatile=*/false,
-                                          /*AlwaysInline=*/false,
-                                          MachinePointerInfo(0),
-                                          MachinePointerInfo(0)));
+      if (Flags.getByValSize() - 4*offset > 0) {
+        unsigned LocMemOffset = VA.getLocMemOffset();
+        SDValue StkPtrOff = DAG.getIntPtrConstant(LocMemOffset);
+        SDValue Dst = DAG.getNode(ISD::ADD, dl, getPointerTy(), StackPtr,
+                                  StkPtrOff);
+        SDValue SrcOffset = DAG.getIntPtrConstant(4*offset);
+        SDValue Src = DAG.getNode(ISD::ADD, dl, getPointerTy(), Arg, SrcOffset);
+        SDValue SizeNode = DAG.getConstant(Flags.getByValSize() - 4*offset,
+                                           MVT::i32);
+        SDValue AlignNode = DAG.getConstant(Flags.getByValAlign(), MVT::i32);
 
+        SDVTList VTs = DAG.getVTList(MVT::Other, MVT::Glue);
+        SDValue Ops[] = { Chain, Dst, Src, SizeNode, AlignNode};
+        MemOpChains.push_back(DAG.getNode(ARMISD::COPY_STRUCT_BYVAL, dl, VTs,
+                                          Ops, array_lengthof(Ops)));
+      }
     } else if (!IsSibCall) {
       assert(VA.isMemLoc());
 
@@ -2098,12 +2107,13 @@ ARMTargetLowering::LowerToTLSGeneralDynamicModel(GlobalAddressSDNode *GA,
   Entry.Ty = (Type *) Type::getInt32Ty(*DAG.getContext());
   Args.push_back(Entry);
   // FIXME: is there useful debug info available here?
-  std::pair<SDValue, SDValue> CallResult =
-    LowerCallTo(Chain, (Type *) Type::getInt32Ty(*DAG.getContext()),
+  TargetLowering::CallLoweringInfo CLI(Chain,
+                (Type *) Type::getInt32Ty(*DAG.getContext()),
                 false, false, false, false,
                 0, CallingConv::C, /*isTailCall=*/false,
                 /*doesNotRet=*/false, /*isReturnValueUsed=*/true,
                 DAG.getExternalSymbol("__tls_get_addr", PtrVT), Args, DAG, dl);
+  std::pair<SDValue, SDValue> CallResult = LowerCallTo(CLI);
   return CallResult.first;
 }
 
@@ -5847,7 +5857,7 @@ EmitSjLjDispatchBlock(MachineInstr *MI, MachineBasicBlock *MBB) const {
 
   const TargetRegisterClass *TRC = Subtarget->isThumb() ?
     (const TargetRegisterClass*)&ARM::tGPRRegClass :
-    (const TargetRegisterClass*)&ARM::GPRRegClass;
+    (const TargetRegisterClass*)&ARM::GPRnopcRegClass;
 
   // Get a mapping of the call site numbers to all of the landing pads they're
   // associated with.
@@ -6231,6 +6241,304 @@ MachineBasicBlock *OtherSucc(MachineBasicBlock *MBB, MachineBasicBlock *Succ) {
   llvm_unreachable("Expecting a BB with two successors!");
 }
 
+MachineBasicBlock *ARMTargetLowering::
+EmitStructByval(MachineInstr *MI, MachineBasicBlock *BB) const {
+  // This pseudo instruction has 3 operands: dst, src, size
+  // We expand it to a loop if size > Subtarget->getMaxInlineSizeThreshold().
+  // Otherwise, we will generate unrolled scalar copies.
+  const TargetInstrInfo *TII = getTargetMachine().getInstrInfo();
+  const BasicBlock *LLVM_BB = BB->getBasicBlock();
+  MachineFunction::iterator It = BB;
+  ++It;
+
+  unsigned dest = MI->getOperand(0).getReg();
+  unsigned src = MI->getOperand(1).getReg();
+  unsigned SizeVal = MI->getOperand(2).getImm();
+  unsigned Align = MI->getOperand(3).getImm();
+  DebugLoc dl = MI->getDebugLoc();
+
+  bool isThumb2 = Subtarget->isThumb2();
+  MachineFunction *MF = BB->getParent();
+  MachineRegisterInfo &MRI = MF->getRegInfo();
+  unsigned ldrOpc, strOpc, UnitSize = 0;
+
+  const TargetRegisterClass *TRC = isThumb2 ?
+    (const TargetRegisterClass*)&ARM::tGPRRegClass :
+    (const TargetRegisterClass*)&ARM::GPRRegClass;
+  const TargetRegisterClass *TRC_Vec = 0;
+
+  if (Align & 1) {
+    ldrOpc = isThumb2 ? ARM::t2LDRB_POST : ARM::LDRB_POST_IMM;
+    strOpc = isThumb2 ? ARM::t2STRB_POST : ARM::STRB_POST_IMM;
+    UnitSize = 1;
+  } else if (Align & 2) {
+    ldrOpc = isThumb2 ? ARM::t2LDRH_POST : ARM::LDRH_POST;
+    strOpc = isThumb2 ? ARM::t2STRH_POST : ARM::STRH_POST;
+    UnitSize = 2;
+  } else {
+    // Check whether we can use NEON instructions.
+    if (!MF->getFunction()->hasFnAttr(Attribute::NoImplicitFloat) &&
+        Subtarget->hasNEON()) {
+      if ((Align % 16 == 0) && SizeVal >= 16) {
+        ldrOpc = ARM::VLD1q32wb_fixed;
+        strOpc = ARM::VST1q32wb_fixed;
+        UnitSize = 16;
+        TRC_Vec = (const TargetRegisterClass*)&ARM::DPairRegClass;
+      }
+      else if ((Align % 8 == 0) && SizeVal >= 8) {
+        ldrOpc = ARM::VLD1d32wb_fixed;
+        strOpc = ARM::VST1d32wb_fixed;
+        UnitSize = 8;
+        TRC_Vec = (const TargetRegisterClass*)&ARM::DPRRegClass;
+      }
+    }
+    // Can't use NEON instructions.
+    if (UnitSize == 0) {
+      ldrOpc = isThumb2 ? ARM::t2LDR_POST : ARM::LDR_POST_IMM;
+      strOpc = isThumb2 ? ARM::t2STR_POST : ARM::STR_POST_IMM;
+      UnitSize = 4;
+    }
+  }
+
+  unsigned BytesLeft = SizeVal % UnitSize;
+  unsigned LoopSize = SizeVal - BytesLeft;
+
+  if (SizeVal <= Subtarget->getMaxInlineSizeThreshold()) {
+    // Use LDR and STR to copy.
+    // [scratch, srcOut] = LDR_POST(srcIn, UnitSize)
+    // [destOut] = STR_POST(scratch, destIn, UnitSize)
+    unsigned srcIn = src;
+    unsigned destIn = dest;
+    for (unsigned i = 0; i < LoopSize; i+=UnitSize) {
+      unsigned scratch = MRI.createVirtualRegister(UnitSize >= 8 ? TRC_Vec:TRC);
+      unsigned srcOut = MRI.createVirtualRegister(TRC);
+      unsigned destOut = MRI.createVirtualRegister(TRC);
+      if (UnitSize >= 8) {
+        AddDefaultPred(BuildMI(*BB, MI, dl,
+          TII->get(ldrOpc), scratch)
+          .addReg(srcOut, RegState::Define).addReg(srcIn).addImm(0));
+
+        AddDefaultPred(BuildMI(*BB, MI, dl, TII->get(strOpc), destOut)
+          .addReg(destIn).addImm(0).addReg(scratch));
+      } else if (isThumb2) {
+        AddDefaultPred(BuildMI(*BB, MI, dl,
+          TII->get(ldrOpc), scratch)
+          .addReg(srcOut, RegState::Define).addReg(srcIn).addImm(UnitSize));
+
+        AddDefaultPred(BuildMI(*BB, MI, dl, TII->get(strOpc), destOut)
+          .addReg(scratch).addReg(destIn)
+          .addImm(UnitSize));
+      } else {
+        AddDefaultPred(BuildMI(*BB, MI, dl,
+          TII->get(ldrOpc), scratch)
+          .addReg(srcOut, RegState::Define).addReg(srcIn).addReg(0)
+          .addImm(UnitSize));
+
+        AddDefaultPred(BuildMI(*BB, MI, dl, TII->get(strOpc), destOut)
+          .addReg(scratch).addReg(destIn)
+          .addReg(0).addImm(UnitSize));
+      }
+      srcIn = srcOut;
+      destIn = destOut;
+    }
+
+    // Handle the leftover bytes with LDRB and STRB.
+    // [scratch, srcOut] = LDRB_POST(srcIn, 1)
+    // [destOut] = STRB_POST(scratch, destIn, 1)
+    ldrOpc = isThumb2 ? ARM::t2LDRB_POST : ARM::LDRB_POST_IMM;
+    strOpc = isThumb2 ? ARM::t2STRB_POST : ARM::STRB_POST_IMM;
+    for (unsigned i = 0; i < BytesLeft; i++) {
+      unsigned scratch = MRI.createVirtualRegister(TRC);
+      unsigned srcOut = MRI.createVirtualRegister(TRC);
+      unsigned destOut = MRI.createVirtualRegister(TRC);
+      if (isThumb2) {
+        AddDefaultPred(BuildMI(*BB, MI, dl,
+          TII->get(ldrOpc),scratch)
+          .addReg(srcOut, RegState::Define).addReg(srcIn).addImm(1));
+
+        AddDefaultPred(BuildMI(*BB, MI, dl, TII->get(strOpc), destOut)
+          .addReg(scratch).addReg(destIn)
+          .addReg(0).addImm(1));
+      } else {
+        AddDefaultPred(BuildMI(*BB, MI, dl,
+          TII->get(ldrOpc),scratch)
+          .addReg(srcOut, RegState::Define).addReg(srcIn).addImm(1));
+
+        AddDefaultPred(BuildMI(*BB, MI, dl, TII->get(strOpc), destOut)
+          .addReg(scratch).addReg(destIn)
+          .addReg(0).addImm(1));
+      }
+      srcIn = srcOut;
+      destIn = destOut;
+    }
+    MI->eraseFromParent();   // The instruction is gone now.
+    return BB;
+  }
+
+  // Expand the pseudo op to a loop.
+  // thisMBB:
+  //   ...
+  //   movw varEnd, # --> with thumb2
+  //   movt varEnd, #
+  //   ldrcp varEnd, idx --> without thumb2
+  //   fallthrough --> loopMBB
+  // loopMBB:
+  //   PHI varPhi, varEnd, varLoop
+  //   PHI srcPhi, src, srcLoop
+  //   PHI destPhi, dst, destLoop
+  //   [scratch, srcLoop] = LDR_POST(srcPhi, UnitSize)
+  //   [destLoop] = STR_POST(scratch, destPhi, UnitSize)
+  //   subs varLoop, varPhi, #UnitSize
+  //   bne loopMBB
+  //   fallthrough --> exitMBB
+  // exitMBB:
+  //   epilogue to handle left-over bytes
+  //   [scratch, srcOut] = LDRB_POST(srcLoop, 1)
+  //   [destOut] = STRB_POST(scratch, destLoop, 1)
+  MachineBasicBlock *loopMBB = MF->CreateMachineBasicBlock(LLVM_BB);
+  MachineBasicBlock *exitMBB = MF->CreateMachineBasicBlock(LLVM_BB);
+  MF->insert(It, loopMBB);
+  MF->insert(It, exitMBB);
+
+  // Transfer the remainder of BB and its successor edges to exitMBB.
+  exitMBB->splice(exitMBB->begin(), BB,
+                  llvm::next(MachineBasicBlock::iterator(MI)),
+                  BB->end());
+  exitMBB->transferSuccessorsAndUpdatePHIs(BB);
+
+  // Load an immediate to varEnd.
+  unsigned varEnd = MRI.createVirtualRegister(TRC);
+  if (isThumb2) {
+    unsigned VReg1 = varEnd;
+    if ((LoopSize & 0xFFFF0000) != 0)
+      VReg1 = MRI.createVirtualRegister(TRC);
+    AddDefaultPred(BuildMI(BB, dl, TII->get(ARM::t2MOVi16), VReg1)
+                   .addImm(LoopSize & 0xFFFF));
+
+    if ((LoopSize & 0xFFFF0000) != 0)
+      AddDefaultPred(BuildMI(BB, dl, TII->get(ARM::t2MOVTi16), varEnd)
+                     .addReg(VReg1)
+                     .addImm(LoopSize >> 16));
+  } else {
+    MachineConstantPool *ConstantPool = MF->getConstantPool();
+    Type *Int32Ty = Type::getInt32Ty(MF->getFunction()->getContext());
+    const Constant *C = ConstantInt::get(Int32Ty, LoopSize);
+
+    // MachineConstantPool wants an explicit alignment.
+    unsigned Align = getTargetData()->getPrefTypeAlignment(Int32Ty);
+    if (Align == 0)
+      Align = getTargetData()->getTypeAllocSize(C->getType());
+    unsigned Idx = ConstantPool->getConstantPoolIndex(C, Align);
+
+    AddDefaultPred(BuildMI(BB, dl, TII->get(ARM::LDRcp))
+                   .addReg(varEnd, RegState::Define)
+                   .addConstantPoolIndex(Idx)
+                   .addImm(0));
+  }
+  BB->addSuccessor(loopMBB);
+
+  // Generate the loop body:
+  //   varPhi = PHI(varLoop, varEnd)
+  //   srcPhi = PHI(srcLoop, src)
+  //   destPhi = PHI(destLoop, dst)
+  MachineBasicBlock *entryBB = BB;
+  BB = loopMBB;
+  unsigned varLoop = MRI.createVirtualRegister(TRC);
+  unsigned varPhi = MRI.createVirtualRegister(TRC);
+  unsigned srcLoop = MRI.createVirtualRegister(TRC);
+  unsigned srcPhi = MRI.createVirtualRegister(TRC);
+  unsigned destLoop = MRI.createVirtualRegister(TRC);
+  unsigned destPhi = MRI.createVirtualRegister(TRC);
+
+  BuildMI(*BB, BB->begin(), dl, TII->get(ARM::PHI), varPhi)
+    .addReg(varLoop).addMBB(loopMBB)
+    .addReg(varEnd).addMBB(entryBB);
+  BuildMI(BB, dl, TII->get(ARM::PHI), srcPhi)
+    .addReg(srcLoop).addMBB(loopMBB)
+    .addReg(src).addMBB(entryBB);
+  BuildMI(BB, dl, TII->get(ARM::PHI), destPhi)
+    .addReg(destLoop).addMBB(loopMBB)
+    .addReg(dest).addMBB(entryBB);
+
+  //   [scratch, srcLoop] = LDR_POST(srcPhi, UnitSize)
+  //   [destLoop] = STR_POST(scratch, destPhi, UnitSiz)
+  unsigned scratch = MRI.createVirtualRegister(UnitSize >= 8 ? TRC_Vec:TRC);
+  if (UnitSize >= 8) {
+    AddDefaultPred(BuildMI(BB, dl, TII->get(ldrOpc), scratch)
+      .addReg(srcLoop, RegState::Define).addReg(srcPhi).addImm(0));
+
+    AddDefaultPred(BuildMI(BB, dl, TII->get(strOpc), destLoop)
+      .addReg(destPhi).addImm(0).addReg(scratch));
+  } else if (isThumb2) {
+    AddDefaultPred(BuildMI(BB, dl, TII->get(ldrOpc), scratch)
+      .addReg(srcLoop, RegState::Define).addReg(srcPhi).addImm(UnitSize));
+
+    AddDefaultPred(BuildMI(BB, dl, TII->get(strOpc), destLoop)
+      .addReg(scratch).addReg(destPhi)
+      .addImm(UnitSize));
+  } else {
+    AddDefaultPred(BuildMI(BB, dl, TII->get(ldrOpc), scratch)
+      .addReg(srcLoop, RegState::Define).addReg(srcPhi).addReg(0)
+      .addImm(UnitSize));
+
+    AddDefaultPred(BuildMI(BB, dl, TII->get(strOpc), destLoop)
+      .addReg(scratch).addReg(destPhi)
+      .addReg(0).addImm(UnitSize));
+  }
+
+  // Decrement loop variable by UnitSize.
+  MachineInstrBuilder MIB = BuildMI(BB, dl,
+    TII->get(isThumb2 ? ARM::t2SUBri : ARM::SUBri), varLoop);
+  AddDefaultCC(AddDefaultPred(MIB.addReg(varPhi).addImm(UnitSize)));
+  MIB->getOperand(5).setReg(ARM::CPSR);
+  MIB->getOperand(5).setIsDef(true);
+
+  BuildMI(BB, dl, TII->get(isThumb2 ? ARM::t2Bcc : ARM::Bcc))
+    .addMBB(loopMBB).addImm(ARMCC::NE).addReg(ARM::CPSR);
+
+  // loopMBB can loop back to loopMBB or fall through to exitMBB.
+  BB->addSuccessor(loopMBB);
+  BB->addSuccessor(exitMBB);
+
+  // Add epilogue to handle BytesLeft.
+  BB = exitMBB;
+  MachineInstr *StartOfExit = exitMBB->begin();
+  ldrOpc = isThumb2 ? ARM::t2LDRB_POST : ARM::LDRB_POST_IMM;
+  strOpc = isThumb2 ? ARM::t2STRB_POST : ARM::STRB_POST_IMM;
+
+  //   [scratch, srcOut] = LDRB_POST(srcLoop, 1)
+  //   [destOut] = STRB_POST(scratch, destLoop, 1)
+  unsigned srcIn = srcLoop;
+  unsigned destIn = destLoop;
+  for (unsigned i = 0; i < BytesLeft; i++) {
+    unsigned scratch = MRI.createVirtualRegister(TRC);
+    unsigned srcOut = MRI.createVirtualRegister(TRC);
+    unsigned destOut = MRI.createVirtualRegister(TRC);
+    if (isThumb2) {
+      AddDefaultPred(BuildMI(*BB, StartOfExit, dl,
+        TII->get(ldrOpc),scratch)
+        .addReg(srcOut, RegState::Define).addReg(srcIn).addImm(1));
+
+      AddDefaultPred(BuildMI(*BB, StartOfExit, dl, TII->get(strOpc), destOut)
+        .addReg(scratch).addReg(destIn)
+        .addImm(1));
+    } else {
+      AddDefaultPred(BuildMI(*BB, StartOfExit, dl,
+        TII->get(ldrOpc),scratch)
+        .addReg(srcOut, RegState::Define).addReg(srcIn).addReg(0).addImm(1));
+
+      AddDefaultPred(BuildMI(*BB, StartOfExit, dl, TII->get(strOpc), destOut)
+        .addReg(scratch).addReg(destIn)
+        .addReg(0).addImm(1));
+    }
+    srcIn = srcOut;
+    destIn = destOut;
+  }
+
+  MI->eraseFromParent();   // The instruction is gone now.
+  return BB;
+}
+
 MachineBasicBlock *
 ARMTargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
                                                MachineBasicBlock *BB) const {
@@ -6534,9 +6842,6 @@ ARMTargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
     MachineRegisterInfo &MRI = Fn->getRegInfo();
     // In Thumb mode S must not be specified if source register is the SP or
     // PC and if destination register is the SP, so restrict register class
-    unsigned NewMovDstReg = MRI.createVirtualRegister(isThumb2 ?
-      (const TargetRegisterClass*)&ARM::rGPRRegClass :
-      (const TargetRegisterClass*)&ARM::GPRRegClass);
     unsigned NewRsbDstReg = MRI.createVirtualRegister(isThumb2 ?
       (const TargetRegisterClass*)&ARM::rGPRRegClass :
       (const TargetRegisterClass*)&ARM::GPRRegClass);
@@ -6553,12 +6858,10 @@ ARMTargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
     // fall through to SinkMBB
     RSBBB->addSuccessor(SinkBB);
 
-    // insert a movs at the end of BB
-    BuildMI(BB, dl, TII->get(isThumb2 ? ARM::t2MOVr : ARM::MOVr),
-      NewMovDstReg)
-      .addReg(ABSSrcReg, RegState::Kill)
-      .addImm((unsigned)ARMCC::AL).addReg(0)
-      .addReg(ARM::CPSR, RegState::Define);
+    // insert a cmp at the end of BB
+    AddDefaultPred(BuildMI(BB, dl, 
+                           TII->get(isThumb2 ? ARM::t2CMPri : ARM::CMPri))
+                   .addReg(ABSSrcReg).addImm(0));
 
     // insert a bcc with opposite CC to ARMCC::MI at the end of BB
     BuildMI(BB, dl,
@@ -6570,7 +6873,7 @@ ARMTargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
     // by if-conversion pass
     BuildMI(*RSBBB, RSBBB->begin(), dl,
       TII->get(isThumb2 ? ARM::t2RSBri : ARM::RSBri), NewRsbDstReg)
-      .addReg(NewMovDstReg, RegState::Kill)
+      .addReg(ABSSrcReg, RegState::Kill)
       .addImm(0).addImm((unsigned)ARMCC::AL).addReg(0).addReg(0);
 
     // insert PHI in SinkBB,
@@ -6578,7 +6881,7 @@ ARMTargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
     BuildMI(*SinkBB, SinkBB->begin(), dl,
       TII->get(ARM::PHI), ABSDstReg)
       .addReg(NewRsbDstReg).addMBB(RSBBB)
-      .addReg(NewMovDstReg).addMBB(BB);
+      .addReg(ABSSrcReg).addMBB(BB);
 
     // remove ABS instruction
     MI->eraseFromParent();
@@ -6586,6 +6889,9 @@ ARMTargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
     // return last added BB
     return SinkBB;
   }
+  case ARM::COPY_STRUCT_BYVAL_I32:
+    ++NumLoopByVals;
+    return EmitStructByval(MI, BB);
   }
 }
 

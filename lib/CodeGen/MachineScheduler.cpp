@@ -14,14 +14,16 @@
 
 #define DEBUG_TYPE "misched"
 
-#include "RegisterClassInfo.h"
-#include "RegisterPressure.h"
 #include "llvm/CodeGen/LiveIntervalAnalysis.h"
 #include "llvm/CodeGen/MachineScheduler.h"
 #include "llvm/CodeGen/Passes.h"
+#include "llvm/CodeGen/RegisterClassInfo.h"
+#include "llvm/CodeGen/RegisterPressure.h"
 #include "llvm/CodeGen/ScheduleDAGInstrs.h"
-#include "llvm/Analysis/AliasAnalysis.h"
+#include "llvm/CodeGen/ScheduleHazardRecognizer.h"
 #include "llvm/Target/TargetInstrInfo.h"
+#include "llvm/MC/MCInstrItineraries.h"
+#include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -149,7 +151,7 @@ priorNonDebug(MachineBasicBlock::iterator I, MachineBasicBlock::iterator Beg) {
 /// non-debug instruction.
 static MachineBasicBlock::iterator
 nextIfDebug(MachineBasicBlock::iterator I, MachineBasicBlock::iterator End) {
-  while(I != End) {
+  for(; I != End; ++I) {
     if (!I->isDebugValue())
       break;
   }
@@ -249,7 +251,8 @@ bool MachineScheduler::runOnMachineFunction(MachineFunction &mf) {
         Scheduler->exitRegion();
         continue;
       }
-      DEBUG(dbgs() << "MachineScheduling " << MF->getFunction()->getName()
+      DEBUG(dbgs() << "********** MI Scheduling **********\n");
+      DEBUG(dbgs() << MF->getFunction()->getName()
             << ":BB#" << MBB->getNumber() << "\n  From: " << *I << "    To: ";
             if (RegionEnd != MBB->end()) dbgs() << *RegionEnd;
             else dbgs() << "End";
@@ -302,6 +305,9 @@ public:
   /// be scheduled at the bottom.
   virtual SUnit *pickNode(bool &IsTopNode) = 0;
 
+  /// Notify MachineSchedStrategy that ScheduleDAGMI has scheduled a node.
+  virtual void schedNode(SUnit *SU, bool IsTopNode) = 0;
+
   /// When all predecessor dependencies have been resolved, free this node for
   /// top-down scheduling.
   virtual void releaseTopNode(SUnit *SU) = 0;
@@ -326,9 +332,14 @@ class ScheduleDAGMI : public ScheduleDAGInstrs {
 
   MachineBasicBlock::iterator LiveRegionEnd;
 
-  // Register pressure in this region computed by buildSchedGraph.
+  /// Register pressure in this region computed by buildSchedGraph.
   IntervalPressure RegPressure;
   RegPressureTracker RPTracker;
+
+  /// List of pressure sets that exceed the target's pressure limit before
+  /// scheduling, listed in increasing set ID order. Each pressure set is paired
+  /// with its max pressure in the currently scheduled regions.
+  std::vector<PressureElement> RegionCriticalPSets;
 
   /// The top of the unscheduled zone.
   MachineBasicBlock::iterator CurrentTop;
@@ -340,15 +351,21 @@ class ScheduleDAGMI : public ScheduleDAGInstrs {
   IntervalPressure BotPressure;
   RegPressureTracker BotRPTracker;
 
+#ifndef NDEBUG
   /// The number of instructions scheduled so far. Used to cut off the
   /// scheduler at the point determined by misched-cutoff.
   unsigned NumInstrsScheduled;
+#endif
 public:
   ScheduleDAGMI(MachineSchedContext *C, MachineSchedStrategy *S):
     ScheduleDAGInstrs(*C->MF, *C->MLI, *C->MDT, /*IsPostRA=*/false, C->LIS),
     AA(C->AA), RegClassInfo(C->RegClassInfo), SchedImpl(S),
     RPTracker(RegPressure), CurrentTop(), TopRPTracker(TopPressure),
-    CurrentBottom(), BotRPTracker(BotPressure), NumInstrsScheduled(0) {}
+    CurrentBottom(), BotRPTracker(BotPressure) {
+#ifndef NDEBUG
+    NumInstrsScheduled = 0;
+#endif
+  }
 
   ~ScheduleDAGMI() {
     delete SchedImpl;
@@ -380,11 +397,24 @@ public:
   /// Get register pressure for the entire scheduling region before scheduling.
   const IntervalPressure &getRegPressure() const { return RegPressure; }
 
+  const std::vector<PressureElement> &getRegionCriticalPSets() const {
+    return RegionCriticalPSets;
+  }
+
+  /// getIssueWidth - Return the max instructions per scheduling group.
+  ///
+  unsigned getIssueWidth() const {
+    return InstrItins ? InstrItins->Props.IssueWidth : 1;
+  }
+
 protected:
   void initRegPressure();
+  void updateScheduledPressure(std::vector<unsigned> NewMaxPressure);
 
   void moveInstruction(MachineInstr *MI, MachineBasicBlock::iterator InsertPos);
   bool checkSchedLimit();
+
+  void releaseRoots();
 
   void releaseSucc(SUnit *SU, SDep *SuccEdge);
   void releaseSuccessors(SUnit *SU);
@@ -397,6 +427,8 @@ protected:
 
 /// ReleaseSucc - Decrement the NumPredsLeft count of a successor. When
 /// NumPredsLeft reaches zero, release the successor node.
+///
+/// FIXME: Adjust SuccSU height based on MinLatency.
 void ScheduleDAGMI::releaseSucc(SUnit *SU, SDep *SuccEdge) {
   SUnit *SuccSU = SuccEdge->getSUnit();
 
@@ -423,6 +455,8 @@ void ScheduleDAGMI::releaseSuccessors(SUnit *SU) {
 
 /// ReleasePred - Decrement the NumSuccsLeft count of a predecessor. When
 /// NumSuccsLeft reaches zero, release the predecessor node.
+///
+/// FIXME: Adjust PredSU height based on MinLatency.
 void ScheduleDAGMI::releasePred(SUnit *SU, SDep *PredEdge) {
   SUnit *PredSU = PredEdge->getSUnit();
 
@@ -449,17 +483,19 @@ void ScheduleDAGMI::releasePredecessors(SUnit *SU) {
 
 void ScheduleDAGMI::moveInstruction(MachineInstr *MI,
                                     MachineBasicBlock::iterator InsertPos) {
-  // Fix RegionBegin if the first instruction moves down.
+  // Advance RegionBegin if the first instruction moves down.
   if (&*RegionBegin == MI)
-    RegionBegin = llvm::next(RegionBegin);
+    ++RegionBegin;
+
+  // Update the instruction stream.
   BB->splice(InsertPos, BB, MI);
+
+  // Update LiveIntervals
   LIS->handleMove(MI);
-  // Fix RegionBegin if another instruction moves above the first instruction.
+
+  // Recede RegionBegin if an instruction moves above the first.
   if (RegionBegin == InsertPos)
     RegionBegin = MI;
-  // Fix TopRPTracker if we move something above CurrentTop.
-  if (CurrentTop == InsertPos)
-    TopRPTracker.setPos(MI);
 }
 
 bool ScheduleDAGMI::checkSchedLimit() {
@@ -498,6 +534,8 @@ void ScheduleDAGMI::initRegPressure() {
   // Close the RPTracker to finalize live ins.
   RPTracker.closeRegion();
 
+  DEBUG(RPTracker.getPressure().dump(TRI));
+
   // Initialize the live ins and live outs.
   TopRPTracker.addLiveRegs(RPTracker.getPressure().LiveInRegs);
   BotRPTracker.addLiveRegs(RPTracker.getPressure().LiveOutRegs);
@@ -513,6 +551,53 @@ void ScheduleDAGMI::initRegPressure() {
     BotRPTracker.recede();
 
   assert(BotRPTracker.getPos() == RegionEnd && "Can't find the region bottom");
+
+  // Cache the list of excess pressure sets in this region. This will also track
+  // the max pressure in the scheduled code for these sets.
+  RegionCriticalPSets.clear();
+  std::vector<unsigned> RegionPressure = RPTracker.getPressure().MaxSetPressure;
+  for (unsigned i = 0, e = RegionPressure.size(); i < e; ++i) {
+    unsigned Limit = TRI->getRegPressureSetLimit(i);
+    if (RegionPressure[i] > Limit)
+      RegionCriticalPSets.push_back(PressureElement(i, 0));
+  }
+  DEBUG(dbgs() << "Excess PSets: ";
+        for (unsigned i = 0, e = RegionCriticalPSets.size(); i != e; ++i)
+          dbgs() << TRI->getRegPressureSetName(
+            RegionCriticalPSets[i].PSetID) << " ";
+        dbgs() << "\n");
+}
+
+// FIXME: When the pressure tracker deals in pressure differences then we won't
+// iterate over all RegionCriticalPSets[i].
+void ScheduleDAGMI::
+updateScheduledPressure(std::vector<unsigned> NewMaxPressure) {
+  for (unsigned i = 0, e = RegionCriticalPSets.size(); i < e; ++i) {
+    unsigned ID = RegionCriticalPSets[i].PSetID;
+    int &MaxUnits = RegionCriticalPSets[i].UnitIncrease;
+    if ((int)NewMaxPressure[ID] > MaxUnits)
+      MaxUnits = NewMaxPressure[ID];
+  }
+}
+
+// Release all DAG roots for scheduling.
+void ScheduleDAGMI::releaseRoots() {
+  SmallVector<SUnit*, 16> BotRoots;
+
+  for (std::vector<SUnit>::iterator
+         I = SUnits.begin(), E = SUnits.end(); I != E; ++I) {
+    // A SUnit is ready to top schedule if it has no predecessors.
+    if (I->Preds.empty())
+      SchedImpl->releaseTopNode(&(*I));
+    // A SUnit is ready to bottom schedule if it has no successors.
+    if (I->Succs.empty())
+      BotRoots.push_back(&(*I));
+  }
+  // Release bottom roots in reverse order so the higher priority nodes appear
+  // first. This is more natural and slightly more efficient.
+  for (SmallVectorImpl<SUnit*>::const_reverse_iterator
+         I = BotRoots.rbegin(), E = BotRoots.rend(); I != E; ++I)
+    SchedImpl->releaseBottomNode(*I);
 }
 
 /// schedule - Called back from MachineScheduler::runOnMachineFunction
@@ -532,7 +617,6 @@ void ScheduleDAGMI::schedule() {
   // Initialize top/bottom trackers after computing region pressure.
   initRegPressure();
 
-  DEBUG(dbgs() << "********** MI Scheduling **********\n");
   DEBUG(for (unsigned su = 0, e = SUnits.size(); su != e; ++su)
           SUnits[su].dumpAll(this));
 
@@ -545,22 +629,12 @@ void ScheduleDAGMI::schedule() {
   releasePredecessors(&ExitSU);
 
   // Release all DAG roots for scheduling.
-  for (std::vector<SUnit>::iterator I = SUnits.begin(), E = SUnits.end();
-       I != E; ++I) {
-    // A SUnit is ready to top schedule if it has no predecessors.
-    if (I->Preds.empty())
-      SchedImpl->releaseTopNode(&(*I));
-    // A SUnit is ready to bottom schedule if it has no successors.
-    if (I->Succs.empty())
-      SchedImpl->releaseBottomNode(&(*I));
-  }
+  releaseRoots();
 
   CurrentTop = nextIfDebug(RegionBegin, RegionEnd);
   CurrentBottom = RegionEnd;
   bool IsTopNode = false;
   while (SUnit *SU = SchedImpl->pickNode(IsTopNode)) {
-    DEBUG(dbgs() << "*** " << (IsTopNode ? "Top" : "Bottom")
-          << " Scheduling Instruction:\n"; SU->dump(this));
     if (!checkSchedLimit())
       break;
 
@@ -571,12 +645,15 @@ void ScheduleDAGMI::schedule() {
       assert(SU->isTopReady() && "node still has unscheduled dependencies");
       if (&*CurrentTop == MI)
         CurrentTop = nextIfDebug(++CurrentTop, CurrentBottom);
-      else
+      else {
         moveInstruction(MI, CurrentTop);
+        TopRPTracker.setPos(MI);
+      }
 
       // Update top scheduled pressure.
       TopRPTracker.advance();
       assert(TopRPTracker.getPos() == CurrentTop && "out of sync");
+      updateScheduledPressure(TopRPTracker.getPressure().MaxSetPressure);
 
       // Release dependent instructions for scheduling.
       releaseSuccessors(SU);
@@ -588,19 +665,23 @@ void ScheduleDAGMI::schedule() {
       if (&*priorII == MI)
         CurrentBottom = priorII;
       else {
-        if (&*CurrentTop == MI)
-          CurrentTop = nextIfDebug(++CurrentTop, CurrentBottom);
+        if (&*CurrentTop == MI) {
+          CurrentTop = nextIfDebug(++CurrentTop, priorII);
+          TopRPTracker.setPos(CurrentTop);
+        }
         moveInstruction(MI, CurrentBottom);
         CurrentBottom = MI;
       }
       // Update bottom scheduled pressure.
       BotRPTracker.recede();
       assert(BotRPTracker.getPos() == CurrentBottom && "out of sync");
+      updateScheduledPressure(BotRPTracker.getPressure().MaxSetPressure);
 
       // Release dependent instructions for scheduling.
       releasePredecessors(SU);
     }
     SU->isScheduled = true;
+    SchedImpl->schedNode(SU, IsTopNode);
   }
   assert(CurrentTop == CurrentBottom && "Nonempty unscheduled zone.");
 
@@ -633,20 +714,29 @@ void ScheduleDAGMI::placeDebugValues() {
 //===----------------------------------------------------------------------===//
 
 namespace {
-/// Wrapper around a vector of SUnits with some basic convenience methods.
-struct ReadyQ {
-  typedef std::vector<SUnit*>::iterator iterator;
-
+/// ReadyQueue encapsulates vector of "ready" SUnits with basic convenience
+/// methods for pushing and removing nodes. ReadyQueue's are uniquely identified
+/// by an ID. SUnit::NodeQueueId is a mask of the ReadyQueues the SUnit is in.
+class ReadyQueue {
   unsigned ID;
+  std::string Name;
   std::vector<SUnit*> Queue;
 
-  ReadyQ(unsigned id): ID(id) {}
+public:
+  ReadyQueue(unsigned id, const Twine &name): ID(id), Name(name.str()) {}
 
-  bool isInQueue(SUnit *SU) const {
-    return SU->NodeQueueId & ID;
-  }
+  unsigned getID() const { return ID; }
+
+  StringRef getName() const { return Name; }
+
+  // SU is in this queue if it's NodeQueueID is a superset of this ID.
+  bool isInQueue(SUnit *SU) const { return (SU->NodeQueueId & ID); }
 
   bool empty() const { return Queue.empty(); }
+
+  unsigned size() const { return Queue.size(); }
+
+  typedef std::vector<SUnit*>::iterator iterator;
 
   iterator begin() { return Queue.begin(); }
 
@@ -666,6 +756,13 @@ struct ReadyQ {
     *I = Queue.back();
     Queue.pop_back();
   }
+
+  void dump() {
+    dbgs() << Name << ": ";
+    for (unsigned i = 0, e = Queue.size(); i < e; ++i)
+      dbgs() << Queue[i]->NodeNum << " ";
+    dbgs() << "\n";
+  }
 };
 
 /// ConvergingScheduler shrinks the unscheduled zone using heuristics to balance
@@ -683,164 +780,509 @@ class ConvergingScheduler : public MachineSchedStrategy {
 
     SchedCandidate(): SU(NULL) {}
   };
+  /// Represent the type of SchedCandidate found within a single queue.
+  enum CandResult {
+    NoCand, NodeOrder, SingleExcess, SingleCritical, SingleMax, MultiPressure };
+
+  /// Each Scheduling boundary is associated with ready queues. It tracks the
+  /// current cycle in whichever direction at has moved, and maintains the state
+  /// of "hazards" and other interlocks at the current cycle.
+  struct SchedBoundary {
+    ReadyQueue Available;
+    ReadyQueue Pending;
+    bool CheckPending;
+
+    ScheduleHazardRecognizer *HazardRec;
+
+    unsigned CurrCycle;
+    unsigned IssueCount;
+
+    /// MinReadyCycle - Cycle of the soonest available instruction.
+    unsigned MinReadyCycle;
+
+    // Remember the greatest min operand latency.
+    unsigned MaxMinLatency;
+
+    /// Pending queues extend the ready queues with the same ID and the
+    /// PendingFlag set.
+    SchedBoundary(unsigned ID, const Twine &Name):
+      Available(ID, Name+".A"),
+      Pending(ID << ConvergingScheduler::LogMaxQID, Name+".P"),
+      CheckPending(false), HazardRec(0), CurrCycle(0), IssueCount(0),
+      MinReadyCycle(UINT_MAX), MaxMinLatency(0) {}
+
+    ~SchedBoundary() { delete HazardRec; }
+
+    bool isTop() const {
+      return Available.getID() == ConvergingScheduler::TopQID;
+    }
+
+    void releaseNode(SUnit *SU, unsigned ReadyCycle);
+
+    void bumpCycle();
+
+    void bumpNode(SUnit *SU, unsigned IssueWidth);
+
+    void releasePending();
+
+    void removeReady(SUnit *SU);
+
+    SUnit *pickOnlyChoice();
+  };
 
   ScheduleDAGMI *DAG;
   const TargetRegisterInfo *TRI;
 
-  ReadyQ TopQueue;
-  ReadyQ BotQueue;
+  // State of the top and bottom scheduled instruction boundaries.
+  SchedBoundary Top;
+  SchedBoundary Bot;
 
 public:
-  /// SUnit::NodeQueueId = 0 (none), = 1 (top), = 2 (bottom), = 3 (both)
+  /// SUnit::NodeQueueId: 0 (none), 1 (top), 2 (bot), 3 (both)
   enum {
     TopQID = 1,
-    BotQID = 2
+    BotQID = 2,
+    LogMaxQID = 2
   };
 
-  ConvergingScheduler(): DAG(0), TRI(0), TopQueue(TopQID), BotQueue(BotQID) {}
+  ConvergingScheduler():
+    DAG(0), TRI(0), Top(TopQID, "TopQ"), Bot(BotQID, "BotQ") {}
 
-  static const char *getQName(unsigned ID) {
-    switch(ID) {
-    default: return "NoQ";
-    case TopQID: return "TopQ";
-    case BotQID: return "BotQ";
-    };
-  }
-
-  virtual void initialize(ScheduleDAGMI *dag) {
-    DAG = dag;
-    TRI = DAG->TRI;
-
-    assert((!ForceTopDown || !ForceBottomUp) &&
-           "-misched-topdown incompatible with -misched-bottomup");
-  }
+  virtual void initialize(ScheduleDAGMI *dag);
 
   virtual SUnit *pickNode(bool &IsTopNode);
 
-  virtual void releaseTopNode(SUnit *SU) {
-    if (!SU->isScheduled)
-      TopQueue.push(SU);
-  }
-  virtual void releaseBottomNode(SUnit *SU) {
-    if (!SU->isScheduled)
-      BotQueue.push(SU);
-  }
+  virtual void schedNode(SUnit *SU, bool IsTopNode);
+
+  virtual void releaseTopNode(SUnit *SU);
+
+  virtual void releaseBottomNode(SUnit *SU);
+
 protected:
+  SUnit *pickNodeBidrectional(bool &IsTopNode);
+
+  CandResult pickNodeFromQueue(ReadyQueue &Q,
+                               const RegPressureTracker &RPTracker,
+                               SchedCandidate &Candidate);
 #ifndef NDEBUG
-  void traceCandidate(const char *Label, unsigned QID, SUnit *SU,
-                      int RPDiff, unsigned PSetID);
+  void traceCandidate(const char *Label, const ReadyQueue &Q, SUnit *SU,
+                      PressureElement P = PressureElement());
 #endif
-  bool pickNodeFromQueue(ReadyQ &Q, const RegPressureTracker &RPTracker,
-                         SchedCandidate &Candidate);
 };
 } // namespace
 
+void ConvergingScheduler::initialize(ScheduleDAGMI *dag) {
+  DAG = dag;
+  TRI = DAG->TRI;
+
+  // Initialize the HazardRecognizers.
+  const TargetMachine &TM = DAG->MF.getTarget();
+  const InstrItineraryData *Itin = TM.getInstrItineraryData();
+  Top.HazardRec = TM.getInstrInfo()->CreateTargetMIHazardRecognizer(Itin, DAG);
+  Bot.HazardRec = TM.getInstrInfo()->CreateTargetMIHazardRecognizer(Itin, DAG);
+
+  assert((!ForceTopDown || !ForceBottomUp) &&
+         "-misched-topdown incompatible with -misched-bottomup");
+}
+
+void ConvergingScheduler::releaseTopNode(SUnit *SU) {
+  if (SU->isScheduled)
+    return;
+
+  for (SUnit::succ_iterator I = SU->Preds.begin(), E = SU->Preds.end();
+       I != E; ++I) {
+    unsigned PredReadyCycle = I->getSUnit()->TopReadyCycle;
+    unsigned Latency =
+      DAG->computeOperandLatency(I->getSUnit(), SU, *I, /*FindMin=*/true);
 #ifndef NDEBUG
-void ConvergingScheduler::
-traceCandidate(const char *Label, unsigned QID, SUnit *SU,
-               int RPDiff, unsigned PSetID) {
-  dbgs() << Label << getQName(QID) << " ";
-  if (RPDiff)
-    dbgs() << TRI->getRegPressureSetName(PSetID) << ":" << RPDiff << " ";
+    Top.MaxMinLatency = std::max(Latency, Top.MaxMinLatency);
+#endif
+    if (SU->TopReadyCycle < PredReadyCycle + Latency)
+      SU->TopReadyCycle = PredReadyCycle + Latency;
+  }
+  Top.releaseNode(SU, SU->TopReadyCycle);
+}
+
+void ConvergingScheduler::releaseBottomNode(SUnit *SU) {
+  if (SU->isScheduled)
+    return;
+
+  assert(SU->getInstr() && "Scheduled SUnit must have instr");
+
+  for (SUnit::succ_iterator I = SU->Succs.begin(), E = SU->Succs.end();
+       I != E; ++I) {
+    unsigned SuccReadyCycle = I->getSUnit()->BotReadyCycle;
+    unsigned Latency =
+      DAG->computeOperandLatency(SU, I->getSUnit(), *I, /*FindMin=*/true);
+#ifndef NDEBUG
+    Bot.MaxMinLatency = std::max(Latency, Bot.MaxMinLatency);
+#endif
+    if (SU->BotReadyCycle < SuccReadyCycle + Latency)
+      SU->BotReadyCycle = SuccReadyCycle + Latency;
+  }
+  Bot.releaseNode(SU, SU->BotReadyCycle);
+}
+
+void ConvergingScheduler::SchedBoundary::releaseNode(SUnit *SU,
+                                                     unsigned ReadyCycle) {
+  if (ReadyCycle < MinReadyCycle)
+    MinReadyCycle = ReadyCycle;
+
+  // Check for interlocks first. For the purpose of other heuristics, an
+  // instruction that cannot issue appears as if it's not in the ReadyQueue.
+  if (ReadyCycle > CurrCycle
+      || (HazardRec->isEnabled() && (HazardRec->getHazardType(SU)
+                                     != ScheduleHazardRecognizer::NoHazard)))
+    Pending.push(SU);
+  else
+    Available.push(SU);
+}
+
+/// Move the boundary of scheduled code by one cycle.
+void ConvergingScheduler::SchedBoundary::bumpCycle() {
+  IssueCount = 0;
+
+  assert(MinReadyCycle < UINT_MAX && "MinReadyCycle uninitialized");
+  unsigned NextCycle = std::max(CurrCycle + 1, MinReadyCycle);
+
+  if (!HazardRec->isEnabled()) {
+    // Bypass HazardRec virtual calls.
+    CurrCycle = NextCycle;
+  }
+  else {
+    // Bypass getHazardType calls in case of long latency.
+    for (; CurrCycle != NextCycle; ++CurrCycle) {
+      if (isTop())
+        HazardRec->AdvanceCycle();
+      else
+        HazardRec->RecedeCycle();
+    }
+  }
+  CheckPending = true;
+
+  DEBUG(dbgs() << "*** " << Available.getName() << " cycle "
+        << CurrCycle << '\n');
+}
+
+/// Move the boundary of scheduled code by one SUnit.
+void ConvergingScheduler::SchedBoundary::bumpNode(SUnit *SU,
+                                                  unsigned IssueWidth) {
+  // Update the reservation table.
+  if (HazardRec->isEnabled()) {
+    if (!isTop() && SU->isCall) {
+      // Calls are scheduled with their preceding instructions. For bottom-up
+      // scheduling, clear the pipeline state before emitting.
+      HazardRec->Reset();
+    }
+    HazardRec->EmitInstruction(SU);
+  }
+  // Check the instruction group size limit.
+  ++IssueCount;
+  if (IssueCount == IssueWidth) {
+    DEBUG(dbgs() << "*** Max instrs at cycle " << CurrCycle << '\n');
+    bumpCycle();
+  }
+}
+
+/// Release pending ready nodes in to the available queue. This makes them
+/// visible to heuristics.
+void ConvergingScheduler::SchedBoundary::releasePending() {
+  // If the available queue is empty, it is safe to reset MinReadyCycle.
+  if (Available.empty())
+    MinReadyCycle = UINT_MAX;
+
+  // Check to see if any of the pending instructions are ready to issue.  If
+  // so, add them to the available queue.
+  for (unsigned i = 0, e = Pending.size(); i != e; ++i) {
+    SUnit *SU = *(Pending.begin()+i);
+    unsigned ReadyCycle = isTop() ? SU->TopReadyCycle : SU->BotReadyCycle;
+
+    if (ReadyCycle < MinReadyCycle)
+      MinReadyCycle = ReadyCycle;
+
+    if (ReadyCycle > CurrCycle)
+      continue;
+
+    if (HazardRec->isEnabled()
+        && HazardRec->getHazardType(SU) != ScheduleHazardRecognizer::NoHazard)
+      continue;
+
+    Available.push(SU);
+    Pending.remove(Pending.begin()+i);
+    --i; --e;
+  }
+  CheckPending = false;
+}
+
+/// Remove SU from the ready set for this boundary.
+void ConvergingScheduler::SchedBoundary::removeReady(SUnit *SU) {
+  if (Available.isInQueue(SU))
+    Available.remove(Available.find(SU));
+  else {
+    assert(Pending.isInQueue(SU) && "bad ready count");
+    Pending.remove(Pending.find(SU));
+  }
+}
+
+/// If this queue only has one ready candidate, return it. As a side effect,
+/// advance the cycle until at least one node is ready. If multiple instructions
+/// are ready, return NULL.
+SUnit *ConvergingScheduler::SchedBoundary::pickOnlyChoice() {
+  if (CheckPending)
+    releasePending();
+
+  for (unsigned i = 0; Available.empty(); ++i) {
+    assert(i <= (HazardRec->getMaxLookAhead() + MaxMinLatency) &&
+           "permanent hazard"); (void)i;
+    bumpCycle();
+    releasePending();
+  }
+  if (Available.size() == 1)
+    return *Available.begin();
+  return NULL;
+}
+
+#ifndef NDEBUG
+void ConvergingScheduler::traceCandidate(const char *Label, const ReadyQueue &Q,
+                                         SUnit *SU, PressureElement P) {
+  dbgs() << Label << " " << Q.getName() << " ";
+  if (P.isValid())
+    dbgs() << TRI->getRegPressureSetName(P.PSetID) << ":" << P.UnitIncrease
+           << " ";
   else
     dbgs() << "     ";
   SU->dump(DAG);
 }
 #endif
 
+/// pickNodeFromQueue helper that returns true if the LHS reg pressure effect is
+/// more desirable than RHS from scheduling standpoint.
+static bool compareRPDelta(const RegPressureDelta &LHS,
+                           const RegPressureDelta &RHS) {
+  // Compare each component of pressure in decreasing order of importance
+  // without checking if any are valid. Invalid PressureElements are assumed to
+  // have UnitIncrease==0, so are neutral.
+
+  // Avoid increasing the max critical pressure in the scheduled region.
+  if (LHS.Excess.UnitIncrease != RHS.Excess.UnitIncrease)
+    return LHS.Excess.UnitIncrease < RHS.Excess.UnitIncrease;
+
+  // Avoid increasing the max critical pressure in the scheduled region.
+  if (LHS.CriticalMax.UnitIncrease != RHS.CriticalMax.UnitIncrease)
+    return LHS.CriticalMax.UnitIncrease < RHS.CriticalMax.UnitIncrease;
+
+  // Avoid increasing the max pressure of the entire region.
+  if (LHS.CurrentMax.UnitIncrease != RHS.CurrentMax.UnitIncrease)
+    return LHS.CurrentMax.UnitIncrease < RHS.CurrentMax.UnitIncrease;
+
+  return false;
+}
+
 /// Pick the best candidate from the top queue.
 ///
 /// TODO: getMaxPressureDelta results can be mostly cached for each SUnit during
 /// DAG building. To adjust for the current scheduling location we need to
 /// maintain the number of vreg uses remaining to be top-scheduled.
-bool ConvergingScheduler::pickNodeFromQueue(ReadyQ &Q,
-                                            const RegPressureTracker &RPTracker,
-                                            SchedCandidate &Candidate) {
+ConvergingScheduler::CandResult ConvergingScheduler::
+pickNodeFromQueue(ReadyQueue &Q, const RegPressureTracker &RPTracker,
+                  SchedCandidate &Candidate) {
+  DEBUG(Q.dump());
+
   // getMaxPressureDelta temporarily modifies the tracker.
   RegPressureTracker &TempTracker = const_cast<RegPressureTracker&>(RPTracker);
 
   // BestSU remains NULL if no top candidates beat the best existing candidate.
-  bool FoundCandidate = false;
-  for (ReadyQ::iterator I = Q.begin(), E = Q.end(); I != E; ++I) {
-
+  CandResult FoundCandidate = NoCand;
+  for (ReadyQueue::iterator I = Q.begin(), E = Q.end(); I != E; ++I) {
     RegPressureDelta RPDelta;
-    TempTracker.getMaxPressureDelta((*I)->getInstr(), RPDelta);
+    TempTracker.getMaxPressureDelta((*I)->getInstr(), RPDelta,
+                                    DAG->getRegionCriticalPSets(),
+                                    DAG->getRegPressure().MaxSetPressure);
 
+    // Initialize the candidate if needed.
+    if (!Candidate.SU) {
+      Candidate.SU = *I;
+      Candidate.RPDelta = RPDelta;
+      FoundCandidate = NodeOrder;
+      continue;
+    }
     // Avoid exceeding the target's limit.
-    if (!Candidate.SU || RPDelta.ExcessUnits < Candidate.RPDelta.ExcessUnits) {
-      DEBUG(traceCandidate(Candidate.SU ? "PCAND" : "ACAND", Q.ID, *I,
-                           RPDelta.ExcessUnits, RPDelta.ExcessSetID));
+    if (RPDelta.Excess.UnitIncrease < Candidate.RPDelta.Excess.UnitIncrease) {
+      DEBUG(traceCandidate("ECAND", Q, *I, RPDelta.Excess));
       Candidate.SU = *I;
       Candidate.RPDelta = RPDelta;
-      FoundCandidate = true;
+      FoundCandidate = SingleExcess;
       continue;
     }
-    if (RPDelta.ExcessUnits > Candidate.RPDelta.ExcessUnits)
+    if (RPDelta.Excess.UnitIncrease > Candidate.RPDelta.Excess.UnitIncrease)
       continue;
+    if (FoundCandidate == SingleExcess)
+      FoundCandidate = MultiPressure;
 
-    // Avoid increasing the max pressure.
-    if (RPDelta.MaxUnitIncrease < Candidate.RPDelta.MaxUnitIncrease) {
-      DEBUG(traceCandidate("MCAND", Q.ID, *I,
-                           RPDelta.ExcessUnits, RPDelta.ExcessSetID));
+    // Avoid increasing the max critical pressure in the scheduled region.
+    if (RPDelta.CriticalMax.UnitIncrease
+        < Candidate.RPDelta.CriticalMax.UnitIncrease) {
+      DEBUG(traceCandidate("PCAND", Q, *I, RPDelta.CriticalMax));
       Candidate.SU = *I;
       Candidate.RPDelta = RPDelta;
-      FoundCandidate = true;
+      FoundCandidate = SingleCritical;
       continue;
     }
-    if (RPDelta.MaxUnitIncrease > Candidate.RPDelta.MaxUnitIncrease)
+    if (RPDelta.CriticalMax.UnitIncrease
+        > Candidate.RPDelta.CriticalMax.UnitIncrease)
       continue;
+    if (FoundCandidate == SingleCritical)
+      FoundCandidate = MultiPressure;
+
+    // Avoid increasing the max pressure of the entire region.
+    if (RPDelta.CurrentMax.UnitIncrease
+        < Candidate.RPDelta.CurrentMax.UnitIncrease) {
+      DEBUG(traceCandidate("MCAND", Q, *I, RPDelta.CurrentMax));
+      Candidate.SU = *I;
+      Candidate.RPDelta = RPDelta;
+      FoundCandidate = SingleMax;
+      continue;
+    }
+    if (RPDelta.CurrentMax.UnitIncrease
+        > Candidate.RPDelta.CurrentMax.UnitIncrease)
+      continue;
+    if (FoundCandidate == SingleMax)
+      FoundCandidate = MultiPressure;
 
     // Fall through to original instruction order.
-    // Only consider node order if BestSU was chosen from this Q.
-    if (!FoundCandidate)
+    // Only consider node order if Candidate was chosen from this Q.
+    if (FoundCandidate == NoCand)
       continue;
 
-    if ((Q.ID == TopQID && (*I)->NodeNum < Candidate.SU->NodeNum)
-        || (Q.ID == BotQID && (*I)->NodeNum > Candidate.SU->NodeNum)) {
-      DEBUG(traceCandidate("NCAND", Q.ID, *I, 0, 0));
+    if ((Q.getID() == TopQID && (*I)->NodeNum < Candidate.SU->NodeNum)
+        || (Q.getID() == BotQID && (*I)->NodeNum > Candidate.SU->NodeNum)) {
+      DEBUG(traceCandidate("NCAND", Q, *I));
       Candidate.SU = *I;
       Candidate.RPDelta = RPDelta;
-      FoundCandidate = true;
+      FoundCandidate = NodeOrder;
     }
   }
   return FoundCandidate;
 }
 
-/// Pick the best node from either the top or bottom queue to balance the
-/// schedule.
+/// Pick the best candidate node from either the top or bottom queue.
+SUnit *ConvergingScheduler::pickNodeBidrectional(bool &IsTopNode) {
+  // Schedule as far as possible in the direction of no choice. This is most
+  // efficient, but also provides the best heuristics for CriticalPSets.
+  if (SUnit *SU = Bot.pickOnlyChoice()) {
+    IsTopNode = false;
+    return SU;
+  }
+  if (SUnit *SU = Top.pickOnlyChoice()) {
+    IsTopNode = true;
+    return SU;
+  }
+  SchedCandidate BotCand;
+  // Prefer bottom scheduling when heuristics are silent.
+  CandResult BotResult = pickNodeFromQueue(Bot.Available,
+                                           DAG->getBotRPTracker(), BotCand);
+  assert(BotResult != NoCand && "failed to find the first candidate");
+
+  // If either Q has a single candidate that provides the least increase in
+  // Excess pressure, we can immediately schedule from that Q.
+  //
+  // RegionCriticalPSets summarizes the pressure within the scheduled region and
+  // affects picking from either Q. If scheduling in one direction must
+  // increase pressure for one of the excess PSets, then schedule in that
+  // direction first to provide more freedom in the other direction.
+  if (BotResult == SingleExcess || BotResult == SingleCritical) {
+    IsTopNode = false;
+    return BotCand.SU;
+  }
+  // Check if the top Q has a better candidate.
+  SchedCandidate TopCand;
+  CandResult TopResult = pickNodeFromQueue(Top.Available,
+                                           DAG->getTopRPTracker(), TopCand);
+  assert(TopResult != NoCand && "failed to find the first candidate");
+
+  if (TopResult == SingleExcess || TopResult == SingleCritical) {
+    IsTopNode = true;
+    return TopCand.SU;
+  }
+  // If either Q has a single candidate that minimizes pressure above the
+  // original region's pressure pick it.
+  if (BotResult == SingleMax) {
+    IsTopNode = false;
+    return BotCand.SU;
+  }
+  if (TopResult == SingleMax) {
+    IsTopNode = true;
+    return TopCand.SU;
+  }
+  // Check for a salient pressure difference and pick the best from either side.
+  if (compareRPDelta(TopCand.RPDelta, BotCand.RPDelta)) {
+    IsTopNode = true;
+    return TopCand.SU;
+  }
+  // Otherwise prefer the bottom candidate in node order.
+  IsTopNode = false;
+  return BotCand.SU;
+}
+
+/// Pick the best node to balance the schedule. Implements MachineSchedStrategy.
 SUnit *ConvergingScheduler::pickNode(bool &IsTopNode) {
   if (DAG->top() == DAG->bottom()) {
-    assert(TopQueue.empty() && BotQueue.empty() && "ReadyQ garbage");
+    assert(Top.Available.empty() && Top.Pending.empty() &&
+           Bot.Available.empty() && Bot.Pending.empty() && "ReadyQ garbage");
     return NULL;
   }
-  // As an initial placeholder heuristic, schedule in the direction that has
-  // the fewest choices.
   SUnit *SU;
   if (ForceTopDown) {
-    SU = DAG->getSUnit(DAG->top());
+    SU = Top.pickOnlyChoice();
+    if (!SU) {
+      SchedCandidate TopCand;
+      CandResult TopResult =
+        pickNodeFromQueue(Top.Available, DAG->getTopRPTracker(), TopCand);
+      assert(TopResult != NoCand && "failed to find the first candidate");
+      (void)TopResult;
+      SU = TopCand.SU;
+    }
     IsTopNode = true;
   }
   else if (ForceBottomUp) {
-    SU = DAG->getSUnit(priorNonDebug(DAG->bottom(), DAG->top()));
+    SU = Bot.pickOnlyChoice();
+    if (!SU) {
+      SchedCandidate BotCand;
+      CandResult BotResult =
+        pickNodeFromQueue(Bot.Available, DAG->getBotRPTracker(), BotCand);
+      assert(BotResult != NoCand && "failed to find the first candidate");
+      (void)BotResult;
+      SU = BotCand.SU;
+    }
     IsTopNode = false;
   }
   else {
-    SchedCandidate Candidate;
-    // Prefer picking from the bottom.
-    pickNodeFromQueue(BotQueue, DAG->getBotRPTracker(), Candidate);
-    IsTopNode =
-      pickNodeFromQueue(TopQueue, DAG->getTopRPTracker(), Candidate);
-    SU = Candidate.SU;
+    SU = pickNodeBidrectional(IsTopNode);
   }
-  if (SU->isTopReady()) {
-    assert(!TopQueue.empty() && "bad ready count");
-    TopQueue.remove(TopQueue.find(SU));
-  }
-  if (SU->isBottomReady()) {
-    assert(!BotQueue.empty() && "bad ready count");
-    BotQueue.remove(BotQueue.find(SU));
-  }
+  if (SU->isTopReady())
+    Top.removeReady(SU);
+  if (SU->isBottomReady())
+    Bot.removeReady(SU);
+
+  DEBUG(dbgs() << "*** " << (IsTopNode ? "Top" : "Bottom")
+        << " Scheduling Instruction in cycle "
+        << (IsTopNode ? Top.CurrCycle : Bot.CurrCycle) << '\n';
+        SU->dump(DAG));
   return SU;
+}
+
+/// Update the scheduler's state after scheduling a node. This is the same node
+/// that was just returned by pickNode(). However, ScheduleDAGMI needs to update
+/// it's state based on the current cycle before MachineSchedStrategy does.
+void ConvergingScheduler::schedNode(SUnit *SU, bool IsTopNode) {
+  if (IsTopNode) {
+    SU->TopReadyCycle = Top.CurrCycle;
+    Top.bumpNode(SU, DAG->getIssueWidth());
+  }
+  else {
+    SU->BotReadyCycle = Bot.CurrCycle;
+    Bot.bumpNode(SU, DAG->getIssueWidth());
+  }
 }
 
 /// Create the standard converging machine scheduler. This will be used as the
@@ -919,6 +1361,8 @@ public:
       IsTopDown = !IsTopDown;
     return SU;
   }
+
+  virtual void schedNode(SUnit *SU, bool IsTopNode) {}
 
   virtual void releaseTopNode(SUnit *SU) {
     TopQ.push(SU);

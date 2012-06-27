@@ -23,6 +23,7 @@
 #include "llvm/IntrinsicInst.h"
 #include "llvm/Intrinsics.h"
 #include "llvm/LLVMContext.h"
+#include "llvm/Metadata.h"
 #include "llvm/Pass.h"
 #include "llvm/Type.h"
 #include "llvm/ADT/DenseMap.h"
@@ -76,6 +77,10 @@ MaxCandPairsForCycleCheck("bb-vectorize-max-cycle-check-pairs", cl::init(200),
                        " a full cycle check"));
 
 static cl::opt<bool>
+NoBools("bb-vectorize-no-bools", cl::init(false), cl::Hidden,
+  cl::desc("Don't try to vectorize boolean (i1) values"));
+
+static cl::opt<bool>
 NoInts("bb-vectorize-no-ints", cl::init(false), cl::Hidden,
   cl::desc("Don't try to vectorize integer values"));
 
@@ -102,6 +107,10 @@ NoFMA("bb-vectorize-no-fma", cl::init(false), cl::Hidden,
 static cl::opt<bool>
 NoSelect("bb-vectorize-no-select", cl::init(false), cl::Hidden,
   cl::desc("Don't try to vectorize select instructions"));
+
+static cl::opt<bool>
+NoCmp("bb-vectorize-no-cmp", cl::init(false), cl::Hidden,
+  cl::desc("Don't try to vectorize comparison instructions"));
 
 static cl::opt<bool>
 NoGEP("bb-vectorize-no-gep", cl::init(false), cl::Hidden,
@@ -302,6 +311,8 @@ namespace {
                      std::multimap<Value *, Value *> &LoadMoveSet,
                      Instruction *&InsertionPt,
                      Instruction *I, Instruction *J);
+
+    void combineMetadata(Instruction *K, const Instruction *J);
 
     bool vectorizeBB(BasicBlock &BB) {
       bool changed = false;
@@ -567,6 +578,9 @@ namespace {
     } else if (isa<SelectInst>(I)) {
       if (!Config.VectorizeSelect)
         return false;
+    } else if (isa<CmpInst>(I)) {
+      if (!Config.VectorizeCmp)
+        return false;
     } else if (GetElementPtrInst *G = dyn_cast<GetElementPtrInst>(I)) {
       if (!Config.VectorizeGEP)
         return false;
@@ -604,10 +618,15 @@ namespace {
         !(VectorType::isValidElementType(T2) || T2->isVectorTy()))
       return false;
 
-    if (!Config.VectorizeInts
-        && (T1->isIntOrIntVectorTy() || T2->isIntOrIntVectorTy()))
-      return false;
-
+    if (T1->getScalarSizeInBits() == 1 && T2->getScalarSizeInBits() == 1) {
+      if (!Config.VectorizeBools)
+        return false;
+    } else {
+      if (!Config.VectorizeInts
+          && (T1->isIntOrIntVectorTy() || T2->isIntOrIntVectorTy()))
+        return false;
+    }
+  
     if (!Config.VectorizeFloats
         && (T1->isFPOrFPVectorTy() || T2->isFPOrFPVectorTy()))
       return false;
@@ -1784,6 +1803,31 @@ namespace {
     }
   }
 
+  // When the first instruction in each pair is cloned, it will inherit its
+  // parent's metadata. This metadata must be combined with that of the other
+  // instruction in a safe way.
+  void BBVectorize::combineMetadata(Instruction *K, const Instruction *J) {
+    SmallVector<std::pair<unsigned, MDNode*>, 4> Metadata;
+    K->getAllMetadataOtherThanDebugLoc(Metadata);
+    for (unsigned i = 0, n = Metadata.size(); i < n; ++i) {
+      unsigned Kind = Metadata[i].first;
+      MDNode *JMD = J->getMetadata(Kind);
+      MDNode *KMD = Metadata[i].second;
+
+      switch (Kind) {
+      default:
+        K->setMetadata(Kind, 0); // Remove unknown metadata
+        break;
+      case LLVMContext::MD_tbaa:
+        K->setMetadata(Kind, MDNode::getMostGenericTBAA(JMD, KMD));
+        break;
+      case LLVMContext::MD_fpmath:
+        K->setMetadata(Kind, MDNode::getMostGenericFPMath(JMD, KMD));
+        break;
+      }
+    }
+  }
+
   // This function fuses the chosen instruction pairs into vector instructions,
   // taking care preserve any needed scalar outputs and, then, it reorders the
   // remaining instructions as needed (users of the first member of the pair
@@ -1862,6 +1906,8 @@ namespace {
 
       if (!isa<StoreInst>(K))
         K->mutateType(getVecTypeForPair(I->getType()));
+
+      combineMetadata(K, J);
 
       for (unsigned o = 0; o < NumOperands; ++o)
         K->setOperand(o, ReplacedOperands[o]);
@@ -1953,6 +1999,7 @@ llvm::vectorizeBasicBlock(Pass *P, BasicBlock &BB, const VectorizeConfig &C) {
 //===----------------------------------------------------------------------===//
 VectorizeConfig::VectorizeConfig() {
   VectorBits = ::VectorBits;
+  VectorizeBools = !::NoBools;
   VectorizeInts = !::NoInts;
   VectorizeFloats = !::NoFloats;
   VectorizePointers = !::NoPointers;
@@ -1960,6 +2007,7 @@ VectorizeConfig::VectorizeConfig() {
   VectorizeMath = !::NoMath;
   VectorizeFMA = !::NoFMA;
   VectorizeSelect = !::NoSelect;
+  VectorizeCmp = !::NoCmp;
   VectorizeGEP = !::NoGEP;
   VectorizeMemOps = !::NoMemOps;
   AlignedOnly = ::AlignedOnly;

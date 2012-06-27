@@ -165,73 +165,6 @@ Instruction *InstCombiner::SimplifyMemSet(MemSetInst *MI) {
   return 0;
 }
 
-/// computeAllocSize - compute the object size allocated by an allocation
-/// site. Returns 0 if the size is not constant (in SizeValue), 1 if the size
-/// is constant (in Size), and 2 if the size could not be determined within the
-/// given maximum Penalty that the computation would incurr at run-time.
-static int computeAllocSize(Value *Alloc, uint64_t &Size, Value* &SizeValue,
-                            uint64_t Penalty, TargetData *TD,
-                            InstCombiner::BuilderTy *Builder) {
-  if (GlobalVariable *GV = dyn_cast<GlobalVariable>(Alloc)) {
-    if (GV->hasDefinitiveInitializer()) {
-      Constant *C = GV->getInitializer();
-      Size = TD->getTypeAllocSize(C->getType());
-      return 1;
-    }
-    // Can't determine size of the GV.
-    return 2;
-
-  } else if (AllocaInst *AI = dyn_cast<AllocaInst>(Alloc)) {
-    if (!AI->getAllocatedType()->isSized())
-      return 2;
-
-    Size = TD->getTypeAllocSize(AI->getAllocatedType());
-    if (!AI->isArrayAllocation())
-      return 1; // we are done
-
-    Value *ArraySize = AI->getArraySize();
-    if (const ConstantInt *C = dyn_cast<ConstantInt>(ArraySize)) {
-      Size *= C->getZExtValue();
-      return 1;
-    }
-
-    if (Penalty < 2)
-      return 2;
-
-    SizeValue = ConstantInt::get(ArraySize->getType(), Size);
-    SizeValue = Builder->CreateMul(SizeValue, ArraySize);
-    return 0;
-
-  } else if (CallInst *MI = extractMallocCall(Alloc)) {
-    SizeValue = MI->getArgOperand(0);
-    if (ConstantInt *CI = dyn_cast<ConstantInt>(SizeValue)) {
-      Size = CI->getZExtValue();
-      return 1;
-    }
-    return 0;
-
-  } else if (CallInst *MI = extractCallocCall(Alloc)) {
-    Value *Arg1 = MI->getArgOperand(0);
-    Value *Arg2 = MI->getArgOperand(1);
-    if (ConstantInt *CI1 = dyn_cast<ConstantInt>(Arg1)) {
-      if (ConstantInt *CI2 = dyn_cast<ConstantInt>(Arg2)) {
-        Size = (CI1->getValue() * CI2->getValue()).getZExtValue();
-        return 1;
-      }
-    }
-
-    if (Penalty < 2)
-      return 2;
-
-    SizeValue = Builder->CreateMul(Arg1, Arg2);
-    return 0;
-  }
-
-  DEBUG(errs() << "computeAllocSize failed:\n");
-  DEBUG(Alloc->dump());
-  return 2;
-}
-
 /// visitCallInst - CallInst simplification.  This mostly only handles folding
 /// of intrinsic instructions.  For normal calls, it allows visitCallSite to do
 /// the heavy lifting.
@@ -239,8 +172,6 @@ static int computeAllocSize(Value *Alloc, uint64_t &Size, Value* &SizeValue,
 Instruction *InstCombiner::visitCallInst(CallInst &CI) {
   if (isFreeCall(&CI))
     return visitFree(CI);
-  if (extractMallocCall(&CI) || extractCallocCall(&CI))
-    return visitMalloc(CI);
 
   // If the caller function is nounwind, mark the call as nounwind, even if the
   // callee isn't.
@@ -313,63 +244,10 @@ Instruction *InstCombiner::visitCallInst(CallInst &CI) {
   switch (II->getIntrinsicID()) {
   default: break;
   case Intrinsic::objectsize: {
-    // We need target data for just about everything so depend on it.
-    if (!TD) return 0;
-
-    Type *ReturnTy = CI.getType();
-    uint64_t Penalty = cast<ConstantInt>(II->getArgOperand(2))->getZExtValue();
-
-    // Get to the real allocated thing and offset as fast as possible.
-    Value *Op1 = II->getArgOperand(0)->stripPointerCasts();
-    GEPOperator *GEP;
-
-    if ((GEP = dyn_cast<GEPOperator>(Op1))) {
-      // check if we will be able to get the offset
-      if (!GEP->hasAllConstantIndices() && Penalty < 2)
-        return 0;
-      Op1 = GEP->getPointerOperand()->stripPointerCasts();
-    }
-
     uint64_t Size;
-    Value *SizeValue;
-    int ConstAlloc = computeAllocSize(Op1, Size, SizeValue, Penalty, TD,
-                                      Builder);
-
-    // Do not return "I don't know" here. Later optimization passes could
-    // make it possible to evaluate objectsize to a constant.
-    if (ConstAlloc == 2)
-      return 0;
-
-    uint64_t Offset = 0;
-    Value *OffsetValue = 0;
-
-    if (GEP) {
-      if (GEP->hasAllConstantIndices()) {
-        SmallVector<Value*, 8> Ops(GEP->idx_begin(), GEP->idx_end());
-        assert(GEP->getPointerOperandType()->isPointerTy());
-        Offset = TD->getIndexedOffset(GEP->getPointerOperandType(), Ops);
-      } else
-        OffsetValue = EmitGEPOffset(GEP, true /*NoNUW*/);
-    }
-
-    if (!OffsetValue && ConstAlloc) {
-      if (Size < Offset) {
-        // Out of bounds
-        return ReplaceInstUsesWith(CI, ConstantInt::get(ReturnTy, 0));
-      }
-      return ReplaceInstUsesWith(CI, ConstantInt::get(ReturnTy, Size-Offset));
-    }
-
-    if (!OffsetValue)
-      OffsetValue = ConstantInt::get(ReturnTy, Offset);
-    if (ConstAlloc)
-      SizeValue = ConstantInt::get(ReturnTy, Size);
-
-    Value *Val = Builder->CreateSub(SizeValue, OffsetValue);
-    // return 0 if there's an overflow
-    Value *Cmp = Builder->CreateICmpULT(SizeValue, OffsetValue);
-    Val = Builder->CreateSelect(Cmp, ConstantInt::get(ReturnTy, 0), Val);
-    return ReplaceInstUsesWith(CI, Val);
+    if (getObjectSize(II->getArgOperand(0), Size, TD))
+      return ReplaceInstUsesWith(CI, ConstantInt::get(CI.getType(), Size));
+    return 0;
   }
   case Intrinsic::bswap:
     // bswap(bswap(x)) -> x
@@ -814,7 +692,7 @@ Instruction *InstCombiner::visitCallInst(CallInst &CI) {
     TerminatorInst *TI = II->getParent()->getTerminator();
     bool CannotRemove = false;
     for (++BI; &*BI != TI; ++BI) {
-      if (isa<AllocaInst>(BI) || isMalloc(BI)) {
+      if (isa<AllocaInst>(BI)) {
         CannotRemove = true;
         break;
       }
@@ -1001,6 +879,9 @@ static IntrinsicInst *FindInitTrampoline(Value *Callee) {
 // visitCallSite - Improvements for call and invoke instructions.
 //
 Instruction *InstCombiner::visitCallSite(CallSite CS) {
+  if (isAllocLikeFn(CS.getInstruction()))
+    return visitMalloc(*CS.getInstruction());
+
   bool Changed = false;
 
   // If the callee is a pointer to a function, attempt to move any casts to the
@@ -1036,24 +917,24 @@ Instruction *InstCombiner::visitCallSite(CallSite CS) {
     }
 
   if (isa<ConstantPointerNull>(Callee) || isa<UndefValue>(Callee)) {
-    // This instruction is not reachable, just remove it.  We insert a store to
-    // undef so that we know that this code is not reachable, despite the fact
-    // that we can't modify the CFG here.
-    new StoreInst(ConstantInt::getTrue(Callee->getContext()),
-               UndefValue::get(Type::getInt1PtrTy(Callee->getContext())),
-                  CS.getInstruction());
-
     // If CS does not return void then replaceAllUsesWith undef.
     // This allows ValueHandlers and custom metadata to adjust itself.
     if (!CS.getInstruction()->getType()->isVoidTy())
       ReplaceInstUsesWith(*CS.getInstruction(),
                           UndefValue::get(CS.getInstruction()->getType()));
 
-    if (InvokeInst *II = dyn_cast<InvokeInst>(CS.getInstruction())) {
-      // Don't break the CFG, insert a dummy cond branch.
-      BranchInst::Create(II->getNormalDest(), II->getUnwindDest(),
-                         ConstantInt::getTrue(Callee->getContext()), II);
+    if (isa<InvokeInst>(CS.getInstruction())) {
+      // Can't remove an invoke because we cannot change the CFG.
+      return 0;
     }
+
+    // This instruction is not reachable, just remove it.  We insert a store to
+    // undef so that we know that this code is not reachable, despite the fact
+    // that we can't modify the CFG here.
+    new StoreInst(ConstantInt::getTrue(Callee->getContext()),
+                  UndefValue::get(Type::getInt1PtrTy(Callee->getContext())),
+                  CS.getInstruction());
+
     return EraseInstFromFunction(*CS.getInstruction());
   }
 
@@ -1297,8 +1178,7 @@ bool InstCombiner::transformConstExprCastCall(CallSite CS) {
   if (NewRetTy->isVoidTy())
     Caller->setName("");   // Void type should not have a name.
 
-  const AttrListPtr &NewCallerPAL = AttrListPtr::get(attrVec.begin(),
-                                                     attrVec.end());
+  const AttrListPtr &NewCallerPAL = AttrListPtr::get(attrVec);
 
   Instruction *NC;
   if (InvokeInst *II = dyn_cast<InvokeInst>(Caller)) {
@@ -1470,8 +1350,7 @@ InstCombiner::transformCallThroughTrampoline(CallSite CS,
         NestF->getType() == PointerType::getUnqual(NewFTy) ?
         NestF : ConstantExpr::getBitCast(NestF,
                                          PointerType::getUnqual(NewFTy));
-      const AttrListPtr &NewPAL = AttrListPtr::get(NewAttrs.begin(),
-                                                   NewAttrs.end());
+      const AttrListPtr &NewPAL = AttrListPtr::get(NewAttrs);
 
       Instruction *NewCaller;
       if (InvokeInst *II = dyn_cast<InvokeInst>(Caller)) {
