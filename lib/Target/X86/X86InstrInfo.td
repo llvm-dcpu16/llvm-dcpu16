@@ -97,6 +97,8 @@ def SDTX86Wrapper : SDTypeProfile<1, 1, [SDTCisSameAs<0, 1>, SDTCisPtrTy<0>]>;
 
 def SDT_X86TLSADDR : SDTypeProfile<0, 1, [SDTCisInt<0>]>;
 
+def SDT_X86TLSBASEADDR : SDTypeProfile<0, 1, [SDTCisInt<0>]>;
+
 def SDT_X86TLSCALL : SDTypeProfile<0, 1, [SDTCisInt<0>]>;
 
 def SDT_X86SEG_ALLOCA : SDTypeProfile<1, 1, [SDTCisVT<0, iPTR>, SDTCisVT<1, iPTR>]>;
@@ -201,6 +203,9 @@ def X86Wrapper    : SDNode<"X86ISD::Wrapper",     SDTX86Wrapper>;
 def X86WrapperRIP : SDNode<"X86ISD::WrapperRIP",  SDTX86Wrapper>;
 
 def X86tlsaddr : SDNode<"X86ISD::TLSADDR", SDT_X86TLSADDR,
+                        [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue]>;
+
+def X86tlsbaseaddr : SDNode<"X86ISD::TLSBASEADDR", SDT_X86TLSBASEADDR,
                         [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue]>;
 
 def X86ehret : SDNode<"X86ISD::EH_RETURN", SDT_X86EHRET,
@@ -492,11 +497,17 @@ def lea32addr : ComplexPattern<i32, 5, "SelectLEAAddr",
 def tls32addr : ComplexPattern<i32, 5, "SelectTLSADDRAddr",
                                [tglobaltlsaddr], []>;
 
+def tls32baseaddr : ComplexPattern<i32, 5, "SelectTLSADDRAddr",
+                               [tglobaltlsaddr], []>;
+
 def lea64addr : ComplexPattern<i64, 5, "SelectLEAAddr",
                         [add, sub, mul, X86mul_imm, shl, or, frameindex,
                          X86WrapperRIP], []>;
 
 def tls64addr : ComplexPattern<i64, 5, "SelectTLSADDRAddr",
+                               [tglobaltlsaddr], []>;
+
+def tls64baseaddr : ComplexPattern<i64, 5, "SelectTLSADDRAddr",
                                [tglobaltlsaddr], []>;
 
 //===----------------------------------------------------------------------===//
@@ -519,8 +530,8 @@ def HasAVX2      : Predicate<"Subtarget->hasAVX2()">;
 
 def HasPOPCNT    : Predicate<"Subtarget->hasPOPCNT()">;
 def HasAES       : Predicate<"Subtarget->hasAES()">;
-def HasCLMUL     : Predicate<"Subtarget->hasCLMUL()">;
-def HasFMA3      : Predicate<"Subtarget->hasFMA3()">;
+def HasPCLMUL    : Predicate<"Subtarget->hasPCLMUL()">;
+def HasFMA       : Predicate<"Subtarget->hasFMA()">;
 def HasFMA4      : Predicate<"Subtarget->hasFMA4()">;
 def HasXOP       : Predicate<"Subtarget->hasXOP()">;
 def HasMOVBE     : Predicate<"Subtarget->hasMOVBE()">;

@@ -275,21 +275,19 @@ BitVector X86RegisterInfo::getReservedRegs(const MachineFunction &MF) const {
 
   // Set the stack-pointer register and its aliases as reserved.
   Reserved.set(X86::RSP);
-  Reserved.set(X86::ESP);
-  Reserved.set(X86::SP);
-  Reserved.set(X86::SPL);
+  for (MCSubRegIterator I(X86::RSP, this); I.isValid(); ++I)
+    Reserved.set(*I);
 
   // Set the instruction pointer register and its aliases as reserved.
   Reserved.set(X86::RIP);
-  Reserved.set(X86::EIP);
-  Reserved.set(X86::IP);
+  for (MCSubRegIterator I(X86::RIP, this); I.isValid(); ++I)
+    Reserved.set(*I);
 
   // Set the frame-pointer register and its aliases as reserved if needed.
   if (TFI->hasFP(MF)) {
     Reserved.set(X86::RBP);
-    Reserved.set(X86::EBP);
-    Reserved.set(X86::BP);
-    Reserved.set(X86::BPL);
+    for (MCSubRegIterator I(X86::RBP, this); I.isValid(); ++I)
+      Reserved.set(*I);
   }
 
   // Mark the segment registers as reserved.
@@ -325,14 +323,13 @@ BitVector X86RegisterInfo::getReservedRegs(const MachineFunction &MF) const {
         X86::R8,  X86::R9,  X86::R10, X86::R11,
         X86::R12, X86::R13, X86::R14, X86::R15
       };
-      for (const uint16_t *AI = getOverlaps(GPR64[n]); unsigned Reg = *AI; ++AI)
-        Reserved.set(Reg);
+      for (MCRegAliasIterator AI(GPR64[n], this, true); AI.isValid(); ++AI)
+        Reserved.set(*AI);
 
       // XMM8, XMM9, ...
       assert(X86::XMM15 == X86::XMM8+7);
-      for (const uint16_t *AI = getOverlaps(X86::XMM8 + n); unsigned Reg = *AI;
-           ++AI)
-        Reserved.set(Reg);
+      for (MCRegAliasIterator AI(X86::XMM8 + n, this, true); AI.isValid(); ++AI)
+        Reserved.set(*AI);
     }
   }
 

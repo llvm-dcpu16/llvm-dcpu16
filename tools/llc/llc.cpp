@@ -118,7 +118,7 @@ FileType("filetype", cl::init(TargetMachine::CGFT_AssemblyFile),
        clEnumValN(TargetMachine::CGFT_AssemblyFile, "asm",
                   "Emit an assembly ('.s') file"),
        clEnumValN(TargetMachine::CGFT_ObjectFile, "obj",
-                  "Emit a native object ('.o') file [experimental]"),
+                  "Emit a native object ('.o') file"),
        clEnumValN(TargetMachine::CGFT_Null, "null",
                   "Emit nothing, for performance testing"),
        clEnumValEnd));
@@ -146,11 +146,6 @@ EnableFPMAD("enable-fp-mad",
   cl::init(false));
 
 static cl::opt<bool>
-PrintCode("print-machineinstrs",
-  cl::desc("Print generated machine code"),
-  cl::init(false));
-
-static cl::opt<bool>
 DisableFPElim("disable-fp-elim",
   cl::desc("Disable frame pointer elimination optimization"),
   cl::init(false));
@@ -158,11 +153,6 @@ DisableFPElim("disable-fp-elim",
 static cl::opt<bool>
 DisableFPElimNonLeaf("disable-non-leaf-fp-elim",
   cl::desc("Disable frame pointer elimination optimization for non-leaf funcs"),
-  cl::init(false));
-
-static cl::opt<bool>
-DisableExcessPrecision("disable-excess-fp-precision",
-  cl::desc("Disable optimizations that may increase FP precision"),
   cl::init(false));
 
 static cl::opt<bool>
@@ -202,6 +192,19 @@ FloatABIForCalls("float-abi",
                "Soft float ABI (implied by -soft-float)"),
     clEnumValN(FloatABI::Hard, "hard",
                "Hard float ABI (uses FP registers)"),
+    clEnumValEnd));
+
+static cl::opt<llvm::FPOpFusion::FPOpFusionMode>
+FuseFPOps("fp-contract",
+  cl::desc("Enable aggresive formation of fused FP ops"),
+  cl::init(FPOpFusion::Standard),
+  cl::values(
+    clEnumValN(FPOpFusion::Fast, "fast",
+               "Fuse FP ops whenever profitable"),
+    clEnumValN(FPOpFusion::Standard, "on",
+               "Only fuse 'blessed' FP ops."),
+    clEnumValN(FPOpFusion::Strict, "off",
+               "Only fuse FP ops when the result won't be effected."),
     clEnumValEnd));
 
 static cl::opt<bool>
@@ -249,6 +252,10 @@ SegmentedStacks("segmented-stacks",
   cl::desc("Use segmented stacks if possible."),
   cl::init(false));
 
+static cl::opt<bool>
+UseInitArray("use-init-array",
+  cl::desc("Use .init_array instead of .ctors."),
+  cl::init(false));
 
 // GetFileNameRoot - Helper function to get the basename of a filename.
 static inline std::string
@@ -403,10 +410,9 @@ int main(int argc, char **argv) {
 
   TargetOptions Options;
   Options.LessPreciseFPMADOption = EnableFPMAD;
-  Options.PrintMachineCode = PrintCode;
   Options.NoFramePointerElim = DisableFPElim;
   Options.NoFramePointerElimNonLeaf = DisableFPElimNonLeaf;
-  Options.NoExcessFPPrecision = DisableExcessPrecision;
+  Options.AllowFPOpFusion = FuseFPOps;
   Options.UnsafeFPMath = EnableUnsafeFPMath;
   Options.NoInfsFPMath = EnableNoInfsFPMath;
   Options.NoNaNsFPMath = EnableNoNaNsFPMath;
@@ -424,6 +430,7 @@ int main(int argc, char **argv) {
   Options.TrapFuncName = TrapFuncName;
   Options.PositionIndependentExecutable = EnablePIE;
   Options.EnableSegmentedStacks = SegmentedStacks;
+  Options.UseInitArray = UseInitArray;
 
   std::auto_ptr<TargetMachine>
     target(TheTarget->createTargetMachine(TheTriple.getTriple(),

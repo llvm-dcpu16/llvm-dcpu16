@@ -74,7 +74,10 @@ FunctionPass *createAggressiveDCEPass();
 // if possible.
 //
 FunctionPass *createScalarReplAggregatesPass(signed Threshold = -1,
-                                             bool UseDomTree = true);
+                                             bool UseDomTree = true,
+                                             signed StructMemberThreshold = -1,
+                                             signed ArrayElementThreshold = -1,
+                                             signed ScalarLoadThreshold = -1);
 
 //===----------------------------------------------------------------------===//
 //
@@ -324,6 +327,14 @@ Pass *createLowerAtomicPass();
 // ValuePropagation - Propagate CFG-derived value information
 //
 Pass *createCorrelatedValuePropagationPass();
+
+//===----------------------------------------------------------------------===//
+//
+// BoundsChecking - This pass instruments the code to perform run-time bounds
+// checking on loads, stores, and other memory intrinsics.
+// Penalty is the maximum run-time that is acceptable for the user.
+//
+FunctionPass *createBoundsCheckingPass(unsigned Penalty = 5);
 
 //===----------------------------------------------------------------------===//
 //

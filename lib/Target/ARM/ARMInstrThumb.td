@@ -32,9 +32,6 @@ def imm_sr : Operand<i32>, PatLeaf<(imm), [{
   let ParserMatchClass = ThumbSRImmAsmOperand;
 }
 
-def imm_neg_XFORM : SDNodeXForm<imm, [{
-  return CurDAG->getTargetConstant(-(int)N->getZExtValue(), MVT::i32);
-}]>;
 def imm_comp_XFORM : SDNodeXForm<imm, [{
   return CurDAG->getTargetConstant(~((uint32_t)N->getZExtValue()), MVT::i32);
 }]>;
@@ -1403,7 +1400,7 @@ def : InstAlias<"nop", (tMOVr R8, R8, 14, 0)>,Requires<[IsThumb, IsThumb1Only]>;
 
 // For round-trip assembly/disassembly, we have to handle a CPS instruction
 // without any iflags. That's not, strictly speaking, valid syntax, but it's
-// a useful extention and assembles to defined behaviour (the insn does
+// a useful extension and assembles to defined behaviour (the insn does
 // nothing).
 def : tInstAlias<"cps$imod", (tCPS imod_op:$imod, 0)>;
 def : tInstAlias<"cps$imod", (tCPS imod_op:$imod, 0)>;

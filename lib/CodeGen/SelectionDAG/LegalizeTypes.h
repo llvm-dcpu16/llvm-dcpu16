@@ -153,7 +153,7 @@ private:
 
   /// DisintegrateMERGE_VALUES - Replace each result of the given MERGE_VALUES
   /// node with the corresponding input operand, except for the result 'ResNo',
-  /// which is returned.
+  /// for which the corresponding input operand is returned.
   SDValue DisintegrateMERGE_VALUES(SDNode *N, unsigned ResNo);
 
   SDValue GetVectorElementPointer(SDValue VecPtr, EVT EltVT, SDValue Index);
@@ -511,6 +511,7 @@ private:
   void ScalarizeVectorResult(SDNode *N, unsigned OpNo);
   SDValue ScalarizeVecRes_MERGE_VALUES(SDNode *N, unsigned ResNo);
   SDValue ScalarizeVecRes_BinOp(SDNode *N);
+  SDValue ScalarizeVecRes_TernaryOp(SDNode *N);
   SDValue ScalarizeVecRes_UnaryOp(SDNode *N);
   SDValue ScalarizeVecRes_InregOp(SDNode *N);
 
@@ -555,6 +556,7 @@ private:
   // Vector Result Splitting: <128 x ty> -> 2 x <64 x ty>.
   void SplitVectorResult(SDNode *N, unsigned OpNo);
   void SplitVecRes_BinOp(SDNode *N, SDValue &Lo, SDValue &Hi);
+  void SplitVecRes_TernaryOp(SDNode *N, SDValue &Lo, SDValue &Hi);
   void SplitVecRes_UnaryOp(SDNode *N, SDValue &Lo, SDValue &Hi);
   void SplitVecRes_InregOp(SDNode *N, SDValue &Lo, SDValue &Hi);
 

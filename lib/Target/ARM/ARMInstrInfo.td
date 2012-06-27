@@ -18,6 +18,9 @@
 // Type profiles.
 def SDT_ARMCallSeqStart : SDCallSeqStart<[ SDTCisVT<0, i32> ]>;
 def SDT_ARMCallSeqEnd   : SDCallSeqEnd<[ SDTCisVT<0, i32>, SDTCisVT<1, i32> ]>;
+def SDT_ARMStructByVal : SDTypeProfile<0, 4,
+                                       [SDTCisVT<0, i32>, SDTCisVT<1, i32>,
+                                        SDTCisVT<2, i32>, SDTCisVT<3, i32>]>;
 
 def SDT_ARMSaveCallPC : SDTypeProfile<0, 1, []>;
 
@@ -90,6 +93,10 @@ def ARMcallseq_start : SDNode<"ISD::CALLSEQ_START", SDT_ARMCallSeqStart,
                               [SDNPHasChain, SDNPOutGlue]>;
 def ARMcallseq_end   : SDNode<"ISD::CALLSEQ_END",   SDT_ARMCallSeqEnd,
                               [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue]>;
+def ARMcopystructbyval : SDNode<"ARMISD::COPY_STRUCT_BYVAL" ,
+                                SDT_ARMStructByVal,
+                                [SDNPHasChain, SDNPInGlue, SDNPOutGlue,
+                                 SDNPMayStore, SDNPMayLoad]>;
 
 def ARMcall          : SDNode<"ARMISD::CALL", SDT_ARMcall,
                               [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue,
@@ -119,6 +126,9 @@ def ARMBcci64        : SDNode<"ARMISD::BCC_i64", SDT_ARMBCC_i64,
                               [SDNPHasChain]>;
 
 def ARMcmp           : SDNode<"ARMISD::CMP", SDT_ARMCmp,
+                              [SDNPOutGlue]>;
+
+def ARMcmn           : SDNode<"ARMISD::CMN", SDT_ARMCmp,
                               [SDNPOutGlue]>;
 
 def ARMcmpZ          : SDNode<"ARMISD::CMPZ", SDT_ARMCmp,
@@ -226,7 +236,8 @@ def UseFPVMLx        : Predicate<"Subtarget->useFPVMLx()">;
 // Prefer fused MAC for fp mul + add over fp VMLA / VMLS if they are available.
 // But only select them if more precision in FP computation is allowed.
 // Do not use them for Darwin platforms.
-def UseFusedMAC      : Predicate<"!TM.Options.NoExcessFPPrecision && "
+def UseFusedMAC      : Predicate<"(TM.Options.AllowFPOpFusion =="
+                                 " FPOpFusion::Fast) && "
                                  "!Subtarget->isTargetDarwin()">;
 def DontUseFusedMAC  : Predicate<"!Subtarget->hasVFP4() || "
                                  "Subtarget->isTargetDarwin()">;
@@ -242,9 +253,9 @@ class RegConstraint<string C> {
 //  ARM specific transformation functions and pattern fragments.
 //
 
-// so_imm_neg_XFORM - Return a so_imm value packed into the format described for
-// so_imm_neg def below.
-def so_imm_neg_XFORM : SDNodeXForm<imm, [{
+// imm_neg_XFORM - Return a imm value packed into the format described for
+// imm_neg defs below.
+def imm_neg_XFORM : SDNodeXForm<imm, [{
   return CurDAG->getTargetConstant(-(int)N->getZExtValue(), MVT::i32);
 }]>;
 
@@ -263,7 +274,7 @@ def so_imm_neg_asmoperand : AsmOperandClass { let Name = "ARMSOImmNeg"; }
 def so_imm_neg : Operand<i32>, PatLeaf<(imm), [{
     int64_t Value = -(int)N->getZExtValue();
     return Value && ARM_AM::getSOImmVal(Value) != -1;
-  }], so_imm_neg_XFORM> {
+  }], imm_neg_XFORM> {
   let ParserMatchClass = so_imm_neg_asmoperand;
 }
 
@@ -576,7 +587,10 @@ def imm1_31 : Operand<i32>, ImmLeaf<i32, [{ return Imm > 0 && Imm < 32; }]> {
 }
 
 /// imm0_15 predicate - Immediate in the range [0,15].
-def Imm0_15AsmOperand: ImmAsmOperand { let Name = "Imm0_15"; }
+def Imm0_15AsmOperand: ImmAsmOperand {
+  let Name = "Imm0_15";
+  let DiagnosticType = "ImmRange0_15";
+}
 def imm0_15 : Operand<i32>, ImmLeaf<i32, [{
   return Imm >= 0 && Imm < 16;
 }]> {
@@ -620,6 +634,11 @@ def imm0_65535 : Operand<i32>, ImmLeaf<i32, [{
 }]> {
   let ParserMatchClass = Imm0_65535AsmOperand;
 }
+
+// imm0_65535_neg - An immediate whose negative value is in the range [0.65535].
+def imm0_65535_neg : Operand<i32>, ImmLeaf<i32, [{
+  return -Imm >= 0 && -Imm < 65536;
+}]>;
 
 // imm0_65535_expr - For movt/movw - 16-bit immediate that can also reference
 // a relocatable expression.
@@ -1575,33 +1594,18 @@ def ATOMCMPXCHG6432 : PseudoInst<(outs GPR:$dst1, GPR:$dst2),
                                  NoItinerary, []>;
 }
 
-def NOP : AI<(outs), (ins), MiscFrm, NoItinerary, "nop", "", []>,
-          Requires<[IsARM, HasV6T2]> {
-  let Inst{27-16} = 0b001100100000;
-  let Inst{15-8} = 0b11110000;
-  let Inst{7-0} = 0b00000000;
+def HINT : AI<(outs), (ins imm0_255:$imm), MiscFrm, NoItinerary,
+              "hint", "\t$imm", []>, Requires<[IsARM, HasV6]> {
+  bits<8> imm;
+  let Inst{27-8} = 0b00110010000011110000;
+  let Inst{7-0} = imm;
 }
 
-def YIELD : AI<(outs), (ins), MiscFrm, NoItinerary, "yield", "", []>,
-          Requires<[IsARM, HasV6T2]> {
-  let Inst{27-16} = 0b001100100000;
-  let Inst{15-8} = 0b11110000;
-  let Inst{7-0} = 0b00000001;
-}
-
-def WFE : AI<(outs), (ins), MiscFrm, NoItinerary, "wfe", "", []>,
-          Requires<[IsARM, HasV6T2]> {
-  let Inst{27-16} = 0b001100100000;
-  let Inst{15-8} = 0b11110000;
-  let Inst{7-0} = 0b00000010;
-}
-
-def WFI : AI<(outs), (ins), MiscFrm, NoItinerary, "wfi", "", []>,
-          Requires<[IsARM, HasV6T2]> {
-  let Inst{27-16} = 0b001100100000;
-  let Inst{15-8} = 0b11110000;
-  let Inst{7-0} = 0b00000011;
-}
+def : InstAlias<"nop$p", (HINT 0, pred:$p)>, Requires<[IsARM, HasV6T2]>;
+def : InstAlias<"yield$p", (HINT 1, pred:$p)>, Requires<[IsARM, HasV6T2]>;
+def : InstAlias<"wfe$p", (HINT 2, pred:$p)>, Requires<[IsARM, HasV6T2]>;
+def : InstAlias<"wfi$p", (HINT 3, pred:$p)>, Requires<[IsARM, HasV6T2]>;
+def : InstAlias<"sev$p", (HINT 4, pred:$p)>, Requires<[IsARM, HasV6T2]>;
 
 def SEL : AI<(outs GPR:$Rd), (ins GPR:$Rn, GPR:$Rm), DPFrm, NoItinerary, "sel",
              "\t$Rd, $Rn, $Rm", []>, Requires<[IsARM, HasV6]> {
@@ -1614,18 +1618,10 @@ def SEL : AI<(outs GPR:$Rd), (ins GPR:$Rn, GPR:$Rm), DPFrm, NoItinerary, "sel",
   let Inst{27-20} = 0b01101000;
   let Inst{7-4} = 0b1011;
   let Inst{11-8} = 0b1111;
-  
   let Unpredictable{11-8} = 0b1111;
 }
 
-def SEV : AI<(outs), (ins), MiscFrm, NoItinerary, "sev", "",
-             []>, Requires<[IsARM, HasV6T2]> {
-  let Inst{27-16} = 0b001100100000;
-  let Inst{15-8} = 0b11110000;
-  let Inst{7-0} = 0b00000100;
-}
-
-// The i32imm operand $val can be used by a debugger to store more information
+// The 16-bit operand $val can be used by a debugger to store more information
 // about the breakpoint.
 def BKPT : AI<(outs), (ins imm0_65535:$val), MiscFrm, NoItinerary,
               "bkpt", "\t$val", []>, Requires<[IsARM]> {
@@ -2691,7 +2687,7 @@ defm STRHT : AI3strT<0b1011, "strht">;
 multiclass arm_ldst_mult<string asm, string sfx, bit L_bit, bit P_bit, Format f,
                          InstrItinClass itin, InstrItinClass itin_upd> {
   // IA is the default, so no need for an explicit suffix on the
-  // mnemonic here. Without it is the cannonical spelling.
+  // mnemonic here. Without it is the canonical spelling.
   def IA :
     AXI4<(outs), (ins GPR:$Rn, pred:$p, reglist:$regs, variable_ops),
          IndexModeNone, f, itin,
@@ -3086,6 +3082,11 @@ def : ARMPat<(add     GPR:$src, so_imm_neg:$imm),
 def : ARMPat<(ARMaddc GPR:$src, so_imm_neg:$imm),
              (SUBSri  GPR:$src, so_imm_neg:$imm)>;
 
+def : ARMPat<(add     GPR:$src, imm0_65535_neg:$imm),
+             (SUBrr   GPR:$src, (MOVi16 (imm_neg_XFORM imm:$imm)))>;
+def : ARMPat<(ARMaddc GPR:$src, imm0_65535_neg:$imm),
+             (SUBSrr  GPR:$src, (MOVi16 (imm_neg_XFORM imm:$imm)))>;
+
 // The with-carry-in form matches bitwise not instead of the negation.
 // Effectively, the inverse interpretation of the carry flag already accounts
 // for part of the negation.
@@ -3405,7 +3406,7 @@ class AsMul1I64<bits<7> opcod, dag oops, dag iops, InstrItinClass itin,
 
 // FIXME: The v5 pseudos are only necessary for the additional Constraint
 //        property. Remove them when it's possible to add those properties
-//        on an individual MachineInstr, not just an instuction description.
+//        on an individual MachineInstr, not just an instruction description.
 let isCommutable = 1, TwoOperandAliasConstraint = "$Rn = $Rd" in {
 def MUL : AsMul1I32<0b0000000, (outs GPRnopc:$Rd),
                     (ins GPRnopc:$Rn, GPRnopc:$Rm),
@@ -3554,8 +3555,7 @@ def SMMLAR : AMul2Ia <0b0111010, 0b0011, (outs GPR:$Rd),
 
 def SMMLS : AMul2Ia <0b0111010, 0b1101, (outs GPR:$Rd),
                (ins GPR:$Rn, GPR:$Rm, GPR:$Ra),
-               IIC_iMAC32, "smmls", "\t$Rd, $Rn, $Rm, $Ra",
-               [(set GPR:$Rd, (sub GPR:$Ra, (mulhs GPR:$Rn, GPR:$Rm)))]>,
+               IIC_iMAC32, "smmls", "\t$Rd, $Rn, $Rm, $Ra", []>,
             Requires<[IsARM, HasV6]>;
 
 def SMMLSR : AMul2Ia <0b0111010, 0b1111, (outs GPR:$Rd),
@@ -3836,49 +3836,85 @@ def : ARMPat<(ARMcmpZ GPR:$src, so_reg_imm:$rhs),
 def : ARMPat<(ARMcmpZ GPR:$src, so_reg_reg:$rhs),
              (CMPrsr   GPR:$src, so_reg_reg:$rhs)>;
 
-// FIXME: We have to be careful when using the CMN instruction and comparison
-// with 0. One would expect these two pieces of code should give identical
-// results:
-//
-//   rsbs r1, r1, 0
-//   cmp  r0, r1
-//   mov  r0, #0
-//   it   ls
-//   mov  r0, #1
-//
-// and:
-//
-//   cmn  r0, r1
-//   mov  r0, #0
-//   it   ls
-//   mov  r0, #1
-//
-// However, the CMN gives the *opposite* result when r1 is 0. This is because
-// the carry flag is set in the CMP case but not in the CMN case. In short, the
-// CMP instruction doesn't perform a truncate of the (logical) NOT of 0 plus the
-// value of r0 and the carry bit (because the "carry bit" parameter to
-// AddWithCarry is defined as 1 in this case, the carry flag will always be set
-// when r0 >= 0). The CMN instruction doesn't perform a NOT of 0 so there is
-// never a "carry" when this AddWithCarry is performed (because the "carry bit"
-// parameter to AddWithCarry is defined as 0).
-//
-// When x is 0 and unsigned:
-//
-//    x = 0
-//   ~x = 0xFFFF FFFF
-//   ~x + 1 = 0x1 0000 0000
-//   (-x = 0) != (0x1 0000 0000 = ~x + 1)
-//
-// Therefore, we should disable CMN when comparing against zero, until we can
-// limit when the CMN instruction is used (when we know that the RHS is not 0 or
-// when it's a comparison which doesn't look at the 'carry' flag).
-//
-// (See the ARM docs for the "AddWithCarry" pseudo-code.)
-//
-// This is related to <rdar://problem/7569620>.
-//
-//defm CMN  : AI1_cmp_irs<0b1011, "cmn",
-//                        BinOpFrag<(ARMcmp node:$LHS,(ineg node:$RHS))>>;
+// CMN register-integer
+let isCompare = 1, Defs = [CPSR] in {
+def CMNri : AI1<0b1011, (outs), (ins GPR:$Rn, so_imm:$imm), DPFrm, IIC_iCMPi,
+                "cmn", "\t$Rn, $imm",
+                [(ARMcmn GPR:$Rn, so_imm:$imm)]> {
+  bits<4> Rn;
+  bits<12> imm;
+  let Inst{25} = 1;
+  let Inst{20} = 1;
+  let Inst{19-16} = Rn;
+  let Inst{15-12} = 0b0000;
+  let Inst{11-0} = imm;
+
+  let Unpredictable{15-12} = 0b1111;
+}
+
+// CMN register-register/shift
+def CMNzrr : AI1<0b1011, (outs), (ins GPR:$Rn, GPR:$Rm), DPFrm, IIC_iCMPr,
+                 "cmn", "\t$Rn, $Rm",
+                 [(BinOpFrag<(ARMcmpZ node:$LHS,(ineg node:$RHS))>
+                   GPR:$Rn, GPR:$Rm)]> {
+  bits<4> Rn;
+  bits<4> Rm;
+  let isCommutable = 1;
+  let Inst{25} = 0;
+  let Inst{20} = 1;
+  let Inst{19-16} = Rn;
+  let Inst{15-12} = 0b0000;
+  let Inst{11-4} = 0b00000000;
+  let Inst{3-0} = Rm;
+
+  let Unpredictable{15-12} = 0b1111;
+}
+
+def CMNzrsi : AI1<0b1011, (outs),
+                  (ins GPR:$Rn, so_reg_imm:$shift), DPSoRegImmFrm, IIC_iCMPsr,
+                  "cmn", "\t$Rn, $shift",
+                  [(BinOpFrag<(ARMcmpZ node:$LHS,(ineg node:$RHS))>
+                    GPR:$Rn, so_reg_imm:$shift)]> {
+  bits<4> Rn;
+  bits<12> shift;
+  let Inst{25} = 0;
+  let Inst{20} = 1;
+  let Inst{19-16} = Rn;
+  let Inst{15-12} = 0b0000;
+  let Inst{11-5} = shift{11-5};
+  let Inst{4} = 0;
+  let Inst{3-0} = shift{3-0};
+
+  let Unpredictable{15-12} = 0b1111;
+}
+
+def CMNzrsr : AI1<0b1011, (outs),
+                  (ins GPRnopc:$Rn, so_reg_reg:$shift), DPSoRegRegFrm, IIC_iCMPsr,
+                  "cmn", "\t$Rn, $shift",
+                  [(BinOpFrag<(ARMcmpZ node:$LHS,(ineg node:$RHS))>
+                    GPRnopc:$Rn, so_reg_reg:$shift)]> {
+  bits<4> Rn;
+  bits<12> shift;
+  let Inst{25} = 0;
+  let Inst{20} = 1;
+  let Inst{19-16} = Rn;
+  let Inst{15-12} = 0b0000;
+  let Inst{11-8} = shift{11-8};
+  let Inst{7} = 0;
+  let Inst{6-5} = shift{6-5};
+  let Inst{4} = 1;
+  let Inst{3-0} = shift{3-0};
+
+  let Unpredictable{15-12} = 0b1111;
+}
+
+}
+
+def : ARMPat<(ARMcmp  GPR:$src, so_imm_neg:$imm),
+             (CMNri   GPR:$src, so_imm_neg:$imm)>;
+
+def : ARMPat<(ARMcmpZ GPR:$src, so_imm_neg:$imm),
+             (CMNri   GPR:$src, so_imm_neg:$imm)>;
 
 // Note that TST/TEQ don't set all the same flags that CMP does!
 defm TST  : AI1_cmp_irs<0b1000, "tst",
@@ -3887,16 +3923,6 @@ defm TST  : AI1_cmp_irs<0b1000, "tst",
 defm TEQ  : AI1_cmp_irs<0b1001, "teq",
                         IIC_iTSTi, IIC_iTSTr, IIC_iTSTsr,
                       BinOpFrag<(ARMcmpZ (xor_su node:$LHS, node:$RHS), 0)>, 1>;
-
-defm CMNz  : AI1_cmp_irs<0b1011, "cmn",
-                         IIC_iCMPi, IIC_iCMPr, IIC_iCMPsr,
-                         BinOpFrag<(ARMcmpZ node:$LHS,(ineg node:$RHS))>>;
-
-//def : ARMPat<(ARMcmp GPR:$src, so_imm_neg:$imm),
-//             (CMNri  GPR:$src, so_imm_neg:$imm)>;
-
-def : ARMPat<(ARMcmpZ GPR:$src, so_imm_neg:$imm),
-             (CMNzri  GPR:$src, so_imm_neg:$imm)>;
 
 // Pseudo i64 compares for some floating point compares.
 let usesCustomInserter = 1, isBranch = 1, isTerminator = 1,
@@ -4164,6 +4190,13 @@ let usesCustomInserter = 1 in {
       (outs GPR:$dst), (ins GPR:$ptr, GPR:$old, GPR:$new), NoItinerary,
       [(set GPR:$dst, (atomic_cmp_swap_32 GPR:$ptr, GPR:$old, GPR:$new))]>;
 }
+}
+
+let usesCustomInserter = 1 in {
+    def COPY_STRUCT_BYVAL_I32 : PseudoInst<
+      (outs), (ins GPR:$dst, GPR:$src, i32imm:$size, i32imm:$alignment),
+      NoItinerary,
+      [(ARMcopystructbyval GPR:$dst, GPR:$src, imm:$size, imm:$alignment)]>;
 }
 
 let mayLoad = 1 in {
@@ -5039,7 +5072,7 @@ def : ARMInstAlias<"add${s}${p} $Rd, $imm",
                  (SUBri GPR:$Rd, GPR:$Rd, so_imm_neg:$imm, pred:$p, cc_out:$s)>;
 // Same for CMP <--> CMN via so_imm_neg
 def : ARMInstAlias<"cmp${p} $Rd, $imm",
-                   (CMNzri rGPR:$Rd, so_imm_neg:$imm, pred:$p)>;
+                   (CMNri rGPR:$Rd, so_imm_neg:$imm, pred:$p)>;
 def : ARMInstAlias<"cmn${p} $Rd, $imm",
                    (CMPri rGPR:$Rd, so_imm_neg:$imm, pred:$p)>;
 

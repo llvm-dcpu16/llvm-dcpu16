@@ -55,6 +55,8 @@ class NoCapture<int argNo> : IntrinsicProperty {
   int ArgNo = argNo;
 }
 
+def IntrNoReturn : IntrinsicProperty;
+
 //===----------------------------------------------------------------------===//
 // Types used by intrinsics.
 //===----------------------------------------------------------------------===//
@@ -63,10 +65,14 @@ class LLVMType<ValueType vt> {
   ValueType VT = vt;
 }
 
-class LLVMPointerType<LLVMType elty>
+class LLVMQualPointerType<LLVMType elty, int addrspace>
   : LLVMType<iPTR>{
   LLVMType ElTy = elty;
+  int AddrSpace = addrspace;
 }
+
+class LLVMPointerType<LLVMType elty>
+  : LLVMQualPointerType<elty, 0>;
 
 class LLVMAnyPointerType<LLVMType elty>
   : LLVMType<iPTRAny>{
@@ -253,12 +259,17 @@ let Properties = [IntrReadMem] in {
   def int_log2 : Intrinsic<[llvm_anyfloat_ty], [LLVMMatchType<0>]>;
   def int_exp  : Intrinsic<[llvm_anyfloat_ty], [LLVMMatchType<0>]>;
   def int_exp2 : Intrinsic<[llvm_anyfloat_ty], [LLVMMatchType<0>]>;
+  def int_fabs : Intrinsic<[llvm_anyfloat_ty], [LLVMMatchType<0>]>;
 }
 
 let Properties = [IntrNoMem] in {
   def int_fma  : Intrinsic<[llvm_anyfloat_ty],
                          [LLVMMatchType<0>, LLVMMatchType<0>,
                           LLVMMatchType<0>]>;
+
+  def int_fmuladd : Intrinsic<[llvm_anyfloat_ty],
+                              [LLVMMatchType<0>, LLVMMatchType<0>,
+                               LLVMMatchType<0>]>;
 }
 
 // NOTE: these are internal interfaces.
@@ -268,8 +279,7 @@ def int_sigsetjmp  : Intrinsic<[llvm_i32_ty] , [llvm_ptr_ty, llvm_i32_ty]>;
 def int_siglongjmp : Intrinsic<[], [llvm_ptr_ty, llvm_i32_ty]>;
 
 // Internal interface for object size checking
-def int_objectsize : Intrinsic<[llvm_anyint_ty],
-                               [llvm_ptr_ty, llvm_i1_ty, llvm_i32_ty],
+def int_objectsize : Intrinsic<[llvm_anyint_ty], [llvm_ptr_ty, llvm_i1_ty],
                                [IntrNoMem]>,
                                GCCBuiltin<"__builtin_object_size">;
 
@@ -397,10 +407,10 @@ def int_invariant_end   : Intrinsic<[],
 //
 def int_flt_rounds : Intrinsic<[llvm_i32_ty]>,
                      GCCBuiltin<"__builtin_flt_rounds">;
-def int_trap : Intrinsic<[]>,
+def int_trap : Intrinsic<[], [], [IntrNoReturn]>,
                GCCBuiltin<"__builtin_trap">;
-def int_debugger : Intrinsic<[]>,
-                   GCCBuiltin<"__builtin_debugger">;
+def int_debugtrap : Intrinsic<[]>,
+                    GCCBuiltin<"__builtin_debugtrap">;
 
 // Intrisics to support half precision floating point format
 let Properties = [IntrNoMem] in {
@@ -442,6 +452,5 @@ include "llvm/IntrinsicsX86.td"
 include "llvm/IntrinsicsARM.td"
 include "llvm/IntrinsicsCellSPU.td"
 include "llvm/IntrinsicsXCore.td"
-include "llvm/IntrinsicsPTX.td"
 include "llvm/IntrinsicsHexagon.td"
 include "llvm/IntrinsicsNVVM.td"

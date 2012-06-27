@@ -1,6 +1,7 @@
 add_llvm_library(LLVMScalarOpts
   ADCE.cpp
   BasicBlockPlacement.cpp
+  BoundsChecking.cpp
   CodeGenPrepare.cpp
   ConstantProp.cpp
   CorrelatedValuePropagation.cpp
@@ -32,3 +33,5 @@ add_llvm_library(LLVMScalarOpts
   Sink.cpp
   TailRecursionElimination.cpp
   )
+
+add_dependencies(LLVMScalarOpts intrinsics_gen)

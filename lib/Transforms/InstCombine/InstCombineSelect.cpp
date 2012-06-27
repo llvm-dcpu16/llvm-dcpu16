@@ -129,6 +129,12 @@ Instruction *InstCombiner::FoldSelectOpOp(SelectInst &SI, Instruction *TI,
     if (TI->isCast()) {
       if (TI->getOperand(0)->getType() != FI->getOperand(0)->getType())
         return 0;
+      // The select condition may be a vector. We may only change the operand
+      // type if the vector width remains the same (and matches the condition).
+      Type *CondTy = SI.getCondition()->getType();
+      if (CondTy->isVectorTy() && CondTy->getVectorNumElements() !=
+          FI->getOperand(0)->getType()->getVectorNumElements())
+        return 0;
     } else {
       return 0;  // unknown unary op.
     }
@@ -498,7 +504,7 @@ Instruction *InstCombiner::visitSelectInstWithICmp(SelectInst &SI,
 
   // NOTE: if we wanted to, this is where to detect integer MIN/MAX
 
-  if (isa<Constant>(CmpRHS)) {
+  if (CmpRHS != CmpLHS && isa<Constant>(CmpRHS)) {
     if (CmpLHS == TrueVal && Pred == ICmpInst::ICMP_EQ) {
       // Transform (X == C) ? X : Y -> (X == C) ? C : Y
       SI.setOperand(1, CmpRHS);

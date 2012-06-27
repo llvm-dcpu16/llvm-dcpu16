@@ -1182,7 +1182,7 @@ static void CheckForLiveRegDef(SUnit *SU, unsigned Reg,
                                SmallSet<unsigned, 4> &RegAdded,
                                SmallVector<unsigned, 4> &LRegs,
                                const TargetRegisterInfo *TRI) {
-  for (const uint16_t *AliasI = TRI->getOverlaps(Reg); *AliasI; ++AliasI) {
+  for (MCRegAliasIterator AliasI(Reg, TRI, true); AliasI.isValid(); ++AliasI) {
 
     // Check if Ref is live.
     if (!LiveRegDefs[*AliasI]) continue;
@@ -2331,22 +2331,21 @@ static int BUCompareLatency(SUnit *left, SUnit *right, bool checkPref,
   // and latency.
   if (!checkPref || (left->SchedulingPref == Sched::ILP ||
                      right->SchedulingPref == Sched::ILP)) {
-    if (DisableSchedCycles) {
+    // If neither instruction stalls (!LStall && !RStall) and HazardRecognizer
+    // is enabled, grouping instructions by cycle, then its height is already
+    // covered so only its depth matters. We also reach this point if both stall
+    // but have the same height.
+    if (!SPQ->getHazardRec()->isEnabled()) {
       if (LHeight != RHeight)
         return LHeight > RHeight ? 1 : -1;
     }
-    else {
-      // If neither instruction stalls (!LStall && !RStall) then
-      // its height is already covered so only its depth matters. We also reach
-      // this if both stall but have the same height.
-      int LDepth = left->getDepth() - LPenalty;
-      int RDepth = right->getDepth() - RPenalty;
-      if (LDepth != RDepth) {
-        DEBUG(dbgs() << "  Comparing latency of SU (" << left->NodeNum
-              << ") depth " << LDepth << " vs SU (" << right->NodeNum
-              << ") depth " << RDepth << "\n");
-        return LDepth < RDepth ? 1 : -1;
-      }
+    int LDepth = left->getDepth() - LPenalty;
+    int RDepth = right->getDepth() - RPenalty;
+    if (LDepth != RDepth) {
+      DEBUG(dbgs() << "  Comparing latency of SU (" << left->NodeNum
+            << ") depth " << LDepth << " vs SU (" << right->NodeNum
+            << ") depth " << RDepth << "\n");
+      return LDepth < RDepth ? 1 : -1;
     }
     if (left->Latency != right->Latency)
       return left->Latency > right->Latency ? 1 : -1;
@@ -2364,7 +2363,7 @@ static bool BURRSort(SUnit *left, SUnit *right, RegReductionPQBase *SPQ) {
     bool RHasPhysReg = right->hasPhysRegDefs;
     if (LHasPhysReg != RHasPhysReg) {
       #ifndef NDEBUG
-      const char *PhysRegMsg[] = {" has no physreg", " defines a physreg"};
+      const char *const PhysRegMsg[] = {" has no physreg"," defines a physreg"};
       #endif
       DEBUG(dbgs() << "  SU (" << left->NodeNum << ") "
             << PhysRegMsg[LHasPhysReg] << " SU(" << right->NodeNum << ") "

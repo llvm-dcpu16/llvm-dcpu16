@@ -1308,8 +1308,8 @@ static bool isLegalUse(const TargetLowering::AddrMode &AM,
     return !AM.BaseGV && AM.Scale == 0 && AM.BaseOffs == 0;
 
   case LSRUse::Special:
-    // Only handle -1 scales, or no scale.
-    return AM.Scale == 0 || AM.Scale == -1;
+    // Special case Basic to handle -1 scales.
+    return !AM.BaseGV && (AM.Scale == 0 || AM.Scale == -1) && AM.BaseOffs == 0;
   }
 
   llvm_unreachable("Invalid LSRUse Kind!");
@@ -2194,7 +2194,7 @@ LSRInstance::FindUseWithSimilarFormula(const Formula &OrigF,
             return &LU;
           // This is the formula where all the registers and symbols matched;
           // there aren't going to be any others. Since we declined it, we
-          // can skip the rest of the formulae and procede to the next LSRUse.
+          // can skip the rest of the formulae and proceed to the next LSRUse.
           break;
         }
       }
@@ -4268,13 +4268,6 @@ Value *LSRInstance::Expand(const LSRFixup &LF,
     Ops.push_back(SE.getUnknown(Rewriter.expandCodeFor(Reg, 0, IP)));
   }
 
-  // Flush the operand list to suppress SCEVExpander hoisting.
-  if (!Ops.empty()) {
-    Value *FullV = Rewriter.expandCodeFor(SE.getAddExpr(Ops), Ty, IP);
-    Ops.clear();
-    Ops.push_back(SE.getUnknown(FullV));
-  }
-
   // Expand the ScaledReg portion.
   Value *ICmpScaledV = 0;
   if (F.AM.Scale != 0) {
@@ -4296,23 +4289,34 @@ Value *LSRInstance::Expand(const LSRFixup &LF,
     } else {
       // Otherwise just expand the scaled register and an explicit scale,
       // which is expected to be matched as part of the address.
+
+      // Flush the operand list to suppress SCEVExpander hoisting address modes.
+      if (!Ops.empty() && LU.Kind == LSRUse::Address) {
+        Value *FullV = Rewriter.expandCodeFor(SE.getAddExpr(Ops), Ty, IP);
+        Ops.clear();
+        Ops.push_back(SE.getUnknown(FullV));
+      }
       ScaledS = SE.getUnknown(Rewriter.expandCodeFor(ScaledS, 0, IP));
       ScaledS = SE.getMulExpr(ScaledS,
                               SE.getConstant(ScaledS->getType(), F.AM.Scale));
       Ops.push_back(ScaledS);
-
-      // Flush the operand list to suppress SCEVExpander hoisting.
-      Value *FullV = Rewriter.expandCodeFor(SE.getAddExpr(Ops), Ty, IP);
-      Ops.clear();
-      Ops.push_back(SE.getUnknown(FullV));
     }
   }
 
   // Expand the GV portion.
   if (F.AM.BaseGV) {
-    Ops.push_back(SE.getUnknown(F.AM.BaseGV));
-
     // Flush the operand list to suppress SCEVExpander hoisting.
+    if (!Ops.empty()) {
+      Value *FullV = Rewriter.expandCodeFor(SE.getAddExpr(Ops), Ty, IP);
+      Ops.clear();
+      Ops.push_back(SE.getUnknown(FullV));
+    }
+    Ops.push_back(SE.getUnknown(F.AM.BaseGV));
+  }
+
+  // Flush the operand list to suppress SCEVExpander hoisting of both folded and
+  // unfolded offsets. LSR assumes they both live next to their uses.
+  if (!Ops.empty()) {
     Value *FullV = Rewriter.expandCodeFor(SE.getAddExpr(Ops), Ty, IP);
     Ops.clear();
     Ops.push_back(SE.getUnknown(FullV));

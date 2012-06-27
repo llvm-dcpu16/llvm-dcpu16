@@ -2007,6 +2007,47 @@ Constant *ConstantExpr::getAShr(Constant *C1, Constant *C2, bool isExact) {
              isExact ? PossiblyExactOperator::IsExact : 0);
 }
 
+/// getBinOpIdentity - Return the identity for the given binary operation,
+/// i.e. a constant C such that X op C = X and C op X = X for every X.  It
+/// returns null if the operator doesn't have an identity.
+Constant *ConstantExpr::getBinOpIdentity(unsigned Opcode, Type *Ty) {
+  switch (Opcode) {
+  default:
+    // Doesn't have an identity.
+    return 0;
+
+  case Instruction::Add:
+  case Instruction::Or:
+  case Instruction::Xor:
+    return Constant::getNullValue(Ty);
+
+  case Instruction::Mul:
+    return ConstantInt::get(Ty, 1);
+
+  case Instruction::And:
+    return Constant::getAllOnesValue(Ty);
+  }
+}
+
+/// getBinOpAbsorber - Return the absorbing element for the given binary
+/// operation, i.e. a constant C such that X op C = C and C op X = C for
+/// every X.  For example, this returns zero for integer multiplication.
+/// It returns null if the operator doesn't have an absorbing element.
+Constant *ConstantExpr::getBinOpAbsorber(unsigned Opcode, Type *Ty) {
+  switch (Opcode) {
+  default:
+    // Doesn't have an absorber.
+    return 0;
+
+  case Instruction::Or:
+    return Constant::getAllOnesValue(Ty);
+
+  case Instruction::And:
+  case Instruction::Mul:
+    return Constant::getNullValue(Ty);
+  }
+}
+
 // destroyConstant - Remove the constant from the constant table...
 //
 void ConstantExpr::destroyConstant() {

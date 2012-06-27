@@ -19,6 +19,7 @@
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/GlobalVariable.h"
 #include "llvm/IntrinsicInst.h"
+#include "llvm/Metadata.h"
 #include "llvm/LLVMContext.h"
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Analysis/ConstantFolding.h"
@@ -557,12 +558,12 @@ namespace {
     }
     
     /// removeFromLeaderTable - Scan the list of values corresponding to a given
-    /// value number, and remove the given value if encountered.
-    void removeFromLeaderTable(uint32_t N, Value *V, BasicBlock *BB) {
+    /// value number, and remove the given instruction if encountered.
+    void removeFromLeaderTable(uint32_t N, Instruction *I, BasicBlock *BB) {
       LeaderTableEntry* Prev = 0;
       LeaderTableEntry* Curr = &LeaderTable[N];
 
-      while (Curr->Val != V || Curr->BB != BB) {
+      while (Curr->Val != I || Curr->BB != BB) {
         Prev = Curr;
         Curr = Curr->Next;
       }
@@ -1435,7 +1436,7 @@ bool GVN::processNonLocalLoad(LoadInst *LI) {
     Instruction *DepInst = DepInfo.getInst();
 
     // Loading the allocation -> undef.
-    if (isa<AllocaInst>(DepInst) || isMalloc(DepInst) ||
+    if (isa<AllocaInst>(DepInst) || isMallocLikeFn(DepInst) ||
         // Loading immediately after lifetime begin -> undef.
         isLifetimeStart(DepInst)) {
       ValuesPerBlock.push_back(AvailableValueInBlock::get(DepBB,
@@ -1734,6 +1735,53 @@ bool GVN::processNonLocalLoad(LoadInst *LI) {
   return true;
 }
 
+static void patchReplacementInstruction(Value *Repl, Instruction *I) {
+  // Patch the replacement so that it is not more restrictive than the value
+  // being replaced.
+  BinaryOperator *Op = dyn_cast<BinaryOperator>(I);
+  BinaryOperator *ReplOp = dyn_cast<BinaryOperator>(Repl);
+  if (Op && ReplOp && isa<OverflowingBinaryOperator>(Op) &&
+      isa<OverflowingBinaryOperator>(ReplOp)) {
+    if (ReplOp->hasNoSignedWrap() && !Op->hasNoSignedWrap())
+      ReplOp->setHasNoSignedWrap(false);
+    if (ReplOp->hasNoUnsignedWrap() && !Op->hasNoUnsignedWrap())
+      ReplOp->setHasNoUnsignedWrap(false);
+  }
+  if (Instruction *ReplInst = dyn_cast<Instruction>(Repl)) {
+    SmallVector<std::pair<unsigned, MDNode*>, 4> Metadata;
+    ReplInst->getAllMetadataOtherThanDebugLoc(Metadata);
+    for (int i = 0, n = Metadata.size(); i < n; ++i) {
+      unsigned Kind = Metadata[i].first;
+      MDNode *IMD = I->getMetadata(Kind);
+      MDNode *ReplMD = Metadata[i].second;
+      switch(Kind) {
+      default:
+        ReplInst->setMetadata(Kind, NULL); // Remove unknown metadata
+        break;
+      case LLVMContext::MD_dbg:
+        llvm_unreachable("getAllMetadataOtherThanDebugLoc returned a MD_dbg");
+      case LLVMContext::MD_tbaa:
+        ReplInst->setMetadata(Kind, MDNode::getMostGenericTBAA(IMD, ReplMD));
+        break;
+      case LLVMContext::MD_range:
+        ReplInst->setMetadata(Kind, MDNode::getMostGenericRange(IMD, ReplMD));
+        break;
+      case LLVMContext::MD_prof:
+        llvm_unreachable("MD_prof in a non terminator instruction");
+        break;
+      case LLVMContext::MD_fpmath:
+        ReplInst->setMetadata(Kind, MDNode::getMostGenericFPMath(IMD, ReplMD));
+        break;
+      }
+    }
+  }
+}
+
+static void patchAndReplaceAllUsesWith(Value *Repl, Instruction *I) {
+  patchReplacementInstruction(Repl, I);
+  I->replaceAllUsesWith(Repl);
+}
+
 /// processLoad - Attempt to eliminate a load, first by eliminating it
 /// locally, and then attempting non-local elimination if that fails.
 bool GVN::processLoad(LoadInst *L) {
@@ -1892,7 +1940,7 @@ bool GVN::processLoad(LoadInst *L) {
     }
     
     // Remove it!
-    L->replaceAllUsesWith(AvailableVal);
+    patchAndReplaceAllUsesWith(AvailableVal, L);
     if (DepLI->getType()->isPointerTy())
       MD->invalidateCachedPointerInfo(DepLI);
     markInstructionForDeletion(L);
@@ -1903,7 +1951,7 @@ bool GVN::processLoad(LoadInst *L) {
   // If this load really doesn't depend on anything, then we must be loading an
   // undef value.  This can happen when loading for a fresh allocation with no
   // intervening stores, for example.
-  if (isa<AllocaInst>(DepInst) || isMalloc(DepInst)) {
+  if (isa<AllocaInst>(DepInst) || isMallocLikeFn(DepInst)) {
     L->replaceAllUsesWith(UndefValue::get(L->getType()));
     markInstructionForDeletion(L);
     ++NumGVNLoad;
@@ -2021,9 +2069,15 @@ bool GVN::propagateEquality(Value *LHS, Value *RHS, BasicBlock *Root) {
             DT->properlyDominates(cast<Instruction>(RHS)->getParent(), Root)) &&
            "Instruction doesn't dominate scope!");
 
-    // If value numbering later deduces that an instruction in the scope is equal
-    // to 'LHS' then ensure it will be turned into 'RHS'.
-    addToLeaderTable(LVN, RHS, Root);
+    // If value numbering later sees that an instruction in the scope is equal
+    // to 'LHS' then ensure it will be turned into 'RHS'.  In order to preserve
+    // the invariant that instructions only occur in the leader table for their
+    // own value number (this is used by removeFromLeaderTable), do not do this
+    // if RHS is an instruction (if an instruction in the scope is morphed into
+    // LHS then it will be turned into RHS by the next GVN iteration anyway, so
+    // using the leader table is about compiling faster, not optimizing better).
+    if (!isa<Instruction>(RHS))
+      addToLeaderTable(LVN, RHS, Root);
 
     // Replace all occurrences of 'LHS' with 'RHS' everywhere in the scope.  As
     // LHS always has at least one use that is not dominated by Root, this will
@@ -2218,7 +2272,7 @@ bool GVN::processInstruction(Instruction *I) {
   }
   
   // Remove it!
-  I->replaceAllUsesWith(repl);
+  patchAndReplaceAllUsesWith(repl, I);
   if (MD && repl->getType()->isPointerTy())
     MD->invalidateCachedPointerInfo(repl);
   markInstructionForDeletion(I);

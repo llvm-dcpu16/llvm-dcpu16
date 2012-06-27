@@ -370,7 +370,6 @@ AC_CACHE_CHECK([target architecture],[llvm_cv_target_arch],
   dcpu16-*)               llvm_cv_target_arch="DCPU16" ;;
   hexagon-*)              llvm_cv_target_arch="Hexagon" ;;
   mblaze-*)               llvm_cv_target_arch="MBlaze" ;;
-  ptx-*)                  llvm_cv_target_arch="PTX" ;;
   nvptx-*)                llvm_cv_target_arch="NVPTX" ;;
   *)                      llvm_cv_target_arch="Unknown" ;;
 esac])
@@ -388,6 +387,30 @@ esac
 
 dnl Define a substitution, ARCH, for the target architecture
 AC_SUBST(ARCH,$llvm_cv_target_arch)
+
+dnl Determine what our host architecture.
+dnl This will allow MCJIT regress tests runs only for supported
+dnl platforms.
+case $host in
+  i?86-*)                 host_arch="x86" ;;
+  amd64-* | x86_64-*)     host_arch="x86_64" ;;
+  sparc*-*)               host_arch="Sparc" ;;
+  powerpc*-*)             host_arch="PowerPC" ;;
+  arm*-*)                 host_arch="ARM" ;;
+  mips-*)                 host_arch="Mips" ;;
+  mipsel-*)               host_arch="Mips" ;;
+  xcore-*)                host_arch="XCore" ;;
+  msp430-*)               host_arch="MSP430" ;;
+  hexagon-*)              host_arch="Hexagon" ;;
+  mblaze-*)               host_arch="MBlaze" ;;
+  *)                      host_arch="Unknown" ;;
+esac
+
+if test "$host_arch" = "Unknown" ; then
+  AC_MSG_WARN([Configuring LLVM for an unknown host archicture])
+fi
+
+AC_SUBST(HOST_ARCH,$host_arch)
 
 dnl Check for the endianness of the target
 AC_C_BIGENDIAN(AC_SUBST([ENDIAN],[big]),AC_SUBST([ENDIAN],[little]))
@@ -519,7 +542,6 @@ else
     DCPU16)      AC_SUBST(TARGET_HAS_JIT,0) ;;
     Hexagon)     AC_SUBST(TARGET_HAS_JIT,0) ;;
     MBlaze)      AC_SUBST(TARGET_HAS_JIT,0) ;;
-    PTX)         AC_SUBST(TARGET_HAS_JIT,0) ;;
     NVPTX)       AC_SUBST(TARGET_HAS_JIT,0) ;;
     *)           AC_SUBST(TARGET_HAS_JIT,0) ;;
   esac
@@ -632,13 +654,13 @@ TARGETS_TO_BUILD=""
 AC_ARG_ENABLE([targets],AS_HELP_STRING([--enable-targets],
     [Build specific host targets: all or target1,target2,... Valid targets are:
      host, x86, x86_64, sparc, powerpc, arm, mips, spu, hexagon,
-     xcore, msp430, dcpu16, ptx, nvptx, cbe, and cpp (default=all)]),,
+     xcore, msp430, dcpu16, nvptx, and cpp (default=all)]),,
     enableval=all)
 if test "$enableval" = host-only ; then
   enableval=host
 fi
 case "$enableval" in
-  all) TARGETS_TO_BUILD="X86 Sparc PowerPC ARM Mips CellSPU XCore MSP430 DCPU16 CppBackend MBlaze PTX NVPTX Hexagon" ;;
+  all) TARGETS_TO_BUILD="X86 Sparc PowerPC ARM Mips CellSPU XCore MSP430 DCPU16 CppBackend MBlaze NVPTX Hexagon" ;;
   *)for a_target in `echo $enableval|sed -e 's/,/ /g' ` ; do
       case "$a_target" in
         x86)      TARGETS_TO_BUILD="X86 $TARGETS_TO_BUILD" ;;
@@ -655,7 +677,6 @@ case "$enableval" in
         cpp)      TARGETS_TO_BUILD="CppBackend $TARGETS_TO_BUILD" ;;
         hexagon)  TARGETS_TO_BUILD="Hexagon $TARGETS_TO_BUILD" ;;
         mblaze)   TARGETS_TO_BUILD="MBlaze $TARGETS_TO_BUILD" ;;
-        ptx)      TARGETS_TO_BUILD="PTX $TARGETS_TO_BUILD" ;;
         nvptx)    TARGETS_TO_BUILD="NVPTX $TARGETS_TO_BUILD" ;;
         host) case "$llvm_cv_target_arch" in
             x86)         TARGETS_TO_BUILD="X86 $TARGETS_TO_BUILD" ;;
@@ -670,7 +691,6 @@ case "$enableval" in
             MSP430)      TARGETS_TO_BUILD="MSP430 $TARGETS_TO_BUILD" ;;
             DCPU16)      TARGETS_TO_BUILD="DCPU16 $TARGETS_TO_BUILD" ;;
             Hexagon)     TARGETS_TO_BUILD="Hexagon $TARGETS_TO_BUILD" ;;
-            PTX)         TARGETS_TO_BUILD="PTX $TARGETS_TO_BUILD" ;;
             NVPTX)       TARGETS_TO_BUILD="NVPTX $TARGETS_TO_BUILD" ;;
             *)       AC_MSG_ERROR([Can not set target to build]) ;;
           esac ;;

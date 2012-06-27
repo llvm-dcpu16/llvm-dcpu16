@@ -1322,6 +1322,9 @@ SDValue DAGCombiner::visitMERGE_VALUES(SDNode *N) {
   // Replacing results may cause a different MERGE_VALUES to suddenly
   // be CSE'd with N, and carry its uses with it. Iterate until no
   // uses remain, to ensure that the node can be safely deleted.
+  // First add the users of this node to the work list so that they
+  // can be tried again once they have new operands.
+  AddUsersToWorkList(N);
   do {
     for (unsigned i = 0, e = N->getNumOperands(); i != e; ++i)
       DAG.ReplaceAllUsesOfValueWith(SDValue(N, i), N->getOperand(i));
@@ -2524,7 +2527,14 @@ SDValue DAGCombiner::visitAND(SDNode *N) {
                               Load->getOffset(), Load->getMemoryVT(),
                               Load->getMemOperand());
         // Replace uses of the EXTLOAD with the new ZEXTLOAD.
-        CombineTo(Load, NewLoad.getValue(0), NewLoad.getValue(1));
+        if (Load->getNumValues() == 3) {
+          // PRE/POST_INC loads have 3 values.
+          SDValue To[] = { NewLoad.getValue(0), NewLoad.getValue(1),
+                           NewLoad.getValue(2) };
+          CombineTo(Load, To, 3, true);
+        } else {
+          CombineTo(Load, NewLoad.getValue(0), NewLoad.getValue(1));
+        }
       }
 
       // Fold the AND away, taking care not to fold to the old load node if we
@@ -5011,6 +5021,10 @@ SDValue DAGCombiner::ReduceLoadWidth(SDNode *N) {
   LoadSDNode *LN0 = cast<LoadSDNode>(N0);
   EVT PtrType = N0.getOperand(1).getValueType();
 
+  if (PtrType == MVT::Untyped || PtrType.isExtended())
+    // It's not possible to generate a constant of extended or untyped type.
+    return SDValue();
+
   // For big endian targets, we need to adjust the offset to the pointer to
   // load the correct bytes.
   if (TLI.isBigEndian()) {
@@ -5608,7 +5622,7 @@ SDValue DAGCombiner::visitFADD(SDNode *N) {
     if (FoldedVOp.getNode()) return FoldedVOp;
   }
 
-  // fold (fadd c1, c2) -> (fadd c1, c2)
+  // fold (fadd c1, c2) -> c1 + c2
   if (N0CFP && N1CFP && VT != MVT::ppcf128)
     return DAG.getNode(ISD::FADD, N->getDebugLoc(), VT, N0, N1);
   // canonicalize constant to RHS
@@ -5636,6 +5650,26 @@ SDValue DAGCombiner::visitFADD(SDNode *N) {
     return DAG.getNode(ISD::FADD, N->getDebugLoc(), VT, N0.getOperand(0),
                        DAG.getNode(ISD::FADD, N->getDebugLoc(), VT,
                                    N0.getOperand(1), N1));
+
+  // FADD -> FMA combines:
+  if ((DAG.getTarget().Options.AllowFPOpFusion == FPOpFusion::Fast ||
+       DAG.getTarget().Options.UnsafeFPMath) &&
+      DAG.getTarget().getTargetLowering()->isFMAFasterThanMulAndAdd(VT) &&
+      TLI.isOperationLegal(ISD::FMA, VT)) {
+
+    // fold (fadd (fmul x, y), z) -> (fma x, y, z)
+    if (N0.getOpcode() == ISD::FMUL && N0->hasOneUse()) {
+      return DAG.getNode(ISD::FMA, N->getDebugLoc(), VT,
+                         N0.getOperand(0), N0.getOperand(1), N1);
+    }
+  
+    // fold (fadd x, (fmul y, z)) -> (fma x, y, z)
+    // Note: Commutes FADD operands.
+    if (N1.getOpcode() == ISD::FMUL && N1->hasOneUse()) {
+      return DAG.getNode(ISD::FMA, N->getDebugLoc(), VT,
+                         N1.getOperand(0), N1.getOperand(1), N0);
+    }
+  }
 
   return SDValue();
 }
@@ -5691,6 +5725,29 @@ SDValue DAGCombiner::visitFSUB(SDNode *N) {
       else if (N11 == N0 && isNegatibleForFree(N10, LegalOperations, TLI,
                                                &DAG.getTarget().Options))
         return GetNegatedExpression(N10, DAG, LegalOperations);
+    }
+  }
+
+  // FSUB -> FMA combines:
+  if ((DAG.getTarget().Options.AllowFPOpFusion == FPOpFusion::Fast ||
+       DAG.getTarget().Options.UnsafeFPMath) &&
+      DAG.getTarget().getTargetLowering()->isFMAFasterThanMulAndAdd(VT) &&
+      TLI.isOperationLegal(ISD::FMA, VT)) {
+
+    // fold (fsub (fmul x, y), z) -> (fma x, y, (fneg z))
+    if (N0.getOpcode() == ISD::FMUL && N0->hasOneUse()) {
+      return DAG.getNode(ISD::FMA, N->getDebugLoc(), VT,
+                         N0.getOperand(0), N0.getOperand(1),
+                         DAG.getNode(ISD::FNEG, N1->getDebugLoc(), VT, N1));
+    }
+
+    // fold (fsub x, (fmul y, z)) -> (fma (fneg y), z, x)
+    // Note: Commutes FSUB operands.
+    if (N1.getOpcode() == ISD::FMUL && N1->hasOneUse()) {
+      return DAG.getNode(ISD::FMA, N->getDebugLoc(), VT,
+                         DAG.getNode(ISD::FNEG, N1->getDebugLoc(), VT,
+                         N1.getOperand(0)),
+                         N1.getOperand(1), N0);
     }
   }
 
@@ -5773,6 +5830,10 @@ SDValue DAGCombiner::visitFMA(SDNode *N) {
     return DAG.getNode(ISD::FADD, N->getDebugLoc(), VT, N1, N2);
   if (N1CFP && N1CFP->isExactlyValue(1.0))
     return DAG.getNode(ISD::FADD, N->getDebugLoc(), VT, N0, N2);
+
+  // Canonicalize (fma c, x, y) -> (fma x, c, y)
+  if (N0CFP && !N1CFP)
+    return DAG.getNode(ISD::FMA, N->getDebugLoc(), VT, N1, N0, N2);
 
   return SDValue();
 }
@@ -7079,7 +7140,8 @@ SDValue DAGCombiner::visitSTORE(SDNode *N) {
       SDValue Tmp;
       switch (CFP->getValueType(0).getSimpleVT().SimpleTy) {
       default: llvm_unreachable("Unknown FP type");
-      case MVT::f80:    // We don't do this for these yet.
+      case MVT::f16:    // We don't do this for these yet.
+      case MVT::f80:
       case MVT::f128:
       case MVT::ppcf128:
         break;

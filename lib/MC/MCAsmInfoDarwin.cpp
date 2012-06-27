@@ -43,13 +43,6 @@ MCAsmInfoDarwin::MCAsmInfoDarwin() {
   HasMachoTBSSDirective = true; // Uses .tbss
   HasStaticCtorDtorReferenceInStaticMode = true;
 
-  CodeBegin = "L$start$code$";
-  DataBegin = "L$start$data$";
-  JT8Begin  = "L$start$jt8$";
-  JT16Begin = "L$start$jt16$";
-  JT32Begin = "L$start$jt32$";
-  SupportsDataRegions = true;
-
   // FIXME: Darwin 10 and newer don't need this.
   LinkerRequiresNonEmptyDwarfLines = true;
 
@@ -66,7 +59,5 @@ MCAsmInfoDarwin::MCAsmInfoDarwin() {
   HasNoDeadStrip = true;
   HasSymbolResolver = true;
 
-  DwarfRequiresRelocationForSectionOffset = false;
-  DwarfUsesLabelOffsetForRanges = false;
-  DwarfUsesRelocationsForStringPool = false;
+  DwarfUsesRelocationsAcrossSections = false;
 }

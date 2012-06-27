@@ -51,9 +51,11 @@ static bool CC_PPC_SVR4_Custom_AlignFPArgRegs(unsigned &ValNo, MVT &ValVT,
                                               ISD::ArgFlagsTy &ArgFlags,
                                               CCState &State);
 
-static cl::opt<bool> EnablePPCPreinc("enable-ppc-preinc",
-cl::desc("enable preincrement load/store generation on PPC (experimental)"),
-                                     cl::Hidden);
+static cl::opt<bool> DisablePPCPreinc("disable-ppc-preinc",
+cl::desc("disable preincrement load/store generation on PPC"), cl::Hidden);
+
+static cl::opt<bool> DisableILPPref("disable-ppc-ilp-pref",
+cl::desc("disable setting the node scheduling preference to ILP on PPC"), cl::Hidden);
 
 static TargetLoweringObjectFile *CreateTLOF(const PPCTargetMachine &TM) {
   if (TM.getSubtargetImpl()->isDarwin())
@@ -130,12 +132,12 @@ PPCTargetLowering::PPCTargetLowering(PPCTargetMachine &TM)
   setOperationAction(ISD::FCOS , MVT::f64, Expand);
   setOperationAction(ISD::FREM , MVT::f64, Expand);
   setOperationAction(ISD::FPOW , MVT::f64, Expand);
-  setOperationAction(ISD::FMA  , MVT::f64, Expand);
+  setOperationAction(ISD::FMA  , MVT::f64, Legal);
   setOperationAction(ISD::FSIN , MVT::f32, Expand);
   setOperationAction(ISD::FCOS , MVT::f32, Expand);
   setOperationAction(ISD::FREM , MVT::f32, Expand);
   setOperationAction(ISD::FPOW , MVT::f32, Expand);
-  setOperationAction(ISD::FMA  , MVT::f32, Expand);
+  setOperationAction(ISD::FMA  , MVT::f32, Legal);
 
   setOperationAction(ISD::FLT_ROUNDS_, MVT::i32, Custom);
 
@@ -376,6 +378,7 @@ PPCTargetLowering::PPCTargetLowering(PPCTargetMachine &TM)
     addRegisterClass(MVT::v16i8, &PPC::VRRCRegClass);
 
     setOperationAction(ISD::MUL, MVT::v4f32, Legal);
+    setOperationAction(ISD::FMA, MVT::v4f32, Legal);
     setOperationAction(ISD::MUL, MVT::v4i32, Custom);
     setOperationAction(ISD::MUL, MVT::v8i16, Custom);
     setOperationAction(ISD::MUL, MVT::v16i8, Custom);
@@ -906,6 +909,7 @@ bool PPCTargetLowering::SelectAddressRegImm(SDValue N, SDValue &Disp,
              && "Cannot handle constant offsets yet!");
       Disp = N.getOperand(1).getOperand(0);  // The global address.
       assert(Disp.getOpcode() == ISD::TargetGlobalAddress ||
+             Disp.getOpcode() == ISD::TargetGlobalTLSAddress ||
              Disp.getOpcode() == ISD::TargetConstantPool ||
              Disp.getOpcode() == ISD::TargetJumpTable);
       Base = N.getOperand(0);
@@ -1084,8 +1088,7 @@ bool PPCTargetLowering::getPreIndexedAddressParts(SDNode *N, SDValue &Base,
                                                   SDValue &Offset,
                                                   ISD::MemIndexedMode &AM,
                                                   SelectionDAG &DAG) const {
-  // Disabled by default for now.
-  if (!EnablePPCPreinc) return false;
+  if (DisablePPCPreinc) return false;
 
   SDValue Ptr;
   EVT VT;
@@ -1103,7 +1106,10 @@ bool PPCTargetLowering::getPreIndexedAddressParts(SDNode *N, SDValue &Base,
   if (VT.isVector())
     return false;
 
-  // TODO: Check reg+reg first.
+  if (SelectAddressRegReg(Ptr, Offset, Base, DAG)) {
+    AM = ISD::PRE_INC;
+    return true;
+  }
 
   // LDU/STU use reg+imm*4, others use reg+imm.
   if (VT != MVT::i64) {
@@ -1220,6 +1226,30 @@ SDValue PPCTargetLowering::LowerBlockAddress(SDValue Op,
   SDValue TgtBAHi = DAG.getBlockAddress(BA, PtrVT, /*isTarget=*/true, MOHiFlag);
   SDValue TgtBALo = DAG.getBlockAddress(BA, PtrVT, /*isTarget=*/true, MOLoFlag);
   return LowerLabelRef(TgtBAHi, TgtBALo, isPIC, DAG);
+}
+
+SDValue PPCTargetLowering::LowerGlobalTLSAddress(SDValue Op,
+                                              SelectionDAG &DAG) const {
+
+  GlobalAddressSDNode *GA = cast<GlobalAddressSDNode>(Op);
+  DebugLoc dl = GA->getDebugLoc();
+  const GlobalValue *GV = GA->getGlobal();
+  EVT PtrVT = getPointerTy();
+  bool is64bit = PPCSubTarget.isPPC64();
+
+  TLSModel::Model model = getTargetMachine().getTLSModel(GV);
+
+  SDValue TGAHi = DAG.getTargetGlobalAddress(GV, dl, PtrVT, 0,
+                                             PPCII::MO_TPREL16_HA);
+  SDValue TGALo = DAG.getTargetGlobalAddress(GV, dl, PtrVT, 0,
+                                             PPCII::MO_TPREL16_LO);
+
+  if (model != TLSModel::LocalExec)
+    llvm_unreachable("only local-exec TLS mode supported");
+  SDValue TLSReg = DAG.getRegister(is64bit ? PPC::X13 : PPC::R2,
+                                   is64bit ? MVT::i64 : MVT::i32);
+  SDValue Hi = DAG.getNode(PPCISD::Hi, dl, PtrVT, TGAHi, TLSReg);
+  return DAG.getNode(PPCISD::Lo, dl, PtrVT, TGALo, Hi);
 }
 
 SDValue PPCTargetLowering::LowerGlobalAddress(SDValue Op,
@@ -1440,13 +1470,16 @@ SDValue PPCTargetLowering::LowerINIT_TRAMPOLINE(SDValue Op,
   Entry.Node = Nest; Args.push_back(Entry);
 
   // Lower to a call to __trampoline_setup(Trmp, TrampSize, FPtr, ctx_reg)
-  std::pair<SDValue, SDValue> CallResult =
-    LowerCallTo(Chain, Type::getVoidTy(*DAG.getContext()),
-                false, false, false, false, 0, CallingConv::C,
+  TargetLowering::CallLoweringInfo CLI(Chain,
+                                       Type::getVoidTy(*DAG.getContext()),
+                                       false, false, false, false, 0,
+                                       CallingConv::C,
                 /*isTailCall=*/false,
-                /*doesNotRet=*/false, /*isReturnValueUsed=*/true,
+                                       /*doesNotRet=*/false,
+                                       /*isReturnValueUsed=*/true,
                 DAG.getExternalSymbol("__trampoline_setup", PtrVT),
                 Args, DAG, dl);
+  std::pair<SDValue, SDValue> CallResult = LowerCallTo(CLI);
 
   return CallResult.second;
 }
@@ -2864,14 +2897,19 @@ PPCTargetLowering::FinishCall(CallingConv::ID CallConv, DebugLoc dl,
 }
 
 SDValue
-PPCTargetLowering::LowerCall(SDValue Chain, SDValue Callee,
-                             CallingConv::ID CallConv, bool isVarArg,
-                             bool doesNotRet, bool &isTailCall,
-                             const SmallVectorImpl<ISD::OutputArg> &Outs,
-                             const SmallVectorImpl<SDValue> &OutVals,
-                             const SmallVectorImpl<ISD::InputArg> &Ins,
-                             DebugLoc dl, SelectionDAG &DAG,
+PPCTargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
                              SmallVectorImpl<SDValue> &InVals) const {
+  SelectionDAG &DAG                     = CLI.DAG;
+  DebugLoc &dl                          = CLI.DL;
+  SmallVector<ISD::OutputArg, 32> &Outs = CLI.Outs;
+  SmallVector<SDValue, 32> &OutVals     = CLI.OutVals;
+  SmallVector<ISD::InputArg, 32> &Ins   = CLI.Ins;
+  SDValue Chain                         = CLI.Chain;
+  SDValue Callee                        = CLI.Callee;
+  bool &isTailCall                      = CLI.IsTailCall;
+  CallingConv::ID CallConv              = CLI.CallConv;
+  bool isVarArg                         = CLI.IsVarArg;
+
   if (isTailCall)
     isTailCall = IsEligibleForTailCallOptimization(Callee, CallConv, isVarArg,
                                                    Ins, DAG);
@@ -4559,7 +4597,7 @@ SDValue PPCTargetLowering::LowerOperation(SDValue Op, SelectionDAG &DAG) const {
   case ISD::ConstantPool:       return LowerConstantPool(Op, DAG);
   case ISD::BlockAddress:       return LowerBlockAddress(Op, DAG);
   case ISD::GlobalAddress:      return LowerGlobalAddress(Op, DAG);
-  case ISD::GlobalTLSAddress:   llvm_unreachable("TLS not implemented for PPC");
+  case ISD::GlobalTLSAddress:   return LowerGlobalTLSAddress(Op, DAG);
   case ISD::JumpTable:          return LowerJumpTable(Op, DAG);
   case ISD::SETCC:              return LowerSETCC(Op, DAG);
   case ISD::INIT_TRAMPOLINE:    return LowerINIT_TRAMPOLINE(Op, DAG);
@@ -4899,11 +4937,37 @@ PPCTargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
 
   MachineFunction *F = BB->getParent();
 
-  if (MI->getOpcode() == PPC::SELECT_CC_I4 ||
-      MI->getOpcode() == PPC::SELECT_CC_I8 ||
-      MI->getOpcode() == PPC::SELECT_CC_F4 ||
-      MI->getOpcode() == PPC::SELECT_CC_F8 ||
-      MI->getOpcode() == PPC::SELECT_CC_VRRC) {
+  if (PPCSubTarget.hasISEL() && (MI->getOpcode() == PPC::SELECT_CC_I4 ||
+                                 MI->getOpcode() == PPC::SELECT_CC_I8)) {
+    unsigned OpCode = MI->getOpcode() == PPC::SELECT_CC_I8 ?
+                                         PPC::ISEL8 : PPC::ISEL;
+    unsigned SelectPred = MI->getOperand(4).getImm();
+    DebugLoc dl = MI->getDebugLoc();
+
+    // The SelectPred is ((BI << 5) | BO) for a BCC
+    unsigned BO = SelectPred & 0xF;
+    assert((BO == 12 || BO == 4) && "invalid predicate BO field for isel");
+
+    unsigned TrueOpNo, FalseOpNo;
+    if (BO == 12) {
+      TrueOpNo = 2;
+      FalseOpNo = 3;
+    } else {
+      TrueOpNo = 3;
+      FalseOpNo = 2;
+      SelectPred = PPC::InvertPredicate((PPC::Predicate)SelectPred);
+    }
+
+    BuildMI(*BB, MI, dl, TII->get(OpCode), MI->getOperand(0).getReg())
+      .addReg(MI->getOperand(TrueOpNo).getReg())
+      .addReg(MI->getOperand(FalseOpNo).getReg())
+      .addImm(SelectPred).addReg(MI->getOperand(1).getReg());
+  } else if (MI->getOpcode() == PPC::SELECT_CC_I4 ||
+             MI->getOpcode() == PPC::SELECT_CC_I8 ||
+             MI->getOpcode() == PPC::SELECT_CC_F4 ||
+             MI->getOpcode() == PPC::SELECT_CC_F8 ||
+             MI->getOpcode() == PPC::SELECT_CC_VRRC) {
+
 
     // The incoming instruction knows the destination vreg to set, the
     // condition code register to branch on, the true/false values to
@@ -5839,11 +5903,30 @@ EVT PPCTargetLowering::getOptimalMemOpType(uint64_t Size,
   }
 }
 
-Sched::Preference PPCTargetLowering::getSchedulingPreference(SDNode *N) const {
-  unsigned Directive = PPCSubTarget.getDarwinDirective();
-  if (Directive == PPC::DIR_440 || Directive == PPC::DIR_A2)
-    return Sched::ILP;
+/// isFMAFasterThanMulAndAdd - Return true if an FMA operation is faster than
+/// a pair of mul and add instructions. fmuladd intrinsics will be expanded to
+/// FMAs when this method returns true (and FMAs are legal), otherwise fmuladd
+/// is expanded to mul + add.
+bool PPCTargetLowering::isFMAFasterThanMulAndAdd(EVT VT) const {
+  if (!VT.isSimple())
+    return false;
 
-  return TargetLowering::getSchedulingPreference(N);
+  switch (VT.getSimpleVT().SimpleTy) {
+  case MVT::f32:
+  case MVT::f64:
+  case MVT::v4f32:
+    return true;
+  default:
+    break;
+  }
+
+  return false;
+}
+
+Sched::Preference PPCTargetLowering::getSchedulingPreference(SDNode *N) const {
+  if (DisableILPPref)
+    return TargetLowering::getSchedulingPreference(N);
+
+  return Sched::ILP;
 }
 

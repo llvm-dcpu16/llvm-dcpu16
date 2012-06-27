@@ -3339,13 +3339,13 @@ static DecodeStatus DecodePostIdxReg(MCInst &Inst, unsigned Insn,
 
 static DecodeStatus DecodeThumbBLXOffset(MCInst &Inst, unsigned Val,
                                  uint64_t Address, const void *Decoder) {
-  // Val is passed in as S:J1:J2:imm10H:imm10L:’0’
+  // Val is passed in as S:J1:J2:imm10H:imm10L:'0'
   // Note only one trailing zero not two.  Also the J1 and J2 values are from
   // the encoded instruction.  So here change to I1 and I2 values via:
   // I1 = NOT(J1 EOR S);
   // I2 = NOT(J2 EOR S);
   // and build the imm32 with two trailing zeros as documented:
-  // imm32 = SignExtend(S:I1:I2:imm10H:imm10L:’00’, 32);
+  // imm32 = SignExtend(S:I1:I2:imm10H:imm10L:'00', 32);
   unsigned S = (Val >> 23) & 1;
   unsigned J1 = (Val >> 22) & 1;
   unsigned J2 = (Val >> 21) & 1;
@@ -3463,9 +3463,9 @@ static DecodeStatus DecodeT2SOImm(MCInst &Inst, unsigned Val,
 static DecodeStatus
 DecodeThumbBCCTargetOperand(MCInst &Inst, unsigned Val,
                             uint64_t Address, const void *Decoder){
-  if (!tryAddingSymbolicOperand(Address, Address + SignExtend32<8>(Val<<1) + 4,
+  if (!tryAddingSymbolicOperand(Address, Address + SignExtend32<9>(Val<<1) + 4,
                                 true, 2, Inst, Decoder))
-    Inst.addOperand(MCOperand::CreateImm(SignExtend32<8>(Val << 1)));
+    Inst.addOperand(MCOperand::CreateImm(SignExtend32<9>(Val << 1)));
   return MCDisassembler::Success;
 }
 
@@ -3477,7 +3477,7 @@ static DecodeStatus DecodeThumbBLTargetOperand(MCInst &Inst, unsigned Val,
   // I1 = NOT(J1 EOR S);
   // I2 = NOT(J2 EOR S);
   // and build the imm32 with one trailing zero as documented:
-  // imm32 = SignExtend(S:I1:I2:imm10:imm11:’0’, 32);
+  // imm32 = SignExtend(S:I1:I2:imm10:imm11:'0', 32);
   unsigned S = (Val >> 23) & 1;
   unsigned J1 = (Val >> 22) & 1;
   unsigned J2 = (Val >> 21) & 1;

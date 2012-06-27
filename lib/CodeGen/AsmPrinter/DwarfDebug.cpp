@@ -117,7 +117,6 @@ DIType DbgVariable::getType() const {
       if (getName() == DT.getName())
         return (DT.getTypeDerivedFrom());
     }
-    return Ty;
   }
   return Ty;
 }
@@ -127,6 +126,7 @@ DIType DbgVariable::getType() const {
 DwarfDebug::DwarfDebug(AsmPrinter *A, Module *M)
   : Asm(A), MMI(Asm->MMI), FirstCU(0),
     AbbreviationsSet(InitAbbreviationsSetSize),
+    SourceIdMap(DIEValueAllocator), StringPool(DIEValueAllocator),
     PrevLabel(NULL) {
   NextStringPoolNumber = 0;
 
@@ -566,7 +566,7 @@ CompileUnit *DwarfDebug::constructCompileUnit(const MDNode *N) {
   NewCU->addUInt(Die, dwarf::DW_AT_low_pc, dwarf::DW_FORM_addr, 0);
   // DW_AT_stmt_list is a offset of line number information for this
   // compile unit in debug_line section.
-  if (Asm->MAI->doesDwarfRequireRelocationForSectionOffset())
+  if (Asm->MAI->doesDwarfUseRelocationsAcrossSections())
     NewCU->addLabel(Die, dwarf::DW_AT_stmt_list, dwarf::DW_FORM_data4,
                     Asm->GetTempSymbol("section_line"));
   else
@@ -1310,8 +1310,9 @@ void DwarfDebug::beginFunction(const MachineFunction *MF) {
                MOE = MI->operands_end(); MOI != MOE; ++MOI) {
           if (!MOI->isReg() || !MOI->isDef() || !MOI->getReg())
             continue;
-          for (const uint16_t *AI = TRI->getOverlaps(MOI->getReg());
-               unsigned Reg = *AI; ++AI) {
+          for (MCRegAliasIterator AI(MOI->getReg(), TRI, true);
+               AI.isValid(); ++AI) {
+            unsigned Reg = *AI;
             const MDNode *Var = LiveUserVar[Reg];
             if (!Var)
               continue;
@@ -1623,7 +1624,7 @@ void DwarfDebug::emitDIE(DIE *Die) {
       // DW_AT_range Value encodes offset in debug_range section.
       DIEInteger *V = cast<DIEInteger>(Values[i]);
 
-      if (Asm->MAI->doesDwarfUseLabelOffsetForRanges()) {
+      if (Asm->MAI->doesDwarfUseRelocationsAcrossSections()) {
         Asm->EmitLabelPlusOffset(DwarfDebugRangeSectionSym,
                                  V->getValue(),
                                  4);
@@ -1636,10 +1637,14 @@ void DwarfDebug::emitDIE(DIE *Die) {
       break;
     }
     case dwarf::DW_AT_location: {
-      if (DIELabel *L = dyn_cast<DIELabel>(Values[i]))
-        Asm->EmitLabelDifference(L->getValue(), DwarfDebugLocSectionSym, 4);
-      else
+      if (DIELabel *L = dyn_cast<DIELabel>(Values[i])) {
+        if (Asm->MAI->doesDwarfUseRelocationsAcrossSections())
+          Asm->EmitLabelReference(L->getValue(), 4);
+        else
+          Asm->EmitLabelDifference(L->getValue(), DwarfDebugLocSectionSym, 4);
+      } else {
         Values[i]->EmitValue(Asm, Form);
+      }
       break;
     }
     case dwarf::DW_AT_accessibility: {

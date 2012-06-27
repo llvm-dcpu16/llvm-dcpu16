@@ -41,3 +41,60 @@ end:
 ; CHECK: then:
 ; CHECK-NEXT: br i1 false, label %end, label %else
 }
+
+; CHECK: @test3
+define i32 @test3(i32 %c) nounwind {
+  %cmp = icmp slt i32 %c, 2
+  br i1 %cmp, label %if.then, label %if.end
+
+if.then:
+  ret i32 1
+
+if.end:
+  %cmp1 = icmp slt i32 %c, 3
+  br i1 %cmp1, label %if.then2, label %if.end8
+
+; CHECK: if.then2
+if.then2:
+  %cmp2 = icmp eq i32 %c, 2
+; CHECK: br i1 true
+  br i1 %cmp2, label %if.then4, label %if.end6
+
+; CHECK: if.end6
+if.end6:
+  ret i32 2
+
+if.then4:
+  ret i32 3
+
+if.end8:
+  ret i32 4
+}
+
+; CHECK: @test4
+define i32 @test4(i32 %c) nounwind {
+  switch i32 %c, label %sw.default [
+    i32 1, label %sw.bb
+    i32 2, label %sw.bb
+    i32 4, label %sw.bb
+  ]
+
+; CHECK: sw.bb
+sw.bb:
+  %cmp = icmp sge i32 %c, 1
+; CHECK: br i1 true
+  br i1 %cmp, label %if.then, label %if.end
+
+if.then:
+  br label %return
+
+if.end:
+  br label %return
+
+sw.default:
+  br label %return
+
+return:
+  %retval.0 = phi i32 [ 42, %sw.default ], [ 4, %if.then ], [ 9, %if.end ]
+  ret i32 %retval.0
+}

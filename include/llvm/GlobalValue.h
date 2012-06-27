@@ -122,6 +122,9 @@ public:
   static bool isAvailableExternallyLinkage(LinkageTypes Linkage) {
     return Linkage == AvailableExternallyLinkage;
   }
+  static bool isLinkOnceODRLinkage(LinkageTypes Linkage) {
+    return Linkage == LinkOnceODRLinkage;
+  }
   static bool isLinkOnceLinkage(LinkageTypes Linkage) {
     return Linkage == LinkOnceAnyLinkage || Linkage == LinkOnceODRLinkage;
   }
@@ -164,6 +167,12 @@ public:
     return Linkage == CommonLinkage;
   }
 
+  /// isDiscardableIfUnused - Whether the definition of this global may be
+  /// discarded if it is not used in its compilation unit.
+  static bool isDiscardableIfUnused(LinkageTypes Linkage) {
+    return isLinkOnceLinkage(Linkage) || isLocalLinkage(Linkage);
+  }
+
   /// mayBeOverridden - Whether the definition of this global may be replaced
   /// by something non-equivalent at link time.  For example, if a function has
   /// weak linkage then the code defining it may be replaced by different code.
@@ -196,6 +205,9 @@ public:
   bool hasAvailableExternallyLinkage() const {
     return isAvailableExternallyLinkage(Linkage);
   }
+  bool hasLinkOnceODRLinkage() const {
+    return isLinkOnceODRLinkage(Linkage);
+  }
   bool hasLinkOnceLinkage() const {
     return isLinkOnceLinkage(Linkage);
   }
@@ -220,6 +232,10 @@ public:
 
   void setLinkage(LinkageTypes LT) { Linkage = LT; }
   LinkageTypes getLinkage() const { return Linkage; }
+
+  bool isDiscardableIfUnused() const {
+    return isDiscardableIfUnused(Linkage);
+  }
 
   bool mayBeOverridden() const { return mayBeOverridden(Linkage); }
 

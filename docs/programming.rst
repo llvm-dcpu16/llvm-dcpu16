@@ -3,32 +3,37 @@
 Programming Documentation
 =========================
 
- * `LLVM Language Reference Manual <LangRef.html>`_
+.. toctree::
+   :hidden:
 
-   Defines the LLVM intermediate representation and the assembly form of the
-   different nodes.
+   CodingStandards
 
- * `The LLVM Programmers Manual <ProgrammersManual.html>`_
+* `LLVM Language Reference Manual <LangRef.html>`_
 
-   Introduction to the general layout of the LLVM sourcebase, important classes
-   and APIs, and some tips & tricks.
+  Defines the LLVM intermediate representation and the assembly form of the
+  different nodes.
 
- * `CommandLine library Reference Manual <CommandLine.html>`_
+* `The LLVM Programmers Manual <ProgrammersManual.html>`_
 
-   Provides information on using the command line parsing library.
+  Introduction to the general layout of the LLVM sourcebase, important classes
+  and APIs, and some tips & tricks.
 
- * `LLVM Coding standards <CodingStandards.html>`_
+* `CommandLine library Reference Manual <CommandLine.html>`_
 
-   Details the LLVM coding standards and provides useful information on writing
-   efficient C++ code.
+  Provides information on using the command line parsing library.
 
- * `Extending LLVM <ExtendingLLVM.html>`_
+* :ref:`coding_standards`
 
-   Look here to see how to add instructions and intrinsics to LLVM.
+  Details the LLVM coding standards and provides useful information on writing
+  efficient C++ code.
 
- * `Doxygen generated documentation <http://llvm.org/doxygen/>`_
+* `Extending LLVM <ExtendingLLVM.html>`_
 
-   (`classes <http://llvm.org/doxygen/inherits.html>`_)
-   (`tarball <http://llvm.org/doxygen/doxygen.tar.gz>`_)
+  Look here to see how to add instructions and intrinsics to LLVM.
 
- * `ViewVC Repository Browser <http://llvm.org/viewvc/>`_
+* `Doxygen generated documentation <http://llvm.org/doxygen/>`_
+
+  (`classes <http://llvm.org/doxygen/inherits.html>`_)
+  (`tarball <http://llvm.org/doxygen/doxygen.tar.gz>`_)
+
+* `ViewVC Repository Browser <http://llvm.org/viewvc/>`_

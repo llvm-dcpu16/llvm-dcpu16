@@ -101,6 +101,9 @@ public:
   /// point where StadardID is expected, add TargetID in its place.
   void substitutePass(char &StandardID, char &TargetID);
 
+  /// Insert InsertedPassID pass after TargetPassID pass.
+  void insertPass(const char &TargetPassID, const char &InsertedPassID);
+
   /// Allow the target to enable a specific standard pass by default.
   void enablePass(char &ID) { substitutePass(ID, ID); }
 
@@ -171,6 +174,18 @@ protected:
   /// addOptimizedRegAlloc - Add passes related to register allocation.
   /// LLVMTargetMachine provides standard regalloc passes for most targets.
   virtual void addOptimizedRegAlloc(FunctionPass *RegAllocPass);
+
+  /// addPreRewrite - Add passes to the optimized register allocation pipeline
+  /// after register allocation is complete, but before virtual registers are
+  /// rewritten to physical registers.
+  ///
+  /// These passes must preserve VirtRegMap and LiveIntervals, and when running
+  /// after RABasic or RAGreedy, they should take advantage of LiveRegMatrix.
+  /// When these passes run, VirtRegMap contains legal physreg assignments for
+  /// all virtual registers.
+  virtual bool addPreRewrite() {
+    return false;
+  }
 
   /// addFinalizeRegAlloc - This method may be implemented by targets that want
   /// to run passes within the regalloc pipeline, immediately after the register
@@ -297,6 +312,10 @@ namespace llvm {
   /// basic blocks.
   extern char &SpillPlacementID;
 
+  /// VirtRegRewriter pass. Rewrite virtual registers to physical registers as
+  /// assigned in VirtRegMap.
+  extern char &VirtRegRewriterID;
+
   /// UnreachableMachineBlockElimination - This pass removes unreachable
   /// machine basic blocks.
   extern char &UnreachableMachineBlockElimID;
@@ -341,6 +360,9 @@ namespace llvm {
   /// successor blocks (creating fall throughs), and eliminating branches over
   /// branches.
   extern char &BranchFolderPassID;
+
+  /// MachineFunctionPrinterPass - This pass prints out MachineInstr's.
+  extern char &MachineFunctionPrinterPassID;
 
   /// TailDuplicate - Duplicate blocks with unconditional branches
   /// into tails of their predecessors.

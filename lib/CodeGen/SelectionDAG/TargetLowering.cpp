@@ -33,13 +33,6 @@
 #include <cctype>
 using namespace llvm;
 
-/// We are in the process of implementing a new TypeLegalization action
-/// - the promotion of vector elements. This feature is disabled by default
-/// and only enabled using this flag.
-static cl::opt<bool>
-AllowPromoteIntElem("promote-elements", cl::Hidden, cl::init(true),
-  cl::desc("Allow promotion of integer vector element types"));
-
 /// InitLibcallNames - Set default libcall names.
 ///
 static void InitLibcallNames(const char **Names) {
@@ -522,8 +515,7 @@ static void InitCmpLibcallCCs(ISD::CondCode *CCs) {
 /// NOTE: The constructor takes ownership of TLOF.
 TargetLowering::TargetLowering(const TargetMachine &tm,
                                const TargetLoweringObjectFile *tlof)
-  : TM(tm), TD(TM.getTargetData()), TLOF(*tlof),
-  mayPromoteElements(AllowPromoteIntElem) {
+  : TM(tm), TD(TM.getTargetData()), TLOF(*tlof) {
   // All operations default to being supported.
   memset(OpActions, 0, sizeof(OpActions));
   memset(LoadExtActions, 0, sizeof(LoadExtActions));
@@ -829,11 +821,8 @@ void TargetLowering::computeRegisterProperties() {
     unsigned NElts = VT.getVectorNumElements();
     if (NElts != 1) {
       bool IsLegalWiderType = false;
-      // If we allow the promotion of vector elements using a flag,
-      // then return TypePromoteInteger on vector elements.
       // First try to promote the elements of integer vectors. If no legal
       // promotion was found, fallback to the widen-vector method.
-      if (mayPromoteElements)
       for (unsigned nVT = i+1; nVT <= MVT::LAST_VECTOR_VALUETYPE; ++nVT) {
         EVT SVT = (MVT::SimpleValueType)nVT;
         // Promote vectors of integers to vectors with the same number
@@ -997,13 +986,11 @@ unsigned TargetLowering::getVectorTypeBreakdown(LLVMContext &Context, EVT VT,
 /// TODO: Move this out of TargetLowering.cpp.
 void llvm::GetReturnInfo(Type* ReturnType, Attributes attr,
                          SmallVectorImpl<ISD::OutputArg> &Outs,
-                         const TargetLowering &TLI,
-                         SmallVectorImpl<uint64_t> *Offsets) {
+                         const TargetLowering &TLI) {
   SmallVector<EVT, 4> ValueVTs;
   ComputeValueVTs(TLI, ReturnType, ValueVTs);
   unsigned NumValues = ValueVTs.size();
   if (NumValues == 0) return;
-  unsigned Offset = 0;
 
   for (unsigned j = 0, f = NumValues; j != f; ++j) {
     EVT VT = ValueVTs[j];
@@ -1026,8 +1013,6 @@ void llvm::GetReturnInfo(Type* ReturnType, Attributes attr,
 
     unsigned NumParts = TLI.getNumRegisters(ReturnType->getContext(), VT);
     EVT PartVT = TLI.getRegisterType(ReturnType->getContext(), VT);
-    unsigned PartSize = TLI.getTargetData()->getTypeAllocSize(
-                        PartVT.getTypeForEVT(ReturnType->getContext()));
 
     // 'inreg' on function refers to return value
     ISD::ArgFlagsTy Flags = ISD::ArgFlagsTy();
@@ -1042,10 +1027,6 @@ void llvm::GetReturnInfo(Type* ReturnType, Attributes attr,
 
     for (unsigned i = 0; i < NumParts; ++i) {
       Outs.push_back(ISD::OutputArg(Flags, PartVT, /*isFixed=*/true));
-      if (Offsets) {
-        Offsets->push_back(Offset);
-        Offset += PartSize;
-      }
     }
   }
 }
@@ -2016,7 +1997,7 @@ TargetLowering::SimplifySetCC(EVT VT, SDValue N0, SDValue N1,
         }
       }
 
-      // Make sure we're not loosing bits from the constant.
+      // Make sure we're not losing bits from the constant.
       if (MinBits < C1.getBitWidth() && MinBits > C1.getActiveBits()) {
         EVT MinVT = EVT::getIntegerVT(*DAG.getContext(), MinBits);
         if (isTypeDesirableForOp(ISD::SETCC, MinVT)) {

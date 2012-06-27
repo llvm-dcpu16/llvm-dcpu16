@@ -83,3 +83,56 @@ entry:
   %cond = select i1 %cmp, i32 %sub, i32 0
   ret i32 %cond
 }
+; rdar://11540023
+define i32 @n(i32 %x, i32 %y) nounwind {
+entry:
+; CHECK: n:
+; CHECK-NOT: sub
+; CHECK: cmp
+  %sub = sub nsw i32 %x, %y
+  %cmp = icmp slt i32 %sub, 0
+  %y.x = select i1 %cmp, i32 %y, i32 %x
+  ret i32 %y.x
+}
+; PR://13046
+define void @o() nounwind uwtable {
+entry:
+  %0 = load i16* undef, align 2
+  br i1 undef, label %if.then.i, label %if.end.i
+
+if.then.i:                                        ; preds = %entry
+  unreachable
+
+if.end.i:                                         ; preds = %entry
+  br i1 undef, label %sw.bb, label %sw.default
+
+sw.bb:                                            ; preds = %if.end.i
+  br i1 undef, label %if.then44, label %if.end29
+
+if.end29:                                         ; preds = %sw.bb
+; CHECK: o:
+; CHECK: cmp
+  %1 = urem i16 %0, 10
+  %cmp25 = icmp eq i16 %1, 0
+  %. = select i1 %cmp25, i16 2, i16 0
+  br i1 %cmp25, label %if.then44, label %sw.default
+
+sw.default:                                       ; preds = %if.end29, %if.end.i
+  br i1 undef, label %if.then.i96, label %if.else.i97
+
+if.then.i96:                                      ; preds = %sw.default
+  unreachable
+
+if.else.i97:                                      ; preds = %sw.default
+  unreachable
+
+if.then44:                                        ; preds = %if.end29, %sw.bb
+  %aModeRefSel.1.ph = phi i16 [ %., %if.end29 ], [ 3, %sw.bb ]
+  br i1 undef, label %if.then.i103, label %if.else.i104
+
+if.then.i103:                                     ; preds = %if.then44
+  unreachable
+
+if.else.i104:                                     ; preds = %if.then44
+  ret void
+}

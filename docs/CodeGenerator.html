@@ -218,7 +218,8 @@
    support completely non-traditional code generation targets.  For example, the
    C backend does not require register allocation, instruction selection, or any
    of the other standard components provided by the system.  As such, it only
-   implements these two interfaces, and does its own thing.  Another example of
+   implements these two interfaces, and does its own thing. Note that C backend
+   was removed from the trunk since LLVM 3.1 release. Another example of
    a code generator like this is a (purely hypothetical) backend that converts
    LLVM to the GCC RTL form and uses GCC to emit machine code for a target.</p>
 
@@ -1626,9 +1627,9 @@ def : Pat&lt;(i32 imm:$imm),
    the registers <tt>EAX</tt>, <tt>AX</tt> and <tt>AL</tt> share the first eight
    bits. These physical registers are marked as <i>aliased</i> in LLVM. Given a
    particular architecture, you can check which registers are aliased by
-   inspecting its <tt>RegisterInfo.td</tt> file. Moreover, the method
-   <tt>MCRegisterInfo::getAliasSet(p_reg)</tt> returns an array containing
-   all the physical registers aliased to the register <tt>p_reg</tt>.</p>
+   inspecting its <tt>RegisterInfo.td</tt> file. Moreover, the class
+   <tt>MCRegAliasIterator</tt> enumerates all the physical registers aliased to
+   a register.</p>
 
 <p>Physical registers, in LLVM, are grouped in <i>Register Classes</i>.
    Elements in the same register class are functionally equivalent, and can be

@@ -3,22 +3,28 @@
 Development Process Documentation
 =================================
 
- * `LLVM Project Guide <Projects.html>`_
+.. toctree::
+   :hidden:
 
-   How-to guide and templates for new projects that *use* the LLVM
-   infrastructure.  The templates (directory organization, Makefiles, and test
-   tree) allow the project code to be located outside (or inside) the ``llvm/``
-   tree, while using LLVM header files and libraries.
+   MakefileGuide
+   Projects
 
- * `LLVMBuild Documentation <LLVMBuild.html>`_
+* :ref:`projects`
 
-   Describes the LLVMBuild organization and files used by LLVM to specify
-   component descriptions.
+  How-to guide and templates for new projects that *use* the LLVM
+  infrastructure.  The templates (directory organization, Makefiles, and test
+  tree) allow the project code to be located outside (or inside) the ``llvm/``
+  tree, while using LLVM header files and libraries.
 
- * `LLVM Makefile Guide <MakefileGuide.html>`_
+* `LLVMBuild Documentation <LLVMBuild.html>`_
 
-   Describes how the LLVM makefiles work and how to use them.
+  Describes the LLVMBuild organization and files used by LLVM to specify
+  component descriptions.
 
- * `How To Release LLVM To The Public <HowToReleaseLLVM.html>`_
+* :ref:`makefile_guide`
 
-   This is a guide to preparing LLVM releases. Most developers can ignore it.
+  Describes how the LLVM makefiles work and how to use them.
+
+* `How To Release LLVM To The Public <HowToReleaseLLVM.html>`_
+
+  This is a guide to preparing LLVM releases. Most developers can ignore it.

@@ -14,8 +14,11 @@
 #ifndef MIPS_MACHINE_FUNCTION_INFO_H
 #define MIPS_MACHINE_FUNCTION_INFO_H
 
+#include "MipsSubtarget.h"
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
+#include "llvm/Target/TargetFrameLowering.h"
+#include "llvm/Target/TargetMachine.h"
 #include <utility>
 
 namespace llvm {
@@ -45,7 +48,7 @@ class MipsFunctionInfo : public MachineFunctionInfo {
   // OutArgFIRange: Range of indices of all frame objects created during call to
   //                LowerCall except for the frame object for restoring $gp.
   std::pair<int, int> InArgFIRange, OutArgFIRange;
-  int GPFI; // Index of the frame object for restoring $gp
+  int GlobalRegFI;
   mutable int DynAllocFI; // Frame index of dynamically allocated stack area.
   unsigned MaxCallFrameSize;
 
@@ -55,7 +58,7 @@ public:
   MipsFunctionInfo(MachineFunction& MF)
   : MF(MF), SRetReturnReg(0), GlobalBaseReg(0),
     VarArgsFrameIndex(0), InArgFIRange(std::make_pair(-1, 0)),
-    OutArgFIRange(std::make_pair(-1, 0)), GPFI(0), DynAllocFI(0),
+    OutArgFIRange(std::make_pair(-1, 0)), GlobalRegFI(0), DynAllocFI(0),
     MaxCallFrameSize(0), EmitNOAT(false)
   {}
 
@@ -74,10 +77,23 @@ public:
     OutArgFIRange.second = LastFI;
   }
 
-  int getGPFI() const { return GPFI; }
-  void setGPFI(int FI) { GPFI = FI; }
-  bool needGPSaveRestore() const { return getGPFI(); }
-  bool isGPFI(int FI) const { return GPFI && GPFI == FI; }
+  bool isGlobalRegFI(int FI) const {
+    return GlobalRegFI && (FI == GlobalRegFI);
+  }
+
+  int getGlobalRegFI() const {
+    return GlobalRegFI;
+  }
+
+  int initGlobalRegFI() {
+    const TargetMachine &TM = MF.getTarget();
+    unsigned RegSize = TM.getSubtarget<MipsSubtarget>().isABI_N64() ? 8 : 4;
+    int64_t StackAlignment = TM.getFrameLowering()->getStackAlignment();
+    uint64_t Offset = RoundUpToAlignment(MaxCallFrameSize, StackAlignment);
+
+    GlobalRegFI = MF.getFrameInfo()->CreateFixedObject(RegSize, Offset, true);
+    return GlobalRegFI;
+  }
 
   // The first call to this function creates a frame object for dynamically
   // allocated stack area.
@@ -92,7 +108,6 @@ public:
   unsigned getSRetReturnReg() const { return SRetReturnReg; }
   void setSRetReturnReg(unsigned Reg) { SRetReturnReg = Reg; }
 
-  bool globalBaseRegFixed() const;
   bool globalBaseRegSet() const;
   unsigned getGlobalBaseReg();
 
