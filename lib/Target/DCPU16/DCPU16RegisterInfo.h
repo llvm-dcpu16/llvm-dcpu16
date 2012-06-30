@@ -40,7 +40,8 @@ public:
   const uint32_t *getCallPreservedMask(CallingConv::ID) const;
 
   BitVector getReservedRegs(const MachineFunction &MF) const;
-  const TargetRegisterClass* getPointerRegClass(unsigned Kind = 0) const;
+  const TargetRegisterClass* getPointerRegClass(const MachineFunction &MF,
+                                                unsigned Kind = 0) const;
 
   void eliminateCallFramePseudoInstr(MachineFunction &MF,
                                      MachineBasicBlock &MBB,
