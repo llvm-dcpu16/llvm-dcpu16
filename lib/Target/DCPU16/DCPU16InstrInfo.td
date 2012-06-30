@@ -196,10 +196,10 @@ let isBarrier = 1 in {
                     "br\t$brdst",
                     [(brind tblockaddress:$brdst)]>;
     def Br  : I16rr<0, (outs), (ins GEXR16:$brdst),
-                    "SET\t{pc, $brdst}",
+                    "SET\t{PC, $brdst}",
                     [(brind GEXR16:$brdst)]>;
     def Bm  : I16rm<0, (outs), (ins memsrc:$brdst),
-                    "SET\t{pc, $brdst}",
+                    "SET\t{PC, $brdst}",
                     [(brind (load addr:$brdst))]>;
   }
 }
