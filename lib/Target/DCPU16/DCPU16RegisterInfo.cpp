@@ -85,7 +85,8 @@ BitVector DCPU16RegisterInfo::getReservedRegs(const MachineFunction &MF) const {
 }
 
 const TargetRegisterClass *
-DCPU16RegisterInfo::getPointerRegClass(unsigned Kind) const {
+DCPU16RegisterInfo::getPointerRegClass(const MachineFunction &MF,
+                                       unsigned Kind) const {
   return &DCPU16::GR16RegClass;
 }
 
