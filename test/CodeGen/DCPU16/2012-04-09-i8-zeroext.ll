@@ -1,8 +1,9 @@
-; RUN: llc < %s -march=dcpu16 | not grep {UNREACHABLE|ERROR}
+; RUN: llc < %s -march=dcpu16 | FileCheck %s
 target datalayout = "e-p:16:16:16-i8:16:16-i16:16:16-i32:16:16-s0:16:16-n16"
 target triple = "dcpu16"
 
 define i16 @hailstone() nounwind {
+; CHECK: :hailstone
 entry:
   %retval = alloca i16, align 2
   %x = alloca i16, align 2
