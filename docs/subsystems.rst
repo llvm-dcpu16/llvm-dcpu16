@@ -7,8 +7,10 @@ Subsystem Documentation
    :hidden:
 
    AliasAnalysis
+   BitCodeFormat
    BranchWeightMetadata
    Bugpoint
+   ExceptionHandling
    LinkTimeOptimization
    SegmentedStacks
    TableGenFundamentals
@@ -47,7 +49,7 @@ Subsystem Documentation
    This document describes the design and philosophy behind the LLVM
    source-level debugger.
     
-* `Zero Cost Exception handling in LLVM <ExceptionHandling.html>`_
+* :ref:`exception_handling`
     
    This document describes the design and implementation of exception handling
    in LLVM.
@@ -57,7 +59,7 @@ Subsystem Documentation
    Automatic bug finder and test-case reducer description and usage
    information.
     
-* `LLVM Bitcode File Format <BitCodeFormat.html>`_
+* :ref:`bitcode_format`
     
    This describes the file format and encoding used for LLVM "bc" files.
     
