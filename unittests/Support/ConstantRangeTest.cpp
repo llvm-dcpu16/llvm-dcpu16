@@ -234,9 +234,39 @@ TEST_F(ConstantRangeTest, IntersectWith) {
   EXPECT_TRUE(LHS.intersectWith(RHS) == LHS);
 
   // previous bug: intersection of [min, 3) and [2, max) should be 2
-  LHS = ConstantRange(APInt(32, -2147483648), APInt(32, 3));
-  RHS = ConstantRange(APInt(32, 2), APInt(32, 2147483648));
+  LHS = ConstantRange(APInt(32, -2147483646), APInt(32, 3));
+  RHS = ConstantRange(APInt(32, 2), APInt(32, 2147483646));
   EXPECT_EQ(LHS.intersectWith(RHS), ConstantRange(APInt(32, 2)));
+
+  // [2, 0) /\ [4, 3) = [2, 0)
+  LHS = ConstantRange(APInt(32, 2), APInt(32, 0));
+  RHS = ConstantRange(APInt(32, 4), APInt(32, 3));
+  EXPECT_EQ(LHS.intersectWith(RHS), ConstantRange(APInt(32, 2), APInt(32, 0)));
+
+  // [2, 0) /\ [4, 2) = [4, 0)
+  LHS = ConstantRange(APInt(32, 2), APInt(32, 0));
+  RHS = ConstantRange(APInt(32, 4), APInt(32, 2));
+  EXPECT_EQ(LHS.intersectWith(RHS), ConstantRange(APInt(32, 4), APInt(32, 0)));
+
+  // [4, 2) /\ [5, 1) = [5, 1)
+  LHS = ConstantRange(APInt(32, 4), APInt(32, 2));
+  RHS = ConstantRange(APInt(32, 5), APInt(32, 1));
+  EXPECT_EQ(LHS.intersectWith(RHS), ConstantRange(APInt(32, 5), APInt(32, 1)));
+
+  // [2, 0) /\ [7, 4) = [7, 4)
+  LHS = ConstantRange(APInt(32, 2), APInt(32, 0));
+  RHS = ConstantRange(APInt(32, 7), APInt(32, 4));
+  EXPECT_EQ(LHS.intersectWith(RHS), ConstantRange(APInt(32, 7), APInt(32, 4)));
+
+  // [4, 2) /\ [1, 0) = [1, 0)
+  LHS = ConstantRange(APInt(32, 4), APInt(32, 2));
+  RHS = ConstantRange(APInt(32, 1), APInt(32, 0));
+  EXPECT_EQ(LHS.intersectWith(RHS), ConstantRange(APInt(32, 4), APInt(32, 2)));
+ 
+  // [15, 0) /\ [7, 6) = [15, 0)
+  LHS = ConstantRange(APInt(32, 15), APInt(32, 0));
+  RHS = ConstantRange(APInt(32, 7), APInt(32, 6));
+  EXPECT_EQ(LHS.intersectWith(RHS), ConstantRange(APInt(32, 15), APInt(32, 0)));
 }
 
 TEST_F(ConstantRangeTest, UnionWith) {
@@ -257,6 +287,23 @@ TEST_F(ConstantRangeTest, UnionWith) {
   EXPECT_EQ(ConstantRange(APInt(16, 1), APInt(16, 0)).unionWith(
                                     ConstantRange(APInt(16, 2), APInt(16, 1))),
               ConstantRange(16));
+}
+
+TEST_F(ConstantRangeTest, SetDifference) {
+  EXPECT_EQ(Full.difference(Empty), Full);
+  EXPECT_EQ(Full.difference(Full), Empty);
+  EXPECT_EQ(Empty.difference(Empty), Empty);
+  EXPECT_EQ(Empty.difference(Full), Empty);
+
+  ConstantRange A(APInt(16, 3), APInt(16, 7));
+  ConstantRange B(APInt(16, 5), APInt(16, 9));
+  ConstantRange C(APInt(16, 3), APInt(16, 5));
+  ConstantRange D(APInt(16, 7), APInt(16, 9));
+  ConstantRange E(APInt(16, 5), APInt(16, 4));
+  ConstantRange F(APInt(16, 7), APInt(16, 3));
+  EXPECT_EQ(A.difference(B), C);
+  EXPECT_EQ(B.difference(A), D);
+  EXPECT_EQ(E.difference(A), F);
 }
 
 TEST_F(ConstantRangeTest, SubtractAPInt) {

@@ -119,3 +119,28 @@ for.cond:                                         ; preds = %for.cond, %entry
   %conv = zext i16 %p to i32
   br label %for.cond
 }
+
+; PR12963
+@a = external global i8
+define i8 @f0(i8 %x) {
+  %t0 = load i8* @a
+  %t1 = mul i8 %x, %x
+  %t2 = mul i8 %t1, %t1
+  %t3 = mul i8 %t2, %t2
+  %t4 = mul i8 %t3, %x
+  %t5 = mul i8 %t4, %t4
+  %t6 = mul i8 %t5, %x
+  %t7 = mul i8 %t6, %t0
+  ret i8 %t7
+}
+
+define i32 @sozefx_(i32 %x, i32 %y) {
+  %t0 = sub i32 %x, %x
+  %t1 = mul i32 %t0, %t0
+  %t2 = mul i32 %x, %t0
+  %t3 = mul i32 %t1, %t1
+  %t4 = add i32 %t2, %t3
+  %t5 = mul i32 %x, %y
+  %t6 = add i32 %t4, %t5
+  ret i32 %t6
+}

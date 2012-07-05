@@ -12,7 +12,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/Analysis/DebugInfo.h"
+#include "llvm/DebugInfo.h"
 #include "llvm/Constants.h"
 #include "llvm/DerivedTypes.h"
 #include "llvm/Intrinsics.h"
@@ -503,28 +503,28 @@ bool DINameSpace::Verify() const {
 uint64_t DIDerivedType::getOriginalTypeSize() const {
   unsigned Tag = getTag();
 
-  if (Tag == dwarf::DW_TAG_member || Tag == dwarf::DW_TAG_typedef ||
-      Tag == dwarf::DW_TAG_const_type || Tag == dwarf::DW_TAG_volatile_type ||
-      Tag == dwarf::DW_TAG_restrict_type) {
-    DIType BaseType = getTypeDerivedFrom();
-    // If this type is not derived from any type then take conservative
-    // approach.
-    if (!BaseType.isValid())
-      return getSizeInBits();
-    // If this is a derived type, go ahead and get the base type, unless
-    // it's a reference then it's just the size of the field. Pointer types
-    // have no need of this since they're a different type of qualification
-    // on the type.
-    if (BaseType.getTag() == dwarf::DW_TAG_reference_type ||
-        BaseType.getTag() == dwarf::DW_TAG_rvalue_reference_type)
-      return getSizeInBits();
-    else if (BaseType.isDerivedType())
-      return DIDerivedType(BaseType).getOriginalTypeSize();
-    else
-      return BaseType.getSizeInBits();
-  }
+  if (Tag != dwarf::DW_TAG_member && Tag != dwarf::DW_TAG_typedef &&
+      Tag != dwarf::DW_TAG_const_type && Tag != dwarf::DW_TAG_volatile_type &&
+      Tag != dwarf::DW_TAG_restrict_type)
+    return getSizeInBits();
 
-  return getSizeInBits();
+  DIType BaseType = getTypeDerivedFrom();
+
+  // If this type is not derived from any type then take conservative approach.
+  if (!BaseType.isValid())
+    return getSizeInBits();
+
+  // If this is a derived type, go ahead and get the base type, unless it's a
+  // reference then it's just the size of the field. Pointer types have no need
+  // of this since they're a different type of qualification on the type.
+  if (BaseType.getTag() == dwarf::DW_TAG_reference_type ||
+      BaseType.getTag() == dwarf::DW_TAG_rvalue_reference_type)
+    return getSizeInBits();
+
+  if (BaseType.isDerivedType())
+    return DIDerivedType(BaseType).getOriginalTypeSize();
+
+  return BaseType.getSizeInBits();
 }
 
 /// getObjCProperty - Return property node, if this ivar is associated with one.
@@ -542,7 +542,7 @@ bool DIVariable::isInlinedFnArgument(const Function *CurFn) {
     return false;
   // This variable is not inlined function argument if its scope
   // does not describe current function.
-  return !(DISubprogram(getContext()).describes(CurFn));
+  return !DISubprogram(getContext()).describes(CurFn);
 }
 
 /// describes - Return true if this subprogram provides debugging
@@ -664,257 +664,6 @@ DIArray DICompileUnit::getGlobalVariables() const {
   return DIArray();
 }
 
-//===----------------------------------------------------------------------===//
-// DIDescriptor: vtable anchors for all descriptors.
-//===----------------------------------------------------------------------===//
-
-void DIScope::anchor() { }
-
-void DICompileUnit::anchor() { }
-
-void DIFile::anchor() { }
-
-void DIType::anchor() { }
-
-void DIBasicType::anchor() { }
-
-void DIDerivedType::anchor() { }
-
-void DICompositeType::anchor() { }
-
-void DISubprogram::anchor() { }
-
-void DILexicalBlock::anchor() { }
-
-void DINameSpace::anchor() { }
-
-void DILexicalBlockFile::anchor() { }
-
-//===----------------------------------------------------------------------===//
-// DIDescriptor: dump routines for all descriptors.
-//===----------------------------------------------------------------------===//
-
-
-/// print - Print descriptor.
-void DIDescriptor::print(raw_ostream &OS) const {
-  OS << "[" << dwarf::TagString(getTag()) << "] ";
-  OS.write_hex((intptr_t) &*DbgNode) << ']';
-}
-
-/// print - Print compile unit.
-void DICompileUnit::print(raw_ostream &OS) const {
-  if (getLanguage())
-    OS << " [" << dwarf::LanguageString(getLanguage()) << "] ";
-
-  OS << " [" << getDirectory() << "/" << getFilename() << "]";
-}
-
-/// print - Print type.
-void DIType::print(raw_ostream &OS) const {
-  if (!DbgNode) return;
-
-  StringRef Res = getName();
-  if (!Res.empty())
-    OS << " [" << Res << "] ";
-
-  unsigned Tag = getTag();
-  OS << " [" << dwarf::TagString(Tag) << "] ";
-
-  // TODO : Print context
-  OS << " ["
-         << "line " << getLineNumber() << ", "
-         << getSizeInBits() << " bits, "
-         << getAlignInBits() << " bit alignment, "
-         << getOffsetInBits() << " bit offset"
-         << "] ";
-
-  if (isPrivate())
-    OS << " [private] ";
-  else if (isProtected())
-    OS << " [protected] ";
-
-  if (isForwardDecl())
-    OS << " [fwd] ";
-
-  if (isBasicType())
-    DIBasicType(DbgNode).print(OS);
-  else if (isDerivedType()) {
-    DIDerivedType DTy = DIDerivedType(DbgNode);
-    DTy.print(OS);
-    DICompositeType CTy = getDICompositeType(DTy);
-    if (CTy.Verify())
-      CTy.print(OS);
-  }
-  else if (isCompositeType())
-    DICompositeType(DbgNode).print(OS);
-  else {
-    OS << "Invalid DIType\n";
-    return;
-  }
-
-  OS << "\n";
-}
-
-/// print - Print basic type.
-void DIBasicType::print(raw_ostream &OS) const {
-  OS << " [" << dwarf::AttributeEncodingString(getEncoding()) << "] ";
-}
-
-/// print - Print derived type.
-void DIDerivedType::print(raw_ostream &OS) const {
-  OS << "\n\t Derived From: ";
-  getTypeDerivedFrom().print(OS);
-  OS << "\n\t";
-}
-
-/// print - Print composite type.
-void DICompositeType::print(raw_ostream &OS) const {
-  DIArray A = getTypeArray();
-  OS << " [" << A.getNumElements() << " elements]";
-}
-
-/// print - Print subprogram.
-void DISubprogram::print(raw_ostream &OS) const {
-  StringRef Res = getName();
-  if (!Res.empty())
-    OS << " [" << Res << "] ";
-
-  unsigned Tag = getTag();
-  OS << " [" << dwarf::TagString(Tag) << "] ";
-
-  // TODO : Print context
-  OS << " [" << getLineNumber() << "] ";
-
-  if (isLocalToUnit())
-    OS << " [local] ";
-
-  if (isDefinition())
-    OS << " [def] ";
-
-  if (getScopeLineNumber() != getLineNumber())
-    OS << " [Scope: " << getScopeLineNumber() << "] ";
-
-  OS << "\n";
-}
-
-/// print - Print global variable.
-void DIGlobalVariable::print(raw_ostream &OS) const {
-  OS << " [";
-  StringRef Res = getName();
-  if (!Res.empty())
-    OS << " [" << Res << "] ";
-
-  unsigned Tag = getTag();
-  OS << " [" << dwarf::TagString(Tag) << "] ";
-
-  // TODO : Print context
-  OS << " [" << getLineNumber() << "] ";
-
-  if (isLocalToUnit())
-    OS << " [local] ";
-
-  if (isDefinition())
-    OS << " [def] ";
-
-  if (isGlobalVariable())
-    DIGlobalVariable(DbgNode).print(OS);
-  OS << "]\n";
-}
-
-static void printDebugLoc(DebugLoc DL, raw_ostream &CommentOS,
-                          const LLVMContext &Ctx) {
-  if (!DL.isUnknown()) {          // Print source line info.
-    DIScope Scope(DL.getScope(Ctx));
-    // Omit the directory, because it's likely to be long and uninteresting.
-    if (Scope.Verify())
-      CommentOS << Scope.getFilename();
-    else
-      CommentOS << "<unknown>";
-    CommentOS << ':' << DL.getLine();
-    if (DL.getCol() != 0)
-      CommentOS << ':' << DL.getCol();
-    DebugLoc InlinedAtDL = DebugLoc::getFromDILocation(DL.getInlinedAt(Ctx));
-    if (!InlinedAtDL.isUnknown()) {
-      CommentOS << " @[ ";
-      printDebugLoc(InlinedAtDL, CommentOS, Ctx);
-      CommentOS << " ]";
-    }
-  }
-}
-
-void DIVariable::printExtendedName(raw_ostream &OS) const {
-  const LLVMContext &Ctx = DbgNode->getContext();
-  StringRef Res = getName();
-  if (!Res.empty())
-    OS << Res << "," << getLineNumber();
-  if (MDNode *InlinedAt = getInlinedAt()) {
-    DebugLoc InlinedAtDL = DebugLoc::getFromDILocation(InlinedAt);
-    if (!InlinedAtDL.isUnknown()) {
-      OS << " @[";
-      printDebugLoc(InlinedAtDL, OS, Ctx);
-      OS << "]";
-    }
-  }
-}
-
-/// print - Print variable.
-void DIVariable::print(raw_ostream &OS) const {
-  StringRef Res = getName();
-  if (!Res.empty())
-    OS << " [" << Res << "] ";
-
-  OS << " [" << getLineNumber() << "] ";
-  getType().print(OS);
-  OS << "\n";
-
-  // FIXME: Dump complex addresses
-}
-
-/// dump - Print descriptor to dbgs() with a newline.
-void DIDescriptor::dump() const {
-  print(dbgs()); dbgs() << '\n';
-}
-
-/// dump - Print compile unit to dbgs() with a newline.
-void DICompileUnit::dump() const {
-  print(dbgs()); dbgs() << '\n';
-}
-
-/// dump - Print type to dbgs() with a newline.
-void DIType::dump() const {
-  print(dbgs()); dbgs() << '\n';
-}
-
-/// dump - Print basic type to dbgs() with a newline.
-void DIBasicType::dump() const {
-  print(dbgs()); dbgs() << '\n';
-}
-
-/// dump - Print derived type to dbgs() with a newline.
-void DIDerivedType::dump() const {
-  print(dbgs()); dbgs() << '\n';
-}
-
-/// dump - Print composite type to dbgs() with a newline.
-void DICompositeType::dump() const {
-  print(dbgs()); dbgs() << '\n';
-}
-
-/// dump - Print subprogram to dbgs() with a newline.
-void DISubprogram::dump() const {
-  print(dbgs()); dbgs() << '\n';
-}
-
-/// dump - Print global variable.
-void DIGlobalVariable::dump() const {
-  print(dbgs()); dbgs() << '\n';
-}
-
-/// dump - Print variable.
-void DIVariable::dump() const {
-  print(dbgs()); dbgs() << '\n';
-}
-
 /// fixupObjcLikeName - Replace contains special characters used
 /// in a typical Objective-C names with '.' in a given string.
 static void fixupObjcLikeName(StringRef Str, SmallVectorImpl<char> &Out) {
@@ -988,6 +737,45 @@ DIVariable llvm::cleanseInlinedVariable(MDNode *DV, LLVMContext &VMContext) {
       Elts.push_back(llvm::Constant::getNullValue(Type::getInt32Ty(VMContext))):
       Elts.push_back(DV->getOperand(i));
   return DIVariable(MDNode::get(VMContext, Elts));
+}
+
+/// getDISubprogram - Find subprogram that is enclosing this scope.
+DISubprogram llvm::getDISubprogram(const MDNode *Scope) {
+  DIDescriptor D(Scope);
+  if (D.isSubprogram())
+    return DISubprogram(Scope);
+
+  if (D.isLexicalBlockFile())
+    return getDISubprogram(DILexicalBlockFile(Scope).getContext());
+  
+  if (D.isLexicalBlock())
+    return getDISubprogram(DILexicalBlock(Scope).getContext());
+
+  return DISubprogram();
+}
+
+/// getDICompositeType - Find underlying composite type.
+DICompositeType llvm::getDICompositeType(DIType T) {
+  if (T.isCompositeType())
+    return DICompositeType(T);
+
+  if (T.isDerivedType())
+    return getDICompositeType(DIDerivedType(T).getTypeDerivedFrom());
+
+  return DICompositeType();
+}
+
+/// isSubprogramContext - Return true if Context is either a subprogram
+/// or another context nested inside a subprogram.
+bool llvm::isSubprogramContext(const MDNode *Context) {
+  if (!Context)
+    return false;
+  DIDescriptor D(Context);
+  if (D.isSubprogram())
+    return true;
+  if (D.isType())
+    return isSubprogramContext(DIType(Context).getContext());
+  return false;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1192,42 +980,179 @@ bool DebugInfoFinder::addSubprogram(DISubprogram SP) {
   return true;
 }
 
-/// getDISubprogram - Find subprogram that is enclosing this scope.
-DISubprogram llvm::getDISubprogram(const MDNode *Scope) {
-  DIDescriptor D(Scope);
-  if (D.isSubprogram())
-    return DISubprogram(Scope);
+//===----------------------------------------------------------------------===//
+// DIDescriptor: dump routines for all descriptors.
+//===----------------------------------------------------------------------===//
 
-  if (D.isLexicalBlockFile())
-    return getDISubprogram(DILexicalBlockFile(Scope).getContext());
-  
-  if (D.isLexicalBlock())
-    return getDISubprogram(DILexicalBlock(Scope).getContext());
-
-  return DISubprogram();
+/// dump - Print descriptor to dbgs() with a newline.
+void DIDescriptor::dump() const {
+  print(dbgs()); dbgs() << '\n';
 }
 
-/// getDICompositeType - Find underlying composite type.
-DICompositeType llvm::getDICompositeType(DIType T) {
-  if (T.isCompositeType())
-    return DICompositeType(T);
+/// print - Print descriptor.
+void DIDescriptor::print(raw_ostream &OS) const {
+  if (!DbgNode) return;
 
-  if (T.isDerivedType())
-    return getDICompositeType(DIDerivedType(T).getTypeDerivedFrom());
+  if (const char *Tag = dwarf::TagString(getTag()))
+    OS << "[ " << Tag << " ]";
 
-  return DICompositeType();
+  if (this->isSubrange()) {
+    DISubrange(DbgNode).printInternal(OS);
+  } else if (this->isScope()) {
+    DIScope(DbgNode).printInternal(OS);
+  } else if (this->isCompileUnit()) {
+    DICompileUnit(DbgNode).printInternal(OS);
+  } else if (this->isFile()) {
+    DIFile(DbgNode).printInternal(OS);
+  } else if (this->isEnumerator()) {
+    DIEnumerator(DbgNode).printInternal(OS);
+  } else if (this->isBasicType()) {
+    DIType(DbgNode).printInternal(OS);
+  } else if (this->isDerivedType()) {
+    DIDerivedType(DbgNode).printInternal(OS);
+  } else if (this->isCompositeType()) {
+    DICompositeType(DbgNode).printInternal(OS);
+  } else if (this->isSubprogram()) {
+    DISubprogram(DbgNode).printInternal(OS);
+  } else if (this->isGlobalVariable()) {
+    DIGlobalVariable(DbgNode).printInternal(OS);
+  } else if (this->isVariable()) {
+    DIVariable(DbgNode).printInternal(OS);
+  }
 }
 
-/// isSubprogramContext - Return true if Context is either a subprogram
-/// or another context nested inside a subprogram.
-bool llvm::isSubprogramContext(const MDNode *Context) {
-  if (!Context)
-    return false;
-  DIDescriptor D(Context);
-  if (D.isSubprogram())
-    return true;
-  if (D.isType())
-    return isSubprogramContext(DIType(Context).getContext());
-  return false;
+void DISubrange::printInternal(raw_ostream &OS) const {
+  OS << " [" << getLo() << ", " << getHi() << ']';
 }
 
+void DIScope::printInternal(raw_ostream &OS) const {
+  OS << " [" << getDirectory() << "/" << getFilename() << ']';
+}
+
+void DICompileUnit::printInternal(raw_ostream &OS) const {
+  DIScope::printInternal(OS);
+  if (unsigned Lang = getLanguage())
+    OS << " [" << dwarf::LanguageString(Lang) << ']';
+}
+
+void DIEnumerator::printInternal(raw_ostream &OS) const {
+  OS << " [" << getName() << " :: " << getEnumValue() << ']';
+}
+
+void DIType::printInternal(raw_ostream &OS) const {
+  if (!DbgNode) return;
+
+  StringRef Res = getName();
+  if (!Res.empty())
+    OS << " [" << Res << "]";
+
+  // TODO: Print context?
+
+  OS << " [line " << getLineNumber()
+     << ", size " << getSizeInBits()
+     << ", align " << getAlignInBits()
+     << ", offset " << getOffsetInBits();
+  if (isBasicType())
+    if (const char *Enc = 
+        dwarf::AttributeEncodingString(DIBasicType(DbgNode).getEncoding()))
+      OS << ", enc " << Enc;
+  OS << "]";
+
+  if (isPrivate())
+    OS << " [private]";
+  else if (isProtected())
+    OS << " [protected]";
+
+  if (isForwardDecl())
+    OS << " [fwd]";
+}
+
+void DIDerivedType::printInternal(raw_ostream &OS) const {
+  DIType::printInternal(OS);
+  OS << " [from " << getTypeDerivedFrom().getName() << ']';
+}
+
+void DICompositeType::printInternal(raw_ostream &OS) const {
+  DIType::printInternal(OS);
+  DIArray A = getTypeArray();
+  OS << " [" << A.getNumElements() << " elements]";
+}
+
+void DISubprogram::printInternal(raw_ostream &OS) const {
+  StringRef Res = getName();
+  if (!Res.empty())
+    OS << " [" << Res << ']';
+
+  // TODO : Print context
+
+  OS << " [line " << getLineNumber() << ']';
+
+  if (isLocalToUnit())
+    OS << " [local]";
+
+  if (isDefinition())
+    OS << " [def]";
+
+  if (getScopeLineNumber() != getLineNumber())
+    OS << " [scope " << getScopeLineNumber() << "]";
+}
+
+void DIGlobalVariable::printInternal(raw_ostream &OS) const {
+  StringRef Res = getName();
+  if (!Res.empty())
+    OS << " [" << Res << ']';
+
+  OS << " [line " << getLineNumber() << ']';
+
+  // TODO : Print context
+
+  if (isLocalToUnit())
+    OS << " [local]";
+
+  if (isDefinition())
+    OS << " [def]";
+}
+
+void DIVariable::printInternal(raw_ostream &OS) const {
+  StringRef Res = getName();
+  if (!Res.empty())
+    OS << " [" << Res << ']';
+
+  OS << " [line " << getLineNumber() << ']';
+}
+
+static void printDebugLoc(DebugLoc DL, raw_ostream &CommentOS,
+                          const LLVMContext &Ctx) {
+  if (!DL.isUnknown()) {          // Print source line info.
+    DIScope Scope(DL.getScope(Ctx));
+    // Omit the directory, because it's likely to be long and uninteresting.
+    if (Scope.Verify())
+      CommentOS << Scope.getFilename();
+    else
+      CommentOS << "<unknown>";
+    CommentOS << ':' << DL.getLine();
+    if (DL.getCol() != 0)
+      CommentOS << ':' << DL.getCol();
+    DebugLoc InlinedAtDL = DebugLoc::getFromDILocation(DL.getInlinedAt(Ctx));
+    if (!InlinedAtDL.isUnknown()) {
+      CommentOS << " @[ ";
+      printDebugLoc(InlinedAtDL, CommentOS, Ctx);
+      CommentOS << " ]";
+    }
+  }
+}
+
+void DIVariable::printExtendedName(raw_ostream &OS) const {
+  const LLVMContext &Ctx = DbgNode->getContext();
+  StringRef Res = getName();
+  if (!Res.empty())
+    OS << Res << "," << getLineNumber();
+  if (MDNode *InlinedAt = getInlinedAt()) {
+    DebugLoc InlinedAtDL = DebugLoc::getFromDILocation(InlinedAt);
+    if (!InlinedAtDL.isUnknown()) {
+      OS << " @[";
+      printDebugLoc(InlinedAtDL, OS, Ctx);
+      OS << "]";
+    }
+  }
+}

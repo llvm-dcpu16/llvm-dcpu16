@@ -21,6 +21,7 @@
 #include "llvm/Analysis/ConstantFolding.h"
 #include "llvm/Constants.h"
 #include "llvm/CallingConv.h"
+#include "llvm/DebugInfo.h"
 #include "llvm/DerivedTypes.h"
 #include "llvm/Function.h"
 #include "llvm/GlobalVariable.h"
@@ -42,7 +43,6 @@
 #include "llvm/CodeGen/MachineModuleInfo.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/CodeGen/SelectionDAG.h"
-#include "llvm/Analysis/DebugInfo.h"
 #include "llvm/Target/TargetData.h"
 #include "llvm/Target/TargetFrameLowering.h"
 #include "llvm/Target/TargetInstrInfo.h"
@@ -1828,9 +1828,13 @@ void SelectionDAGBuilder::visitInvoke(const InvokeInst &I) {
   MachineBasicBlock *LandingPad = FuncInfo.MBBMap[I.getSuccessor(1)];
 
   const Value *Callee(I.getCalledValue());
+  const Function *Fn = dyn_cast<Function>(Callee);
   if (isa<InlineAsm>(Callee))
     visitInlineAsm(&I);
-  else
+  else if (Fn && Fn->isIntrinsic()) {
+    assert(Fn->getIntrinsicID() == Intrinsic::donothing);
+    return; // ignore invokes to @llvm.donothing
+  } else
     LowerCallTo(&I, getValue(Callee), false, LandingPad);
 
   // If the value of the invoke is used outside of its defining block, make it
@@ -2048,7 +2052,7 @@ bool SelectionDAGBuilder::handleSmallSwitchRange(CaseRec& CR,
 }
 
 static inline bool areJTsAllowed(const TargetLowering &TLI) {
-  return !TLI.getTargetMachine().Options.DisableJumpTables &&
+  return TLI.supportJumpTables() &&
           (TLI.isOperationLegalOrCustom(ISD::BR_JT, MVT::Other) ||
            TLI.isOperationLegalOrCustom(ISD::BRIND, MVT::Other));
 }
@@ -5178,6 +5182,9 @@ SelectionDAGBuilder::visitIntrinsicCall(const CallInst &I, unsigned Intrinsic) {
   case Intrinsic::lifetime_end:
     // Discard region information.
     return 0;
+  case Intrinsic::donothing:
+    // ignore
+    return 0;
   }
 }
 
@@ -6242,8 +6249,15 @@ void SelectionDAGBuilder::visitInlineAsm(ImmutableCallSite CS) {
       assert((OpInfo.ConstraintType == TargetLowering::C_RegisterClass ||
               OpInfo.ConstraintType == TargetLowering::C_Register) &&
              "Unknown constraint type!");
-      assert(!OpInfo.isIndirect &&
-             "Don't know how to handle indirect register inputs yet!");
+
+      // TODO: Support this.
+      if (OpInfo.isIndirect) {
+        LLVMContext &Ctx = *DAG.getContext();
+        Ctx.emitError(CS.getInstruction(),
+                      "Don't know how to handle indirect register inputs yet "
+                      "for constraint '" + Twine(OpInfo.ConstraintCode) + "'");
+        break;
+      }
 
       // Copy the input into the appropriate registers.
       if (OpInfo.AssignedRegs.Regs.empty()) {

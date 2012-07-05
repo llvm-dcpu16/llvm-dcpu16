@@ -95,7 +95,7 @@ struct InstrStage {
 /// operands are read and written.
 ///
 struct InstrItinerary {
-  unsigned NumMicroOps;        ///< # of micro-ops, 0 means it's variable
+  int      NumMicroOps;        ///< # of micro-ops, -1 means it's variable
   unsigned FirstStage;         ///< Index of first stage in itinerary
   unsigned LastStage;          ///< Index of last + 1 stage in itinerary
   unsigned FirstOperandCycle;  ///< Index of first operand rd/wr
@@ -313,15 +313,15 @@ public:
     return UseCycle;
   }
 
-  /// isMicroCoded - Return true if the instructions in the given class decode
-  /// to more than one micro-ops.
-  bool isMicroCoded(unsigned ItinClassIndx) const {
+  /// getNumMicroOps - Return the number of micro-ops that the given class
+  /// decodes to. Return -1 for classes that require dynamic lookup via
+  /// TargetInstrInfo.
+  int getNumMicroOps(unsigned ItinClassIndx) const {
     if (isEmpty())
-      return false;
-    return Itineraries[ItinClassIndx].NumMicroOps != 1;
+      return 1;
+    return Itineraries[ItinClassIndx].NumMicroOps;
   }
 };
-
 
 } // End llvm namespace
 

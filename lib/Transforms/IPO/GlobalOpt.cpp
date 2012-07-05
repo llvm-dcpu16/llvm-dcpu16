@@ -254,6 +254,8 @@ static bool AnalyzeGlobal(const Value *V, GlobalStatus &GS,
             GS.StoredType = GlobalStatus::isStored;
           }
         }
+      } else if (isa<BitCastInst>(I)) {
+        if (AnalyzeGlobal(I, GS, PHIUsers)) return true;
       } else if (isa<GetElementPtrInst>(I)) {
         if (AnalyzeGlobal(I, GS, PHIUsers)) return true;
       } else if (isa<SelectInst>(I)) {
@@ -1731,12 +1733,6 @@ bool GlobalOpt::ProcessGlobal(GlobalVariable *GV,
     return true;
   }
 
-  if (GV->hasLinkOnceODRLinkage() && GV->hasUnnamedAddr() && GV->isConstant() &&
-      GV->getVisibility() != GlobalValue::HiddenVisibility) {
-    GV->setVisibility(GlobalValue::HiddenVisibility);
-    return true;
-  }
-
   if (!GV->hasLocalLinkage())
     return false;
 
@@ -1749,7 +1745,6 @@ bool GlobalOpt::ProcessGlobal(GlobalVariable *GV,
   if (!GS.isCompared && !GV->hasUnnamedAddr()) {
     GV->setUnnamedAddr(true);
     NumUnnamed++;
-    return true;
   }
 
   if (GV->isConstant() || !GV->hasInitializer())
@@ -1924,10 +1919,6 @@ bool GlobalOpt::OptimizeFunctions(Module &M) {
       F->eraseFromParent();
       Changed = true;
       ++NumFnDeleted;
-    } else if (F->hasLinkOnceODRLinkage() && F->hasUnnamedAddr() &&
-               F->getVisibility() != GlobalValue::HiddenVisibility) {
-      F->setVisibility(GlobalValue::HiddenVisibility);
-      Changed = true;
     } else if (F->hasLocalLinkage()) {
       if (F->getCallingConv() == CallingConv::C && !F->isVarArg() &&
           !F->hasAddressTaken()) {

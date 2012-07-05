@@ -16,6 +16,12 @@
 #define DEBUG_TYPE "asan"
 
 #include "FunctionBlackList.h"
+#include "llvm/Function.h"
+#include "llvm/IRBuilder.h"
+#include "llvm/IntrinsicInst.h"
+#include "llvm/LLVMContext.h"
+#include "llvm/Module.h"
+#include "llvm/Type.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/SmallSet.h"
@@ -23,14 +29,9 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/Triple.h"
-#include "llvm/Function.h"
-#include "llvm/IntrinsicInst.h"
-#include "llvm/LLVMContext.h"
-#include "llvm/Module.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/DataTypes.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/IRBuilder.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/system_error.h"
 #include "llvm/Target/TargetData.h"
@@ -38,7 +39,6 @@
 #include "llvm/Transforms/Instrumentation.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
-#include "llvm/Type.h"
 
 #include <string>
 #include <algorithm>
@@ -82,6 +82,14 @@ static cl::opt<bool> ClInstrumentWrites("asan-instrument-writes",
 static cl::opt<bool> ClInstrumentAtomics("asan-instrument-atomics",
        cl::desc("instrument atomic instructions (rmw, cmpxchg)"),
        cl::Hidden, cl::init(true));
+// This flags limits the number of instructions to be instrumented
+// in any given BB. Normally, this should be set to unlimited (INT_MAX),
+// but due to http://llvm.org/bugs/show_bug.cgi?id=12652 we temporary
+// set it to 10000.
+static cl::opt<int> ClMaxInsnsToInstrumentPerBB("asan-max-ins-per-bb",
+       cl::init(10000),
+       cl::desc("maximal number of instructions to instrument in any given BB"),
+       cl::Hidden);
 // This flag may need to be replaced with -f[no]asan-stack.
 static cl::opt<bool> ClStack("asan-stack",
        cl::desc("Handle stack memory"), cl::Hidden, cl::init(true));
@@ -149,7 +157,6 @@ struct AddressSanitizer : public ModulePass {
   bool poisonStackInFunction(Module &M, Function &F);
   virtual bool runOnModule(Module &M);
   bool insertGlobalRedzones(Module &M);
-  BranchInst *splitBlockAndInsertIfThen(Instruction *SplitBefore, Value *Cmp);
   static char ID;  // Pass identification, replacement for typeid
 
  private:
@@ -212,29 +219,27 @@ static GlobalVariable *createPrivateGlobalForString(Module &M, StringRef Str) {
 // Split the basic block and insert an if-then code.
 // Before:
 //   Head
-//   SplitBefore
+//   Cmp
 //   Tail
 // After:
 //   Head
 //   if (Cmp)
-//     NewBasicBlock
-//   SplitBefore
+//     ThenBlock
 //   Tail
 //
-// Returns the NewBasicBlock's terminator.
-BranchInst *AddressSanitizer::splitBlockAndInsertIfThen(
-    Instruction *SplitBefore, Value *Cmp) {
+// Returns the ThenBlock's terminator.
+static BranchInst *splitBlockAndInsertIfThen(Value *Cmp) {
+  Instruction *SplitBefore = cast<Instruction>(Cmp)->getNextNode();
   BasicBlock *Head = SplitBefore->getParent();
   BasicBlock *Tail = Head->splitBasicBlock(SplitBefore);
   TerminatorInst *HeadOldTerm = Head->getTerminator();
-  BasicBlock *NewBasicBlock =
-      BasicBlock::Create(*C, "", Head->getParent());
-  BranchInst *HeadNewTerm = BranchInst::Create(/*ifTrue*/NewBasicBlock,
-                                               /*ifFalse*/Tail,
-                                               Cmp);
+  LLVMContext &C = Head->getParent()->getParent()->getContext();
+  BasicBlock *ThenBlock = BasicBlock::Create(C, "", Head->getParent());
+  BranchInst *HeadNewTerm =
+    BranchInst::Create(/*ifTrue*/ThenBlock, /*ifFalse*/Tail, Cmp);
   ReplaceInstWithInst(HeadOldTerm, HeadNewTerm);
 
-  BranchInst *CheckTerm = BranchInst::Create(Tail, NewBasicBlock);
+  BranchInst *CheckTerm = BranchInst::Create(Tail, ThenBlock);
   return CheckTerm;
 }
 
@@ -283,8 +288,8 @@ bool AddressSanitizer::instrumentMemIntrinsic(MemIntrinsic *MI) {
     IRBuilder<> IRB(InsertBefore);
 
     Value *Cmp = IRB.CreateICmpNE(Length,
-                                   Constant::getNullValue(Length->getType()));
-    InsertBefore = splitBlockAndInsertIfThen(InsertBefore, Cmp);
+                                  Constant::getNullValue(Length->getType()));
+    InsertBefore = splitBlockAndInsertIfThen(Cmp);
   }
 
   instrumentMemIntrinsicParam(MI, Dst, Length, InsertBefore, true);
@@ -381,8 +386,7 @@ void AddressSanitizer::instrumentAddress(Instruction *OrigIns,
 
   Value *Cmp = IRB.CreateICmpNE(ShadowValue, CmpVal);
 
-  Instruction *CheckTerm = splitBlockAndInsertIfThen(
-      cast<Instruction>(Cmp)->getNextNode(), Cmp);
+  Instruction *CheckTerm = splitBlockAndInsertIfThen(Cmp);
   IRBuilder<> IRB2(CheckTerm);
 
   size_t Granularity = 1 << MappingScale;
@@ -400,7 +404,7 @@ void AddressSanitizer::instrumentAddress(Instruction *OrigIns,
     // ((uint8_t) ((Addr & (Granularity-1)) + size - 1)) >= ShadowValue
     Value *Cmp2 = IRB2.CreateICmpSGE(LastAccessedByte, ShadowValue);
 
-    CheckTerm = splitBlockAndInsertIfThen(CheckTerm, Cmp2);
+    CheckTerm = splitBlockAndInsertIfThen(Cmp2);
   }
 
   IRBuilder<> IRB1(CheckTerm);
@@ -689,6 +693,7 @@ bool AddressSanitizer::handleFunction(Module &M, Function &F) {
   for (Function::iterator FI = F.begin(), FE = F.end();
        FI != FE; ++FI) {
     TempsToInstrument.clear();
+    int NumInsnsPerBB = 0;
     for (BasicBlock::iterator BI = FI->begin(), BE = FI->end();
          BI != BE; ++BI) {
       if (LooksLikeCodeInBug11395(BI)) return false;
@@ -710,6 +715,9 @@ bool AddressSanitizer::handleFunction(Module &M, Function &F) {
         continue;
       }
       ToInstrument.push_back(BI);
+      NumInsnsPerBB++;
+      if (NumInsnsPerBB >= ClMaxInsnsToInstrumentPerBB)
+        break;
     }
   }
 
