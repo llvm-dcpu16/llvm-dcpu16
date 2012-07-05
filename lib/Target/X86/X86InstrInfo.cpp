@@ -2595,7 +2595,7 @@ void X86InstrInfo::insertSelect(MachineBasicBlock &MBB,
    MachineRegisterInfo &MRI = MBB.getParent()->getRegInfo();
    assert(Cond.size() == 1 && "Invalid Cond array");
    unsigned Opc = getCMovFromCond((X86::CondCode)Cond[0].getImm(),
-                                  MRI.getRegClass(DstReg)->getSize());
+                                  MRI.getRegClass(DstReg)->getSize()/8);
    BuildMI(MBB, I, DL, get(Opc), DstReg).addReg(FalseReg).addReg(TrueReg);
 }
 
