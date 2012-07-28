@@ -51,6 +51,7 @@ public:
   }
 
   virtual bool addInstSelector();
+  virtual bool addPreEmitPass();
 };
 } // namespace
 
@@ -64,4 +65,9 @@ bool DCPU16PassConfig::addInstSelector() {
   // Peephole optimisations
   addPass(createDCPU16Peephole());
   return false;
+}
+
+bool DCPU16PassConfig::addPreEmitPass() {
+  PM->add(createDCPU16DuplicateBranch());
+  return true;
 }

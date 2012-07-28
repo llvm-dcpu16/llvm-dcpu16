@@ -21,6 +21,7 @@ add_llvm_target(DCPU16CodeGen
   DCPU16AsmPrinter.cpp
   DCPU16MCInstLower.cpp
   DCPU16Peephole.cpp
+  DCPU16DuplicateBranch.cpp
   )
 
 add_subdirectory(InstPrinter)

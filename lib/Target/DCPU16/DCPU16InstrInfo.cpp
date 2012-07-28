@@ -118,7 +118,7 @@ void DCPU16InstrInfo::copyPhysReg(MachineBasicBlock &MBB,
     .addReg(SrcReg, getKillRegState(KillSrc));
 }
 
-static bool isBR_CC(unsigned Opcode) {
+bool llvm::isBR_CC(unsigned Opcode) {
   switch (Opcode) {
     default: return false;
     case DCPU16::BR_CCrr:
