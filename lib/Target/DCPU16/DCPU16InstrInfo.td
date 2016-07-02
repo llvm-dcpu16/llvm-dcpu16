@@ -177,7 +177,7 @@ def NOP : Pseudo<(outs), (ins), "nop", []>;
 let isReturn = 1, isTerminator = 1, isBarrier = 1 in {
   def RET  : IForm16<0x0, DstReg, SrcPostInc, Size2Bytes,
                      (outs), (ins), "SET\t{PC, POP}",  [(DCPU16retflag)]>;
-  def RETI : II16r<0x0, (outs), (ins), "RFI", [(DCPU16retiflag)]>;
+  def RETI : II16r<0x0, (outs), (ins), "RFI 0", [(DCPU16retiflag)]>;
 }
 
 let isBranch = 1, isTerminator = 1 in {
