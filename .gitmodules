@@ -1,0 +1,3 @@
+[submodule "tools/clang"]
+	path = tools/clang
+	url = git@github.com:FrOSt-Foundation/clang.git

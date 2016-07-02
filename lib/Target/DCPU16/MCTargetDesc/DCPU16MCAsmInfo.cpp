@@ -22,7 +22,7 @@ DCPU16MCAsmInfo::DCPU16MCAsmInfo(const Target &T, StringRef TT) {
   LabelSuffix = "";
   PointerSize = 2;
 
-  PrivateGlobalPrefix = ".L";
+  PrivateGlobalPrefix = "_L"; // There might be some incompatibility with sublabels and stuff
   WeakRefDirective ="\t.weak\t";
   PCSymbol=".";
   CommentString = ";";
@@ -37,4 +37,7 @@ DCPU16MCAsmInfo::DCPU16MCAsmInfo(const Target &T, StringRef TT) {
 
   // Use .lcomm instead of .local .comm (required for binutils support)
   LCOMMDirectiveType = LCOMM::NoAlignment;
+
+  Data8bitsDirective = "\t.dat\t";
+  Data16bitsDirective = "\t.dat\t";
 }

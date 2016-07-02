@@ -22,8 +22,8 @@ bool MCSectionCOFF::ShouldOmitSectionDirective(StringRef Name,
                                                const MCAsmInfo &MAI) const {
 
   // FIXME: Does .section .bss/.data/.text work everywhere??
-  if (Name == ".text" || Name == ".data" || Name == ".bss")
-    return true;
+  //if (Name == ".text" || Name == ".data" || Name == ".bss")
+    //return true;
 
   return false;
 }
@@ -31,7 +31,7 @@ bool MCSectionCOFF::ShouldOmitSectionDirective(StringRef Name,
 void MCSectionCOFF::PrintSwitchToSection(const MCAsmInfo &MAI,
                                          raw_ostream &OS) const {
 
-  // standard sections don't require the '.section'
+  /* // standard sections don't require the '.section'
   if (ShouldOmitSectionDirective(SectionName, MAI)) {
     OS << '\t' << getSectionName() << '\n';
     return;
@@ -72,7 +72,7 @@ void MCSectionCOFF::PrintSwitchToSection(const MCAsmInfo &MAI,
         assert (0 && "unsupported COFF selection type");
         break;
     }
-  }
+} */
 }
 
 bool MCSectionCOFF::UseCodeAlign() const {
